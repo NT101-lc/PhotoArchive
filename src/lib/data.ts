@@ -1,31 +1,105 @@
-import { MOCK_ALBUMS, MOCK_PHOTOS } from "./mock-data";
-import type { Album, Photo } from "./types";
+import "server-only";
+import { asc, desc, eq, getTableColumns, inArray } from "drizzle-orm";
+import { connection } from "next/server";
+import { cache } from "react";
+import { albums, db, members, photos, type AlbumRow } from "@/db";
+import { resolvePhotoUrl } from "./storage";
+import type { Album, Member, Photo } from "./types";
 
-// Lớp truy cập dữ liệu duy nhất mà UI được phép dùng.
-// Khi có backend, chỉ cần thay phần thân các hàm này bằng lời gọi API thật;
-// chữ ký (tham số + kiểu trả về) giữ nguyên để không phải sửa component.
+// Data Access Layer: nơi duy nhất UI đọc dữ liệu. Chỉ chạy phía server,
+// trả về DTO gọn (Album / Photo) thay vì nguyên hàng trong DB.
 
-const MOCK_LATENCY_MS = 350;
+const photoCount = db.$count(photos, eq(photos.albumId, albums.id));
 
-function delay<T>(value: T): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), MOCK_LATENCY_MS));
+/** URL ảnh bìa cho từng album: ảnh bìa đã chọn, nếu không có thì ảnh chụp sớm nhất. */
+async function coverUrls(rows: AlbumRow[]): Promise<Map<string, string>> {
+  if (rows.length === 0) return new Map();
+  const chosenIds = rows.map((r) => r.coverPhotoId).filter((id): id is string => !!id);
+  const [chosen, earliest] = await Promise.all([
+    chosenIds.length
+      ? db.select().from(photos).where(inArray(photos.id, chosenIds))
+      : Promise.resolve([]),
+    db
+      .selectDistinctOn([photos.albumId])
+      .from(photos)
+      .where(inArray(photos.albumId, rows.map((r) => r.id)))
+      .orderBy(photos.albumId, asc(photos.takenAt)),
+  ]);
+  const byId = new Map(chosen.map((p) => [p.id, p]));
+  const firstByAlbum = new Map(earliest.map((p) => [p.albumId, p]));
+  return new Map(
+    rows.map((r) => {
+      const p = (r.coverPhotoId && byId.get(r.coverPhotoId)) || firstByAlbum.get(r.id);
+      return [r.id, p ? resolvePhotoUrl(p) : ""];
+    }),
+  );
+}
+
+function toAlbum(row: AlbumRow & { photoCount: number }, coverUrl: string): Album {
+  return {
+    id: row.slug,
+    title: row.title,
+    location: row.location,
+    tripDate: row.tripDate,
+    coverUrl,
+    photoCount: row.photoCount,
+  };
 }
 
 /** Danh sách album, mới nhất trước. */
-export async function getAlbums(): Promise<Album[]> {
-  const albums = [...MOCK_ALBUMS].sort((a, b) => b.tripDate.localeCompare(a.tripDate));
-  return delay(albums);
-}
+export const getAlbums = cache(async (): Promise<Album[]> => {
+  await connection(); // luôn đọc dữ liệu mới theo từng request
+  const rows = await db
+    .select({ ...getTableColumns(albums), photoCount })
+    .from(albums)
+    .orderBy(desc(albums.tripDate), desc(albums.createdAt));
+  const covers = await coverUrls(rows);
+  return rows.map((r) => toAlbum(r, covers.get(r.id) ?? ""));
+});
 
-/** Một album theo id, `null` nếu không tồn tại. */
-export async function getAlbum(id: string): Promise<Album | null> {
-  return delay(MOCK_ALBUMS.find((a) => a.id === id) ?? null);
-}
+/** Một album theo slug, `null` nếu không tồn tại. */
+export const getAlbum = cache(async (slug: string): Promise<Album | null> => {
+  await connection();
+  const [row] = await db
+    .select({ ...getTableColumns(albums), photoCount })
+    .from(albums)
+    .where(eq(albums.slug, slug))
+    .limit(1);
+  if (!row) return null;
+  const covers = await coverUrls([row]);
+  return toAlbum(row, covers.get(row.id) ?? "");
+});
 
-/** Ảnh của một album, theo thứ tự thời gian chụp. */
-export async function getPhotos(albumId: string): Promise<Photo[]> {
-  const photos = MOCK_PHOTOS.filter((p) => p.albumId === albumId).sort((a, b) =>
-    a.takenAt.localeCompare(b.takenAt),
-  );
-  return delay(photos);
-}
+/** Ảnh của một album (theo slug), theo thứ tự thời gian chụp. */
+export const getPhotos = cache(async (slug: string): Promise<Photo[]> => {
+  await connection();
+  const rows = await db
+    .select({ photo: photos, uploader: members.name })
+    .from(photos)
+    .innerJoin(albums, eq(albums.id, photos.albumId))
+    .leftJoin(members, eq(members.id, photos.uploadedById))
+    .where(eq(albums.slug, slug))
+    .orderBy(asc(photos.takenAt), asc(photos.createdAt));
+
+  return rows.map(({ photo, uploader }) => {
+    const url = resolvePhotoUrl(photo);
+    return {
+      id: photo.id,
+      albumId: slug,
+      url,
+      // next/image tự resize khi hiển thị lưới, nên thumb dùng chung file gốc
+      thumbUrl: url,
+      width: photo.width,
+      height: photo.height,
+      uploadedBy: uploader ?? "Unknown",
+      takenAt: photo.takenAt.toISOString(),
+    };
+  });
+});
+
+/** Thành viên nhóm (để chọn "Uploading as" khi chưa có đăng nhập). */
+export const getMembers = cache(async (): Promise<Member[]> => {
+  await connection();
+  return db.select({ id: members.id, name: members.name }).from(members).orderBy(asc(members.name));
+});
+

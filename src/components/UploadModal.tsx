@@ -1,16 +1,32 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { formatBytes, plural } from "@/lib/format";
-import type { Album } from "@/lib/types";
+import type { Album, Member } from "@/lib/types";
+import {
+  ACCEPTED_EXT,
+  createAlbum,
+  getMembers,
+  getUploadStatus,
+  mimeOf,
+  uploadPhotos,
+  type UploadProgress,
+} from "@/lib/upload-client";
 import { IconChevronDown, IconClose, IconFolder, IconImage, IconPlus, IconUpload } from "./Icons";
 import { Modal } from "./Modal";
 import { useToast } from "./Toast";
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const PREVIEW_LIMIT = 24; // số ảnh preview mỗi thư mục trước khi bấm "xem thêm"
-const IMAGE_EXT = /\.(jpe?g|png|gif|webp|avif|heic|heif|bmp|tiff?)$/i;
 const LOOSE = ""; // nhóm ảnh lẻ (không nằm trong thư mục)
+const UPLOADER_KEY = "b6-uploader"; // chưa có đăng nhập → nhớ "Uploading as" trên máy này
+
+/** `YYYY-MM-DD` theo giờ máy */
+function localDate(ms: number) {
+  const d = new Date(ms);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+}
 
 type Picked = {
   key: string;
@@ -22,7 +38,9 @@ type Picked = {
   previewUrl: string;
 };
 
-type Target = { mode: "existing"; albumId: string } | { mode: "new"; title: string };
+type Target =
+  | { mode: "existing"; albumId: string }
+  | { mode: "new"; title: string; location: string; tripDate: string };
 
 type Props = {
   albums: Pick<Album, "id" | "title">[];
@@ -31,7 +49,7 @@ type Props = {
 };
 
 /**
- * Nút "Upload ảnh" + modal. Chỉ là UI, chưa gửi file đi đâu.
+ * Nút "Upload ảnh" + modal. File được upload thẳng lên R2 qua URL đã ký (xem lib/upload-client.ts).
  * Truyền `children` + `className` để đổi giao diện nút (vd thẻ lối tắt ở trang chủ).
  */
 export function UploadButton({
@@ -58,7 +76,11 @@ export function UploadButton({
 }
 
 function isImage(file: File) {
-  return file.type.startsWith("image/") || IMAGE_EXT.test(file.name);
+  return ACCEPTED_EXT.test(file.name) || mimeOf(file).startsWith("image/");
+}
+
+function newTarget(title = "", tripDate = localDate(Date.now())): Target {
+  return { mode: "new", title, location: "", tripDate };
 }
 
 function dirname(path: string) {
@@ -99,11 +121,41 @@ async function walkEntry(entry: FileSystemEntry): Promise<Array<{ file: File; pa
 
 function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () => void }) {
   const toast = useToast();
+  const router = useRouter();
   const [items, setItems] = useState<Picked[]>([]);
-  const [target, setTarget] = useState<Target>({ mode: "existing", albumId: defaultAlbumId ?? albums[0]?.id ?? "" });
+  const [target, setTarget] = useState<Target>(() =>
+    albums.length > 0 ? { mode: "existing", albumId: defaultAlbumId ?? albums[0].id } : newTarget(),
+  );
   const [targetTouched, setTargetTouched] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [reading, setReading] = useState(false);
+  const [storageReady, setStorageReady] = useState<boolean | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [uploaderId, setUploaderId] = useState("");
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
+  const uploading = progress !== null;
+
+  // Kiểm tra R2 đã cấu hình chưa + lấy danh sách thành viên
+  useEffect(() => {
+    let alive = true;
+    getUploadStatus()
+      .then((s) => alive && setStorageReady(s.configured))
+      .catch(() => alive && setStorageReady(false));
+    getMembers()
+      .then((list) => {
+        if (!alive) return;
+        setMembers(list);
+        let saved = "";
+        try {
+          saved = localStorage.getItem(UPLOADER_KEY) ?? "";
+        } catch {}
+        if (list.some((m) => m.id === saved)) setUploaderId(saved);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Giải phóng object URL của preview khi đóng modal
   const itemsRef = useRef(items);
@@ -153,8 +205,12 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
     setItems((prev) => [...prev, ...added]);
 
     // Có thư mục → gợi ý tạo album mới theo tên thư mục gốc (nếu người dùng chưa tự chọn)
+    // Ngày đi gợi ý = ngày của file cũ nhất
     const rootFolder = added.find((a) => a.folder)?.folder.split("/")[0];
-    if (rootFolder && !targetTouched) setTarget({ mode: "new", title: rootFolder });
+    if (rootFolder && !targetTouched) {
+      const earliest = Math.min(...added.map((a) => a.file.lastModified || Date.now()));
+      setTarget(newTarget(rootFolder, localDate(earliest)));
+    }
   }
 
   async function onDrop(e: DragEvent) {
@@ -200,21 +256,56 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
 
   const totalSize = items.reduce((s, f) => s + f.file.size, 0);
   const folderCount = groups.filter(([f]) => f !== LOOSE).length;
-  const targetValid = target.mode === "existing" ? !!target.albumId : target.title.trim().length > 0;
+  const targetValid =
+    target.mode === "existing"
+      ? !!target.albumId
+      : !!target.title.trim() && !!target.location.trim() && !!target.tripDate;
 
-  function onSave() {
-    const dest = target.mode === "new" ? `new album “${target.title.trim()}”` : "the selected album";
-    toast.show({
-      tone: "warn",
-      title: "Backend not connected",
-      message: `${plural(items.length, "photo")} not saved to ${dest} — real uploads arrive once the API is connected.`,
-    });
+  async function onSave() {
+    try {
+      localStorage.setItem(UPLOADER_KEY, uploaderId);
+    } catch {}
+    setProgress({ done: 0, failed: 0, total: items.length });
+    try {
+      const slug =
+        target.mode === "existing"
+          ? target.albumId
+          : (
+              await createAlbum({
+                title: target.title.trim(),
+                location: target.location.trim(),
+                tripDate: target.tripDate,
+                createdById: uploaderId || undefined,
+              })
+            ).slug;
+
+      const { added, failed } = await uploadPhotos(
+        slug,
+        items.map((i) => i.file),
+        uploaderId || undefined,
+        setProgress,
+      );
+
+      toast.show({
+        tone: failed ? "warn" : "success",
+        title: `Uploaded ${plural(added, "photo")}`,
+        message: failed ? `${plural(failed, "file")} failed — try those again.` : undefined,
+      });
+      onClose();
+      router.push(`/albums/${slug}`);
+      router.refresh();
+    } catch (err) {
+      toast.show({ tone: "warn", title: "Upload failed", message: err instanceof Error ? err.message : undefined });
+      setProgress(null);
+    }
   }
 
   return (
     <Modal
       open
-      onClose={onClose}
+      onClose={() => {
+        if (!uploading) onClose();
+      }}
       maxWidth="max-w-[720px]"
       eyebrow="Add photos"
       title="Upload photos or whole folders"
@@ -225,14 +316,35 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
               ? `${plural(items.length, "photo")} · ${formatBytes(totalSize)}${folderCount ? ` · ${plural(folderCount, "folder")}` : ""}`
               : "No photos selected"}
           </p>
-          <button type="button" className="btn btn-primary h-11 px-6" disabled={items.length === 0 || !targetValid} onClick={onSave}>
-            <IconUpload size={16} />
-            Save {items.length > 0 ? plural(items.length, "photo") : ""}
+          <button
+            type="button"
+            className="btn btn-primary h-11 px-6"
+            disabled={items.length === 0 || !targetValid || uploading || storageReady !== true}
+            onClick={onSave}
+          >
+            {uploading ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-on-accent/25 border-t-on-accent" />
+                Uploading {progress.done + progress.failed}/{progress.total}…
+              </>
+            ) : (
+              <>
+                <IconUpload size={16} />
+                Save {items.length > 0 ? plural(items.length, "photo") : ""}
+              </>
+            )}
           </button>
         </div>
       }
     >
       <div className="flex flex-col gap-5 p-5">
+        {storageReady === false && (
+          <p role="alert" className="rounded-xl border-2 border-accent bg-accent/10 px-4 py-3 text-sm">
+            <b>Storage isn’t configured yet.</b> Set <code className="font-mono">R2_BUCKET</code> (and the other R2
+            variables) in <code className="font-mono">.env</code>, then restart the server to enable uploads.
+          </p>
+        )}
+
         {/* Album đích */}
         <fieldset className="flex flex-col gap-2">
           <legend className="eyebrow mb-2">Save to</legend>
@@ -254,7 +366,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
               aria-pressed={target.mode === "new"}
               onClick={() => {
                 setTargetTouched(true);
-                setTarget({ mode: "new", title: groups.find(([f]) => f)?.[0].split("/")[0] ?? "" });
+                setTarget(newTarget(groups.find(([f]) => f)?.[0].split("/")[0] ?? ""));
               }}
             >
               <IconPlus size={13} />
@@ -278,18 +390,46 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
               ))}
             </select>
           ) : (
-            <input
-              value={target.title}
-              onChange={(e) => {
-                setTargetTouched(true);
-                setTarget({ mode: "new", title: e.target.value });
-              }}
-              placeholder="Trip name, e.g. Sapa in March"
-              className="field"
-              aria-label="New album name"
-            />
+            <div className="grid gap-2 sm:grid-cols-[2fr_1.4fr_1fr]">
+              <input
+                value={target.title}
+                onChange={(e) => {
+                  setTargetTouched(true);
+                  setTarget({ ...target, title: e.target.value });
+                }}
+                placeholder="Trip name, e.g. Sapa in March"
+                className="field"
+                aria-label="New album name"
+              />
+              <input
+                value={target.location}
+                onChange={(e) => setTarget({ ...target, location: e.target.value })}
+                placeholder="Place, e.g. Sapa"
+                className="field"
+                aria-label="Place"
+              />
+              <input
+                type="date"
+                value={target.tripDate}
+                onChange={(e) => setTarget({ ...target, tripDate: e.target.value })}
+                className="field"
+                aria-label="Trip date"
+              />
+            </div>
           )}
         </fieldset>
+
+        <label className="flex flex-col gap-2">
+          <span className="eyebrow">Uploading as</span>
+          <select value={uploaderId} onChange={(e) => setUploaderId(e.target.value)} className="field">
+            <option value="">— Choose your name —</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </label>
 
         {/* Vùng thả */}
         <div

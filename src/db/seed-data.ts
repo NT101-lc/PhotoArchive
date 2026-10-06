@@ -1,9 +1,9 @@
-import type { Album, Photo } from "./types";
+import type { Album, Photo } from "../lib/types";
 
-// Dữ liệu giả, chỉ được đọc qua lib/data.ts.
+// Dữ liệu mẫu để seed DB (npm run db:seed).
 // Mọi giá trị đều tất định (không dùng Math.random) để server/client render giống nhau.
 
-const MEMBERS = ["Nam Anh", "Minh", "Thảo", "Huy", "Linh", "Quân"];
+export const MEMBERS = ["Nam Anh", "Minh", "Thảo", "Huy", "Linh", "Quân"];
 
 // Các tỉ lệ ảnh hay gặp: ngang 3:2, dọc 2:3, 4:3, 3:4, 16:9
 const SHAPES: Array<[number, number]> = [

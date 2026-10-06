@@ -38,6 +38,14 @@ export function normalizeText(s: string) {
     .trim();
 }
 
+/** `Đà Lạt mùa sương 2025` → `da-lat-mua-suong-2025` */
+export function slugify(s: string) {
+  return normalizeText(s)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
 export function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;

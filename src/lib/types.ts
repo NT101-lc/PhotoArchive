@@ -21,3 +21,8 @@ export type Photo = {
   /** Thời điểm chụp, ISO datetime */
   takenAt: string;
 };
+
+export type Member = {
+  id: string;
+  name: string;
+};
