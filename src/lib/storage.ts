@@ -95,6 +95,12 @@ function amzDate(ms: number) {
   return new Date(ms).toISOString().replace(/[:-]|\.\d{3}/g, ""); // 20261006T050000Z
 }
 
+/** URL hiển thị cho một object trên R2 (vd ảnh đại diện); null nếu không có / chưa cấu hình R2. */
+export async function resolveObjectUrl(key: string | null) {
+  if (!key) return null;
+  return (await resolvePhotoUrl({ storageKey: key, sourceUrl: null })) || null;
+}
+
 /**
  * URL hiển thị của một ảnh:
  * - bucket có public URL → link thẳng

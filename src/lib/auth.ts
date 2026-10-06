@@ -6,7 +6,8 @@ import { cache } from "react";
 import { db, members, ROLE_ADMIN } from "@/db";
 import { serverEnv } from "./env";
 import { verifyPassword } from "./password";
-import type { Actor } from "./permissions";
+import { resolveObjectUrl } from "./storage";
+import type { Me } from "./types";
 
 // Danh tính không cần đăng nhập: user chỉ chọn tên; admin phải nhập mật khẩu.
 // Cookie lưu `memberId.hếtHạn.chữKý` (HMAC-SHA256) → không sửa tay để thành người khác / admin được.
@@ -60,7 +61,7 @@ export async function clearSession() {
 }
 
 /** Người đang dùng (theo cookie), `null` nếu chưa chọn tên. */
-export const getCurrentMember = cache(async (): Promise<Actor | null> => {
+export const getCurrentMember = cache(async (): Promise<Me | null> => {
   let id: string | null;
   try {
     id = decode((await cookies()).get(COOKIE)?.value);
@@ -69,11 +70,13 @@ export const getCurrentMember = cache(async (): Promise<Actor | null> => {
   }
   if (!id) return null;
   const [m] = await db
-    .select({ id: members.id, name: members.name, role: members.role })
+    .select({ id: members.id, name: members.name, role: members.role, avatarKey: members.avatarKey })
     .from(members)
     .where(eq(members.id, id))
     .limit(1);
-  return m ?? null;
+  if (!m) return null;
+  const { avatarKey, ...rest } = m;
+  return { ...rest, avatarUrl: await resolveObjectUrl(avatarKey) };
 });
 
 export async function requireMember() {

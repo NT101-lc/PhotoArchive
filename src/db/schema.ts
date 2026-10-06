@@ -36,6 +36,8 @@ export const members = pgTable(
     role: smallint().notNull().default(ROLE_USER),
     // Chỉ admin có mật khẩu (scrypt, dạng `salt:hash` hex)
     passwordHash: text(),
+    // Ảnh đại diện trên R2 (`avatars/<memberId>/<uuid>.<ext>`); null → hiện chữ cái đầu
+    avatarKey: text(),
     ...timestamps,
   },
   (t) => [check("members_role_valid", sql`${t.role} in (0, 1)`)],

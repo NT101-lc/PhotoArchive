@@ -3,7 +3,7 @@ import { asc, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { connection } from "next/server";
 import { cache } from "react";
 import { albums, db, members, photos, ROLE_USER, type AlbumRow } from "@/db";
-import { resolvePhotoUrl } from "./storage";
+import { resolveObjectUrl, resolvePhotoUrl } from "./storage";
 import type { Album, Member, Photo } from "./types";
 
 // Data Access Layer: nơi duy nhất UI đọc dữ liệu. Chỉ chạy phía server,
@@ -108,10 +108,13 @@ export const getPhotos = cache(async (slug: string): Promise<Photo[]> => {
 /** Thành viên thường (role 1) để chọn "Bạn là ai". Tài khoản admin không nằm trong danh sách này. */
 export const getMembers = cache(async (): Promise<Member[]> => {
   await connection();
-  return db
-    .select({ id: members.id, name: members.name })
+  const rows = await db
+    .select({ id: members.id, name: members.name, avatarKey: members.avatarKey })
     .from(members)
     .where(eq(members.role, ROLE_USER))
     .orderBy(asc(members.createdAt), asc(members.name));
+  return Promise.all(
+    rows.map(async ({ avatarKey, ...m }) => ({ ...m, avatarUrl: await resolveObjectUrl(avatarKey) })),
+  );
 });
 

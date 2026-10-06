@@ -63,6 +63,8 @@ Giao diện hiển thị bằng tiếng Anh (tên chuyến đi / địa danh tro
 Cột `members.role`: **0 = admin**, **1 = user**. Thành viên: Nam Anh, Thảo, Diệp, Hoàng, Nam, Hưng (user) và ADMIN.
 
 - **User** không cần mật khẩu — chọn tên ở trang `/login` ("Who are you?").
+- Trang **`/profile`** (bấm chip tên ở góc trên): đổi **ảnh đại diện** (cắt vuông 512 px ngay trên trình duyệt, lưu trên R2)
+  và **tên hiển thị** (không trùng tên người khác; tên ADMIN cố định vì dùng để đăng nhập).
 - **ADMIN** đăng nhập bằng mật khẩu ở cùng trang (mục "Admin sign-in"). Mật khẩu lưu dạng scrypt hash trong DB.
 - Danh tính lưu trong cookie `b6_session` có chữ ký HMAC (`SESSION_SECRET`) — sửa tay cookie không giả làm người khác được;
   vai trò luôn đọc lại từ DB.
@@ -73,7 +75,9 @@ Cột `members.role`: **0 = admin**, **1 = user**. Thành viên: Nam Anh, Thảo
 | Upload ảnh, tạo album mới               | ✓ (phải chọn tên trước)      | ✓     |
 | Đổi ảnh bìa                             | chỉ album do mình tạo        | ✓     |
 | Xoá ảnh                                 | chỉ ảnh do mình upload       | ✓     |
-| Sửa tên / nơi / ngày album, xoá album   | ✗                            | ✓     |
+| Sửa ngày đi của album                   | ✓                            | ✓     |
+| Đổi tên / ảnh đại diện của mình         | ✓                            | chỉ ảnh |
+| Sửa tên / nơi album, xoá album          | ✗                            | ✓     |
 
 Luật nằm ở `src/lib/permissions.ts`, dùng chung cho API (chặn thật, trả 401 / 403) và giao diện (ẩn nút).
 
@@ -81,7 +85,7 @@ Luật nằm ở `src/lib/permissions.ts`, dùng chung cho API (chặn thật, t
 
 | Bảng      | Nội dung                                                                                      |
 | --------- | --------------------------------------------------------------------------------------------- |
-| `members` | Thành viên: tên, `role` (0 admin / 1 user), `password_hash` (chỉ admin)                       |
+| `members` | Thành viên: tên, `role` (0 admin / 1 user), `avatar_key` (ảnh đại diện trên R2), `password_hash` (chỉ admin) |
 | `albums`  | Chuyến đi: `slug` (dùng trên URL), tên, địa điểm, ngày đi, ảnh bìa (null → ảnh chụp sớm nhất) |
 | `photos`  | Ảnh: `storage_key` trên R2 **hoặc** `source_url` ngoài (seed), kích thước, người upload, thời điểm chụp |
 
@@ -94,12 +98,14 @@ Xoá album sẽ xoá luôn ảnh (cascade). Số ảnh của album được đ�
 | `GET /api/albums`                  | Danh sách album                                                          |
 | `POST /api/albums`                 | Tạo album `{ title, location, tripDate }` → `{ id, slug }` (cần đã chọn tên) |
 | `GET /api/albums/:slug`            | Album + danh sách ảnh                                                    |
-| `PATCH /api/albums/:slug`          | `{ title?, location?, tripDate?, coverPhotoId? }` — thông tin: admin; bìa: admin / người tạo |
+| `PATCH /api/albums/:slug`          | `{ title?, location?, tripDate?, coverPhotoId? }` — tên/nơi: admin; ngày: mọi thành viên; bìa: admin / người tạo |
 | `DELETE /api/albums/:slug`         | Xoá album + ảnh (DB và R2) — admin                                       |
 | `POST /api/albums/:slug/photos`    | Ghi ảnh đã upload `{ photos: [{ key, width, height, sizeBytes, mimeType, takenAt? }], coverKey? }` |
 | `DELETE /api/photos/:id`           | Xoá ảnh (DB và R2) — admin / người upload                                |
 | `GET/POST/DELETE /api/session`     | Xem / chọn tên `{ memberId }` / bỏ chọn                                 |
 | `POST /api/session/admin`          | Đăng nhập admin `{ name, password }`                                    |
+| `GET/PATCH /api/me`                | Xem / sửa profile của mình `{ name?, avatarKey? (null = gỡ) }`           |
+| `POST /api/me/avatar`              | URL ký để upload ảnh đại diện `{ type, size }` (≤ 5 MB)                  |
 | `GET /api/uploads`                 | R2 đã cấu hình chưa                                                      |
 | `POST /api/uploads`                | Xin URL ký để PUT lên R2 `{ albumSlug, files: [{ name, type, size }] }` (tối đa 100 file, 50 MB/file) |
 | `GET /api/members`                 | Thành viên thường (để chọn tên)                                          |

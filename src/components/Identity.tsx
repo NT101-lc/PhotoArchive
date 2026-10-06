@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, type ReactNode } from "react";
-import type { Actor } from "@/lib/permissions";
+import type { Me } from "@/lib/types";
+import { Avatar } from "./Avatar";
 import { IconLock, IconUser } from "./Icons";
 
 // Người đang dùng — server đọc từ cookie đã ký (lib/auth.ts) rồi truyền xuống đây.
 // Chỉ dùng để ẩn/hiện nút; quyền thật luôn được kiểm tra lại ở API.
 
-const IdentityContext = createContext<Actor | null>(null);
+const IdentityContext = createContext<Me | null>(null);
 
-export function IdentityProvider({ member, children }: { member: Actor | null; children: ReactNode }) {
+export function IdentityProvider({ member, children }: { member: Me | null; children: ReactNode }) {
   return <IdentityContext.Provider value={member}>{children}</IdentityContext.Provider>;
 }
 
@@ -19,13 +20,13 @@ export function useIdentity() {
   return useContext(IdentityContext);
 }
 
-/** Nút trên thanh trên cùng: tên người đang dùng, bấm để đổi. */
+/** Nút trên thanh trên cùng: chưa chọn tên → trang chọn tên; đã chọn → trang profile. */
 export function IdentityChip() {
   const me = useIdentity();
   const pathname = usePathname();
-  const href = pathname === "/login" ? "/login" : `/login?next=${encodeURIComponent(pathname)}`;
 
   if (!me) {
+    const href = pathname === "/login" ? "/login" : `/login?next=${encodeURIComponent(pathname)}`;
     return (
       <Link href={href} className="btn h-[42px] px-3" title="Choose who you are">
         <IconUser size={17} />
@@ -36,12 +37,13 @@ export function IdentityChip() {
   const admin = me.role === 0;
   return (
     <Link
-      href={href}
-      className={`btn h-[42px] px-3 ${admin ? "btn-primary" : ""}`}
-      title={admin ? "Signed in as admin — click to switch" : "Click to switch person"}
+      href="/profile"
+      className={`btn h-[42px] gap-2 pr-3 pl-1.5 ${admin ? "btn-primary" : ""}`}
+      title={admin ? "Admin — your profile" : "Your profile"}
     >
-      {admin ? <IconLock size={16} /> : <IconUser size={17} />}
-      <span className="max-w-[9ch] truncate">{me.name}</span>
+      <Avatar name={me.name} url={me.avatarUrl} size={28} />
+      <span className="max-w-[9ch] truncate max-sm:hidden">{me.name}</span>
+      {admin && <IconLock size={14} />}
     </Link>
   );
 }

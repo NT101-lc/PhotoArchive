@@ -2,12 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { Avatar } from "@/components/Avatar";
 import { IconCheck, IconLock } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
-import type { Actor } from "@/lib/permissions";
-import type { Member } from "@/lib/types";
-
-const AVATAR_BG = ["bg-accent", "bg-teal", "bg-lilac", "bg-butter", "bg-sky", "bg-accent"];
+import type { Me, Member } from "@/lib/types";
 
 async function post(url: string, body?: unknown, method = "POST") {
   const res = await fetch(url, {
@@ -19,7 +17,7 @@ async function post(url: string, body?: unknown, method = "POST") {
   if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
 }
 
-export function IdentityForm({ members, current, next }: { members: Member[]; current: Actor | null; next: string }) {
+export function IdentityForm({ members, current, next }: { members: Member[]; current: Me | null; next: string }) {
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
@@ -66,7 +64,7 @@ export function IdentityForm({ members, current, next }: { members: Member[]; cu
   return (
     <div className="flex flex-col gap-6">
       <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-        {members.map((m, i) => {
+        {members.map((m) => {
           const selected = current?.id === m.id;
           return (
             <li key={m.id}>
@@ -79,10 +77,13 @@ export function IdentityForm({ members, current, next }: { members: Member[]; cu
                   selected ? "bg-ink text-bg" : "bg-surface"
                 }`}
               >
-                <span
-                  className={`flex h-10 w-10 items-center justify-center rounded-full border-2 border-line font-display font-bold text-on-accent ${AVATAR_BG[i % AVATAR_BG.length]}`}
-                >
-                  {selected ? <IconCheck size={18} /> : initials(m.name)}
+                <span className="relative">
+                  <Avatar name={m.name} url={m.avatarUrl} size={44} />
+                  {selected && (
+                    <span className="absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-line bg-accent text-on-accent">
+                      <IconCheck size={11} />
+                    </span>
+                  )}
                 </span>
                 <span className="text-sm font-semibold">{busy === m.id ? "…" : m.name}</span>
               </button>
@@ -130,13 +131,4 @@ export function IdentityForm({ members, current, next }: { members: Member[]; cu
       )}
     </div>
   );
-}
-
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 }

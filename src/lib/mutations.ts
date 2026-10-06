@@ -1,10 +1,18 @@
 import "server-only";
-import { and, eq, isNotNull, like, or } from "drizzle-orm";
+import { and, eq, ilike, isNotNull, like, ne, or } from "drizzle-orm";
 import { z } from "zod";
-import { albums, db, photos } from "@/db";
+import { albums, db, members, photos } from "@/db";
 import { ForbiddenError } from "./auth";
 import { slugify } from "./format";
-import { canDeleteAlbum, canDeletePhoto, canEditAlbum, canSetCover, type Actor } from "./permissions";
+import {
+  canDeleteAlbum,
+  canDeletePhoto,
+  canEditAlbum,
+  canEditAlbumDate,
+  canRenameSelf,
+  canSetCover,
+  type Actor,
+} from "./permissions";
 import { deleteObjects, presignUpload } from "./storage";
 
 // Các thao tác ghi. Mọi input từ client đi qua schema zod, mọi thao tác nhận `actor`
@@ -78,13 +86,17 @@ export const updateAlbumInput = z
   })
   .partial();
 
-/** Sửa album. Tên / nơi / ngày: chỉ admin. Ảnh bìa: admin hoặc người tạo album. */
+/** Sửa album. Tên / nơi: chỉ admin. Ngày đi: mọi thành viên. Ảnh bìa: admin hoặc người tạo album. */
 export async function updateAlbum(actor: Actor, slug: string, input: z.infer<typeof updateAlbumInput>) {
   const album = await findAlbum(slug);
   const { coverPhotoId, ...info } = input;
-  const editsInfo = Object.keys(info).length > 0;
 
-  if (editsInfo && !canEditAlbum(actor)) throw new ForbiddenError("Only the admin can edit album details.");
+  if ((info.title !== undefined || info.location !== undefined) && !canEditAlbum(actor)) {
+    throw new ForbiddenError("Only the admin can rename an album or change its place.");
+  }
+  if (info.tripDate !== undefined && !canEditAlbumDate(actor)) {
+    throw new ForbiddenError("Choose who you are first.");
+  }
   if (coverPhotoId !== undefined && !canSetCover(actor, album)) {
     throw new ForbiddenError("Only the admin or the album’s creator can change its cover.");
   }
@@ -225,6 +237,61 @@ export async function addPhotos(actor: Actor, albumSlug: string, input: z.infer<
   if (cover) await db.update(albums).set({ coverPhotoId: cover.id }).where(eq(albums.id, album.id));
 
   return { added: rows.length, coverSet: !!cover };
+}
+
+// ---------- Profile ----------
+
+export const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+
+export const avatarUploadInput = z.object({
+  type: imageType,
+  size: z.number().int().positive().max(MAX_AVATAR_BYTES),
+});
+
+/** URL ký để upload ảnh đại diện của chính mình. */
+export async function presignAvatarUpload(actor: Actor, input: z.infer<typeof avatarUploadInput>) {
+  const key = `avatars/${actor.id}/${crypto.randomUUID()}.${IMAGE_TYPES[input.type]}`;
+  return { key, contentType: input.type, uploadUrl: await presignUpload(key, input.type) };
+}
+
+export const updateProfileInput = z
+  .object({
+    name: z.string().trim().min(1).max(40),
+    // null = gỡ ảnh đại diện
+    avatarKey: z.string().max(300).nullable(),
+  })
+  .partial();
+
+/** Đổi tên / ảnh đại diện của chính mình. ADMIN không đổi tên (dùng để đăng nhập). */
+export async function updateProfile(actor: Actor, input: z.infer<typeof updateProfileInput>) {
+  const patch: Partial<typeof members.$inferInsert> = {};
+
+  if (input.name !== undefined && input.name !== actor.name) {
+    if (!canRenameSelf(actor)) throw new ForbiddenError("The admin account name can’t be changed.");
+    if (input.name.toLowerCase() === "admin") throw new BadRequestError("That name is reserved.");
+    const [taken] = await db
+      .select({ id: members.id })
+      .from(members)
+      .where(and(ilike(members.name, input.name), ne(members.id, actor.id)))
+      .limit(1);
+    if (taken) throw new BadRequestError(`“${input.name}” is already taken.`);
+    patch.name = input.name;
+  }
+
+  let oldAvatar: string | null = null;
+  if (input.avatarKey !== undefined) {
+    if (input.avatarKey && (!input.avatarKey.startsWith(`avatars/${actor.id}/`) || input.avatarKey.includes(".."))) {
+      throw new BadRequestError("Avatar must be uploaded through /api/me/avatar.");
+    }
+    const [cur] = await db.select({ key: members.avatarKey }).from(members).where(eq(members.id, actor.id));
+    oldAvatar = cur?.key ?? null;
+    patch.avatarKey = input.avatarKey;
+  }
+
+  if (Object.keys(patch).length > 0) await db.update(members).set(patch).where(eq(members.id, actor.id));
+  // Xoá file avatar cũ trên R2 (sau khi DB đã trỏ sang file mới)
+  if (oldAvatar && oldAvatar !== input.avatarKey) await deleteObjects([oldAvatar]);
+  return { ok: true };
 }
 
 export async function getPhotoStorageKey(photoId: string) {

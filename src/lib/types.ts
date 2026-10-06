@@ -29,4 +29,13 @@ export type Photo = {
 export type Member = {
   id: string;
   name: string;
+  avatarUrl: string | null;
+};
+
+/** Người đang dùng: role 0 = admin, 1 = user. */
+export type Me = {
+  id: string;
+  name: string;
+  role: number;
+  avatarUrl: string | null;
 };
