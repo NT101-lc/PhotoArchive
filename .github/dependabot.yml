@@ -9,6 +9,15 @@ updates:
       # Gom bản vá nhỏ thành một PR cho đỡ ồn
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Bản lớn của TypeScript / ESLint chờ Next (eslint-config-next) hỗ trợ rồi nâng cùng lúc
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
+      # Type của Node phải khớp phiên bản Node đang chạy (.nvmrc = 24)
+      - dependency-name: "@types/node"
+        versions: [">=25"]
 
   - package-ecosystem: github-actions
     directory: /
