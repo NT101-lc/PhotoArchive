@@ -74,7 +74,7 @@ Xoá album sẽ xoá luôn ảnh (cascade). Số ảnh của album được đ�
 | `GET /api/uploads`                 | R2 đã cấu hình chưa                                                      |
 | `POST /api/uploads`                | Xin URL ký để PUT lên R2 `{ albumSlug, files: [{ name, type, size }] }` (tối đa 100 file, 50 MB/file) |
 | `GET /api/members`                 | Thành viên                                                               |
-| `GET /api/photos/:id/raw`          | Chuyển hướng tới URL đọc tạm thời (khi bucket private)                   |
+| `GET /api/photos/:id/raw`          | Link cố định tới ảnh gốc: chuyển hướng sang URL đọc tạm thời trên R2      |
 
 Lỗi trả về `{ error }` với mã 400 (input sai), 404, 503 (chưa cấu hình R2), 500.
 
@@ -82,7 +82,8 @@ Lỗi trả về `{ error }` với mã 400 (input sai), 404, 503 (chưa cấu h�
 
 1. Tạo bucket, điền `R2_BUCKET` trong `.env`.
 2. Hiển thị ảnh — chọn một trong hai:
-   - **Bucket private** (mặc định): để trống `R2_PUBLIC_URL`, ảnh đi qua `/api/photos/:id/raw` (URL ký, hết hạn sau 1 giờ).
+   - **Bucket private** (mặc định): để trống `R2_PUBLIC_URL`. Server ký URL đọc cho từng ảnh khi render;
+     mốc ký làm tròn theo giờ nên URL giữ nguyên trong 1 giờ (cache được), hạn 2 giờ.
    - **Bucket public**: bật r2.dev hoặc gắn custom domain, điền `R2_PUBLIC_URL`.
 3. Bật **CORS** cho bucket để trình duyệt PUT được (R2 → bucket → Settings → CORS policy):
 

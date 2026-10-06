@@ -20,13 +20,11 @@ const nextConfig: NextConfig = {
       // Ảnh seed
       { protocol: "https", hostname: "picsum.photos" },
       { protocol: "https", hostname: "fastly.picsum.photos" },
-      // R2 private: /api/photos/:id/raw chuyển hướng sang URL đã ký trên domain này
+      // R2 private: URL GET đã ký trên domain này
       { protocol: "https", hostname: "*.r2.cloudflarestorage.com" },
       { protocol: "https", hostname: "*.r2.dev" },
       ...r2PublicPattern(),
     ],
-    // Ảnh R2 private đi qua route nội bộ
-    localPatterns: [{ pathname: "/api/photos/**" }],
   },
 };
 

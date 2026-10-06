@@ -28,10 +28,12 @@ async function coverUrls(rows: AlbumRow[]): Promise<Map<string, string>> {
   const byId = new Map(chosen.map((p) => [p.id, p]));
   const firstByAlbum = new Map(earliest.map((p) => [p.albumId, p]));
   return new Map(
-    rows.map((r) => {
-      const p = (r.coverPhotoId && byId.get(r.coverPhotoId)) || firstByAlbum.get(r.id);
-      return [r.id, p ? resolvePhotoUrl(p) : ""];
-    }),
+    await Promise.all(
+      rows.map(async (r) => {
+        const p = (r.coverPhotoId && byId.get(r.coverPhotoId)) || firstByAlbum.get(r.id);
+        return [r.id, p ? await resolvePhotoUrl(p) : ""] as const;
+      }),
+    ),
   );
 }
 
@@ -81,20 +83,22 @@ export const getPhotos = cache(async (slug: string): Promise<Photo[]> => {
     .where(eq(albums.slug, slug))
     .orderBy(asc(photos.takenAt), asc(photos.createdAt));
 
-  return rows.map(({ photo, uploader }) => {
-    const url = resolvePhotoUrl(photo);
-    return {
-      id: photo.id,
-      albumId: slug,
-      url,
-      // next/image tự resize khi hiển thị lưới, nên thumb dùng chung file gốc
-      thumbUrl: url,
-      width: photo.width,
-      height: photo.height,
-      uploadedBy: uploader ?? "Unknown",
-      takenAt: photo.takenAt.toISOString(),
-    };
-  });
+  return Promise.all(
+    rows.map(async ({ photo, uploader }) => {
+      const url = await resolvePhotoUrl(photo);
+      return {
+        id: photo.id,
+        albumId: slug,
+        url,
+        // next/image tự resize khi hiển thị lưới, nên thumb dùng chung file gốc
+        thumbUrl: url,
+        width: photo.width,
+        height: photo.height,
+        uploadedBy: uploader ?? "Unknown",
+        takenAt: photo.takenAt.toISOString(),
+      };
+    }),
+  );
 });
 
 /** Thành viên nhóm (để chọn "Uploading as" khi chưa có đăng nhập). */

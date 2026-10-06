@@ -36,20 +36,25 @@ function objectUrl(cfg: R2Config, key: string) {
   return new URL(`${cfg.endpoint}/${cfg.bucket}/${path}`);
 }
 
-async function presign(method: "GET" | "PUT", key: string, expires: number, headers?: Record<string, string>) {
+async function presign(
+  method: "GET" | "PUT",
+  key: string,
+  expires: number,
+  opts: { headers?: Record<string, string>; datetime?: string } = {},
+) {
   const c = r2();
   if (!c) throw new StorageNotConfiguredError();
   const url = objectUrl(c.cfg, key);
   url.searchParams.set("X-Amz-Expires", String(expires));
-  const signed = await c.aws.sign(new Request(url, { method, headers }), {
-    aws: { signQuery: true, allHeaders: true },
+  const signed = await c.aws.sign(new Request(url, { method, headers: opts.headers }), {
+    aws: { signQuery: true, allHeaders: true, datetime: opts.datetime },
   });
   return signed.url;
 }
 
 /** URL để trình duyệt PUT file lên. Phải gửi đúng Content-Type đã ký. */
 export function presignUpload(key: string, contentType: string) {
-  return presign("PUT", key, PUT_EXPIRES_S, { "Content-Type": contentType });
+  return presign("PUT", key, PUT_EXPIRES_S, { headers: { "Content-Type": contentType } });
 }
 
 /** URL đọc tạm thời cho bucket private. */
@@ -57,18 +62,28 @@ export function presignDownload(key: string) {
   return presign("GET", key, GET_EXPIRES_S);
 }
 
+// Ảnh hiển thị: ký với mốc giờ làm tròn → trong cùng một giờ URL không đổi, nên trình duyệt
+// và bộ tối ưu ảnh của Next cache được. Hạn 2 giờ ⇒ URL nào trả ra cũng còn hạn ít nhất 1 giờ.
+const VIEW_WINDOW_MS = 60 * 60 * 1000;
+const VIEW_EXPIRES_S = 2 * 60 * 60;
+
+function amzDate(ms: number) {
+  return new Date(ms).toISOString().replace(/[:-]|\.\d{3}/g, ""); // 20261006T050000Z
+}
+
 /**
  * URL hiển thị của một ảnh:
  * - bucket có public URL → link thẳng
- * - bucket private → qua /api/photos/:id/raw (redirect sang URL đã ký)
+ * - bucket private → URL GET đã ký (ổn định trong từng giờ)
  * - ảnh ngoài (seed) → sourceUrl
  */
-export function resolvePhotoUrl(photo: { id: string; storageKey: string | null; sourceUrl: string | null }) {
-  if (photo.storageKey) {
-    const publicUrl = r2Config()?.publicUrl;
-    return publicUrl ? `${publicUrl}/${photo.storageKey}` : `/api/photos/${photo.id}/raw`;
-  }
-  return photo.sourceUrl ?? "";
+export async function resolvePhotoUrl(photo: { storageKey: string | null; sourceUrl: string | null }) {
+  if (!photo.storageKey) return photo.sourceUrl ?? "";
+  const cfg = r2Config();
+  if (!cfg) return ""; // ảnh trên R2 nhưng server chưa cấu hình R2
+  if (cfg.publicUrl) return `${cfg.publicUrl}/${photo.storageKey}`;
+  const windowStart = Math.floor(Date.now() / VIEW_WINDOW_MS) * VIEW_WINDOW_MS;
+  return presign("GET", photo.storageKey, VIEW_EXPIRES_S, { datetime: amzDate(windowStart) });
 }
 
 export class StorageNotConfiguredError extends Error {
