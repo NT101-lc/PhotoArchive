@@ -1,0 +1,442 @@
+"use client";
+
+import Image from "next/image";
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode, type TouchEvent } from "react";
+import { formatDateTime, pad2 } from "@/lib/format";
+import type { Photo } from "@/lib/types";
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconClose,
+  IconDownload,
+  IconExternal,
+  IconHeart,
+  IconInfo,
+  IconLink,
+  IconPause,
+  IconPlay,
+  IconZoomIn,
+  IconZoomOut,
+} from "./Icons";
+import { useBodyScrollLock } from "./Modal";
+import { useToast } from "./Toast";
+
+type Props = {
+  photos: Photo[];
+  index: number;
+  onIndexChange: (index: number) => void;
+  onClose: () => void;
+  isFavorite: (id: string) => boolean;
+  onToggleFavorite: (id: string) => void;
+};
+
+const SWIPE_MIN_PX = 50;
+const SLIDESHOW_MS = 3500;
+const DOUBLE_TAP_MS = 280;
+
+/**
+ * Xem ảnh gốc. Phím: ← → chuyển ảnh · Space slideshow · Z phóng to · F yêu thích · I thông tin · Esc đóng.
+ * Mobile: vuốt trái/phải để chuyển, vuốt xuống để đóng, chạm 2 lần để phóng to.
+ * Luôn dùng tông tối (phòng tối) bất kể theme.
+ */
+export function Lightbox({ photos, index, onIndexChange, onClose, isFavorite, onToggleFavorite }: Props) {
+  const toast = useToast();
+  const [showInfo, setShowInfo] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const lastTap = useRef(0);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const photo = photos[index];
+  const total = photos.length;
+  const fav = photo ? isFavorite(photo.id) : false;
+
+  useBodyScrollLock(true);
+
+  const go = useCallback(
+    (delta: number) => {
+      setZoomed(false);
+      onIndexChange((index + delta + total) % total);
+    },
+    [index, total, onIndexChange],
+  );
+
+  // Slideshow: tự chuyển ảnh; dừng khi đang phóng to
+  useEffect(() => {
+    if (!playing || zoomed || total < 2) return;
+    const t = setTimeout(() => go(1), SLIDESHOW_MS);
+    return () => clearTimeout(t);
+  }, [playing, zoomed, go, total, index]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (zoomed) setZoomed(false);
+        else onClose();
+      } else if (e.key === "ArrowLeft") go(-1);
+      else if (e.key === "ArrowRight") go(1);
+      else if (e.key === " ") {
+        e.preventDefault();
+        setPlaying((v) => !v);
+      } else if (e.key === "i" || e.key === "I") setShowInfo((v) => !v);
+      else if (e.key === "z" || e.key === "Z") setZoomed((v) => !v);
+      else if ((e.key === "f" || e.key === "F") && photo) onToggleFavorite(photo.id);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [go, onClose, zoomed, photo, onToggleFavorite]);
+
+  // Tải trước ảnh kế bên để chuyển ảnh mượt hơn
+  useEffect(() => {
+    for (const d of [1, -1]) {
+      const p = photos[(index + d + total) % total];
+      if (p) new window.Image().src = p.url;
+    }
+  }, [index, photos, total]);
+
+  // Giữ ô đang xem ở giữa dải phim
+  useEffect(() => {
+    stripRef.current
+      ?.querySelector<HTMLElement>(`[data-index="${index}"]`)
+      ?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [index]);
+
+  function onTouchStart(e: TouchEvent) {
+    const t = e.touches[0];
+    touchStart.current = { x: t.clientX, y: t.clientY };
+  }
+
+  function onTouchEnd(e: TouchEvent) {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+      // Chạm 2 lần liên tiếp → phóng to / thu nhỏ
+      const now = Date.now();
+      if (now - lastTap.current < DOUBLE_TAP_MS) {
+        e.preventDefault(); // chặn dblclick giả lập để không bị bật/tắt 2 lần
+        setZoomed((v) => !v);
+        lastTap.current = 0;
+      } else lastTap.current = now;
+      return;
+    }
+    if (zoomed) return; // đang phóng to thì vuốt = kéo xem ảnh
+    if (Math.abs(dx) > SWIPE_MIN_PX && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1);
+    else if (dy > SWIPE_MIN_PX * 2 && Math.abs(dy) > Math.abs(dx)) onClose();
+  }
+
+  async function download() {
+    if (!photo) return;
+    try {
+      const res = await fetch(photo.url);
+      if (!res.ok) throw new Error(String(res.status));
+      const blobUrl = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `${photo.id}.jpg`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch {
+      // Storage không cho CORS → mở tab mới để người dùng tự lưu
+      window.open(photo.url, "_blank", "noopener");
+    }
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.show({ tone: "success", title: "Đã copy link ảnh", message: "Mở link sẽ tới thẳng tấm ảnh này." });
+    } catch {
+      toast.show({ tone: "warn", title: "Không copy được", message: "Trình duyệt chặn clipboard." });
+    }
+  }
+
+  if (!photo) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Ảnh ${index + 1} trên ${total}`}
+      className="animate-fade fixed inset-0 z-[1100] flex flex-col bg-[#0e0d0c] text-[#f1ebe0]"
+    >
+      {/* Thanh tiến trình slideshow */}
+      {playing && !zoomed && (
+        <div className="absolute inset-x-0 top-0 z-10 h-[3px] bg-white/10">
+          <div key={index} className="h-full origin-left bg-[#ff6b47]" style={{ animation: `lb-progress ${SLIDESHOW_MS}ms linear forwards` }} />
+        </div>
+      )}
+
+      {/* Thanh trên */}
+      <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2.5 sm:px-5">
+        <span className="rounded-full border border-white/20 px-3 py-1 font-mono text-xs tabular-nums">
+          {pad2(index + 1)} <span className="opacity-50">/ {pad2(total)}</span>
+        </span>
+        <div className="flex items-center gap-1 sm:gap-1.5">
+          <LbButton onClick={() => onToggleFavorite(photo.id)} label={fav ? "Bỏ yêu thích (F)" : "Yêu thích (F)"} active={fav} accent>
+            <IconHeart size={18} filled={fav} />
+          </LbButton>
+          <LbButton onClick={() => setPlaying((v) => !v)} label={playing ? "Dừng slideshow (Space)" : "Slideshow (Space)"} active={playing}>
+            {playing ? <IconPause size={18} /> : <IconPlay size={16} />}
+          </LbButton>
+          <LbButton onClick={() => setZoomed((v) => !v)} label={zoomed ? "Thu nhỏ (Z)" : "Phóng to (Z)"} active={zoomed} className="max-sm:hidden">
+            {zoomed ? <IconZoomOut size={18} /> : <IconZoomIn size={18} />}
+          </LbButton>
+          <LbButton onClick={download} label="Tải ảnh gốc" className="max-sm:hidden">
+            <IconDownload size={18} />
+          </LbButton>
+          <LbButton onClick={copyLink} label="Copy link ảnh" className="max-sm:hidden">
+            <IconLink size={18} />
+          </LbButton>
+          <LbButton onClick={() => setShowInfo((v) => !v)} label="Thông tin (I)" active={showInfo}>
+            <IconInfo size={18} />
+          </LbButton>
+          <span className="mx-0.5 h-6 w-px bg-white/15" aria-hidden="true" />
+          <LbButton onClick={onClose} label="Đóng (Esc)">
+            <IconClose size={18} />
+          </LbButton>
+        </div>
+      </div>
+
+      {/* Ảnh */}
+      <div
+        className="relative min-h-0 flex-1 touch-pan-y select-none"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        {zoomed ? (
+          <ZoomedImage key={photo.id} photo={photo} onExit={() => setZoomed(false)} />
+        ) : (
+          <FittedImage key={photo.id} photo={photo} onDoubleClick={() => setZoomed(true)} />
+        )}
+
+        {total > 1 && !zoomed && (
+          <>
+            <NavButton side="left" onClick={() => go(-1)} />
+            <NavButton side="right" onClick={() => go(1)} />
+          </>
+        )}
+
+        {showInfo && <InfoPanel photo={photo} onClose={() => setShowInfo(false)} onDownload={download} onCopyLink={copyLink} />}
+      </div>
+
+      {/* Dải phim */}
+      <div className="shrink-0 border-t border-white/10 bg-black/40">
+        <div className="flex items-center justify-between gap-3 px-3 pt-2 font-mono text-[0.7rem] sm:px-5">
+          <span className="truncate">
+            <span className="text-[#ff6b47]">{photo.uploadedBy}</span>
+            <span className="opacity-60"> · {formatDateTime(photo.takenAt)}</span>
+          </span>
+          <span className="hidden opacity-40 md:inline">← → chuyển · Space slideshow · Z zoom · F tim · Esc đóng</span>
+        </div>
+        <div ref={stripRef} className="scrollbar-none flex gap-1.5 overflow-x-auto px-3 py-2.5 sm:px-5">
+          {photos.map((p, i) => (
+            <button
+              key={p.id}
+              type="button"
+              data-index={i}
+              onClick={() => {
+                setZoomed(false);
+                onIndexChange(i);
+              }}
+              aria-label={`Ảnh ${i + 1}`}
+              aria-current={i === index}
+              className={`relative h-12 shrink-0 overflow-hidden rounded-md border-2 transition-all sm:h-14 ${
+                i === index ? "border-[#ff6b47] opacity-100" : "border-transparent opacity-45 hover:opacity-80"
+              }`}
+              style={{ aspectRatio: `${p.width} / ${p.height}` }}
+            >
+              <Image src={p.thumbUrl} alt="" fill sizes="96px" className="object-cover" />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <style>{`@keyframes lb-progress { from { transform: scaleX(0) } to { transform: scaleX(1) } }`}</style>
+    </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-white/15 border-t-[#ff6b47]" />
+    </div>
+  );
+}
+
+function FittedImage({ photo, onDoubleClick }: { photo: Photo; onDoubleClick: () => void }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div className="absolute inset-2 sm:inset-x-20 sm:inset-y-2" onDoubleClick={onDoubleClick}>
+      {!loaded && <Spinner />}
+      {/* unoptimized: hiển thị đúng ảnh gốc, không qua bộ resize của Next */}
+      <Image
+        src={photo.url}
+        alt={`Ảnh của ${photo.uploadedBy}`}
+        fill
+        unoptimized
+        sizes="100vw"
+        loading="eager"
+        draggable={false}
+        onLoad={() => setLoaded(true)}
+        className={`cursor-zoom-in object-contain transition-opacity duration-200 ${loaded ? "opacity-100" : "opacity-0"}`}
+      />
+    </div>
+  );
+}
+
+/** Ảnh ở kích thước thật trong khung cuộn được — kéo / cuộn để xem chi tiết. */
+function ZoomedImage({ photo, onExit }: { photo: Photo; onExit: () => void }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  // Mở ra ở giữa ảnh
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    box.scrollLeft = (box.scrollWidth - box.clientWidth) / 2;
+    box.scrollTop = (box.scrollHeight - box.clientHeight) / 2;
+  }, []);
+
+  function onDoubleClick(e: MouseEvent) {
+    e.stopPropagation();
+    onExit();
+  }
+
+  return (
+    <div ref={boxRef} className="absolute inset-0 overflow-auto overscroll-contain" onDoubleClick={onDoubleClick}>
+      <div className="flex min-h-full min-w-full items-center justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element -- cần kích thước thật để cuộn, đã được tải sẵn ở chế độ thường */}
+        <img
+          src={photo.url}
+          alt={`Ảnh của ${photo.uploadedBy} (phóng to)`}
+          width={photo.width}
+          height={photo.height}
+          draggable={false}
+          className="max-w-none cursor-zoom-out"
+        />
+      </div>
+    </div>
+  );
+}
+
+function NavButton({ side, onClick }: { side: "left" | "right"; onClick: () => void }) {
+  const Icon = side === "left" ? IconChevronLeft : IconChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={side === "left" ? "Ảnh trước (←)" : "Ảnh sau (→)"}
+      className={`absolute top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/5 backdrop-blur-sm transition-colors hover:bg-[#ff6b47] hover:text-[#1d1b18] sm:flex ${
+        side === "left" ? "left-4" : "right-4"
+      }`}
+    >
+      <Icon size={24} />
+    </button>
+  );
+}
+
+function LbButton({
+  onClick,
+  label,
+  children,
+  active = false,
+  accent = false,
+  className = "",
+}: {
+  onClick: () => void;
+  label: string;
+  children: ReactNode;
+  active?: boolean;
+  accent?: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors sm:h-10 sm:w-10 ${
+        active ? (accent ? "bg-[#ff6b47] text-[#1d1b18]" : "bg-[#f1ebe0] text-[#1d1b18]") : "hover:bg-white/10"
+      } ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Bảng chi tiết ảnh. */
+function InfoPanel({
+  photo,
+  onClose,
+  onDownload,
+  onCopyLink,
+}: {
+  photo: Photo;
+  onClose: () => void;
+  onDownload: () => void;
+  onCopyLink: () => void;
+}) {
+  const rows: Array<[string, string]> = [
+    ["Người chụp", photo.uploadedBy],
+    ["Thời điểm", formatDateTime(photo.takenAt)],
+    ["Kích thước", `${photo.width} × ${photo.height}`],
+    ["Hướng", photo.width >= photo.height ? "Ngang" : "Dọc"],
+  ];
+
+  return (
+    <aside className="animate-rise absolute inset-x-2 bottom-2 z-10 rounded-2xl border border-white/15 bg-[#1e1c19]/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-auto sm:top-2 sm:right-4 sm:bottom-auto sm:w-[300px]">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="font-mono text-[0.7rem] tracking-[0.14em] text-[#a89f92] uppercase">Chi tiết ảnh</span>
+        <button type="button" onClick={onClose} className="rounded-full p-1 hover:bg-white/10" aria-label="Đóng thông tin">
+          <IconClose size={14} />
+        </button>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+        {rows.map(([k, v]) => (
+          <div key={k}>
+            <dt className="text-[0.7rem] text-[#a89f92]">{k}</dt>
+            <dd className="text-sm font-semibold">{v}</dd>
+          </div>
+        ))}
+        <div className="col-span-2">
+          <dt className="text-[0.7rem] text-[#a89f92]">Mã ảnh</dt>
+          <dd className="truncate font-mono text-xs">{photo.id}</dd>
+        </div>
+      </dl>
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <PanelAction onClick={onDownload} icon={<IconDownload size={16} />} label="Tải về" />
+        <PanelAction onClick={onCopyLink} icon={<IconLink size={16} />} label="Copy link" />
+        <a
+          href={photo.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-col items-center gap-1 rounded-xl border border-white/15 py-2 text-xs font-semibold hover:bg-white/10"
+        >
+          <IconExternal size={16} /> Ảnh gốc
+        </a>
+      </div>
+    </aside>
+  );
+}
+
+function PanelAction({ onClick, icon, label }: { onClick: () => void; icon: ReactNode; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-col items-center gap-1 rounded-xl border border-white/15 py-2 text-xs font-semibold hover:bg-white/10"
+    >
+      {icon} {label}
+    </button>
+  );
+}
