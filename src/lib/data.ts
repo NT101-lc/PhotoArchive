@@ -9,7 +9,8 @@ import type { Album, Member, Photo } from "./types";
 // Data Access Layer: nơi duy nhất UI đọc dữ liệu. Chỉ chạy phía server,
 // trả về DTO gọn (Album / Photo) thay vì nguyên hàng trong DB.
 
-const photoCount = db.$count(photos, eq(photos.albumId, albums.id));
+// Hàm (không phải hằng) để không đụng tới DB lúc import module
+const photoCount = () => db.$count(photos, eq(photos.albumId, albums.id));
 
 /** URL ảnh bìa cho từng album: ảnh bìa đã chọn, nếu không có thì ảnh chụp sớm nhất. */
 async function coverUrls(rows: AlbumRow[]): Promise<Map<string, string>> {
@@ -52,7 +53,7 @@ function toAlbum(row: AlbumRow & { photoCount: number }, coverUrl: string): Albu
 export const getAlbums = cache(async (): Promise<Album[]> => {
   await connection(); // luôn đọc dữ liệu mới theo từng request
   const rows = await db
-    .select({ ...getTableColumns(albums), photoCount })
+    .select({ ...getTableColumns(albums), photoCount: photoCount() })
     .from(albums)
     .orderBy(desc(albums.tripDate), desc(albums.createdAt));
   const covers = await coverUrls(rows);
@@ -63,7 +64,7 @@ export const getAlbums = cache(async (): Promise<Album[]> => {
 export const getAlbum = cache(async (slug: string): Promise<Album | null> => {
   await connection();
   const [row] = await db
-    .select({ ...getTableColumns(albums), photoCount })
+    .select({ ...getTableColumns(albums), photoCount: photoCount() })
     .from(albums)
     .where(eq(albums.slug, slug))
     .limit(1);
