@@ -16,6 +16,10 @@ export function SmartImage({ alt, className = "", onLoad, ...props }: ImageProps
       <Image
         {...props}
         alt={alt}
+        // Ảnh đã tải xong trước khi hydrate (cache, preload) thì onLoad không bắn nữa → tự kiểm tra
+        ref={(img) => {
+          if (img?.complete && img.naturalWidth > 0) setLoaded(true);
+        }}
         className={`${className} transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
         onLoad={(e) => {
           setLoaded(true);

@@ -27,7 +27,7 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
     <main className="mx-auto max-w-[1280px] px-4 pb-20 sm:px-6">
       <PageHero
         backHref="/albums"
-        eyebrow="Trip album"
+        eyebrow="All albums"
         title={album.title}
         description={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -42,8 +42,8 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
           </span>
         }
         stats={[
-          { value: photos.length, label: "Photos", color: "accent" },
-          { value: contributors, label: "People", color: "lilac" },
+          { value: photos.length, label: "photos" },
+          { value: contributors, label: "people" },
         ]}
         actions={
           <>

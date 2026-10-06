@@ -1,19 +1,18 @@
-// Skeleton trang chủ landing
+// Skeleton trang chủ: tiêu đề chuyến gần nhất + dải contact sheet
 export default function HomeLoading() {
   return (
     <main aria-busy="true">
-      <div className="skeleton h-[46px] border-b-2 border-line" />
-      <div className="mx-auto grid max-w-[1280px] items-center gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:py-16">
-        <div className="flex flex-col gap-4">
-          <div className="skeleton h-6 w-48 rounded-md" />
-          <div className="skeleton h-28 w-full max-w-md rounded-xl sm:h-36" />
-          <div className="skeleton h-5 w-full max-w-lg rounded-full" />
-          <div className="flex gap-3">
-            <div className="skeleton h-12 w-44 rounded-xl border-2 border-line" />
-            <div className="skeleton h-12 w-36 rounded-xl border-2 border-line" />
-          </div>
+      <div className="mx-auto flex max-w-[1280px] flex-col gap-4 px-4 pt-10 pb-8 sm:px-6 sm:pt-14">
+        <div className="skeleton h-4 w-44 rounded-full" />
+        <div className="skeleton h-20 w-full max-w-2xl rounded-md sm:h-28" />
+        <div className="skeleton h-5 w-full max-w-md rounded-full" />
+      </div>
+      <div className="bg-film py-8">
+        <div className="mx-auto flex max-w-[1440px] gap-3 overflow-hidden px-4 sm:px-6">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="aspect-[3/2] w-[64vw] shrink-0 rounded-[2px] bg-white/5 sm:w-[38vw] md:w-auto md:flex-1" />
+          ))}
         </div>
-        <div className="skeleton mx-auto aspect-[5/4] w-full max-w-[560px] rounded-xl" />
       </div>
     </main>
   );

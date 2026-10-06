@@ -1,23 +1,15 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { FilmTicker } from "@/components/FilmTicker";
-import {
-  IconArrowRight,
-  IconCalendar,
-  IconFolder,
-  IconGrid,
-  IconImage,
-  IconPin,
-  IconTimeline,
-  IconUpload,
-} from "@/components/Icons";
+import { EmptyState } from "@/components/EmptyState";
+import { IconArrowRight, IconImage, IconPin, IconUpload } from "@/components/Icons";
 import { SmartImage } from "@/components/SmartImage";
 import { UploadButton } from "@/components/UploadModal";
 import { getAlbums, getPhotos } from "@/lib/data";
-import { dayKey, formatDate, pad2, plural, yearOf } from "@/lib/format";
-import type { Album } from "@/lib/types";
+import { dayKey, formatDate, plural, yearOf } from "@/lib/format";
+import type { Album, Photo } from "@/lib/types";
 
-// Trang chủ dạng landing: dải phim → hero → lối tắt → chuyến gần nhất → dòng thời gian → footer
+const SHEET_FRAMES = 6;
+
+// Trang chủ: chuyến gần nhất mở ra như một tờ contact sheet, bên dưới là sổ ghi các chuyến theo năm.
 export default async function HomePage() {
   const albums = await getAlbums(); // mới nhất trước
   const latest = albums[0];
@@ -28,181 +20,98 @@ export default async function HomePage() {
   const years = [...new Set(albums.map((a) => yearOf(a.tripDate)))];
   const albumOptions = albums.map(({ id, title, createdById }) => ({ id, title, createdById }));
 
+  if (!latest) {
+    return (
+      <main className="mx-auto max-w-[1280px] px-4 pb-16 sm:px-6">
+        <EmptyState
+          icon={<IconImage size={26} />}
+          title="No trips yet"
+          action={
+            <UploadButton albums={albumOptions}>
+              <IconUpload size={18} />
+              Upload the first trip
+            </UploadButton>
+          }
+        >
+          Upload a folder from your last trip and it becomes the first album here.
+        </EmptyState>
+      </main>
+    );
+  }
+
+  const people = new Set(latestPhotos.map((p) => p.uploadedBy)).size;
+  const days = new Set(latestPhotos.map((p) => dayKey(p.takenAt))).size;
+
   return (
     <>
-      <FilmTicker albums={albums} />
-
-      <main className="mx-auto max-w-[1280px] px-4 pb-16 sm:px-6">
-        {/* ---------- Hero ---------- */}
-        <section className="grid items-center gap-10 py-10 lg:grid-cols-[1.1fr_1fr] lg:py-16">
-          <div>
-            <span className="inline-block rounded-md border-2 border-line bg-butter px-2.5 py-1 font-mono text-[0.68rem] font-bold tracking-[0.14em] text-on-accent uppercase shadow-hard-sm">
-              The B6 crew’s private archive
-            </span>
-            <h1 className="mt-5 font-display text-[3.2rem] leading-[0.9] font-extrabold tracking-[-0.04em] sm:text-[4.6rem]">
-              Keep every
-              <br />
-              trip<span className="text-accent">.</span>
-            </h1>
-            <p className="mt-5 max-w-lg text-lg text-ink-soft">
-              Wherever we go, whatever we shoot, it all lands in one place. Each trip is an album — everyone drops their photos in, and we can relive it any time.
+      <main>
+        {/* ---------- Chuyến gần nhất ---------- */}
+        <section className="mx-auto max-w-[1280px] px-4 pt-10 pb-8 sm:px-6 sm:pt-14">
+          <p className="eyebrow">Latest trip, {formatDate(latest.tripDate)}</p>
+          <h1
+            className="mt-2 max-w-[16ch] font-display text-[clamp(2.6rem,8vw,6.25rem)] leading-[0.9] font-extrabold tracking-[-0.04em] text-balance"
+            style={{ fontStretch: "125%" }}
+          >
+            {latest.title}
+          </h1>
+          <div className="mt-6 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <p className="max-w-[46ch] text-lg leading-relaxed text-ink-soft">
+              <span className="mr-2 inline-flex items-center gap-1 align-[-2px] font-semibold text-ink">
+                <IconPin size={18} className="text-accent" />
+                {latest.location}
+              </span>
+              {plural(latestPhotos.length, "photo")} from {people} {people === 1 ? "person" : "people"}
+              {days > 1 ? ` across ${days} days` : ""}.
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link href="/albums" className="btn btn-primary h-12 px-6 text-base">
-                Browse all albums
-                <IconArrowRight size={18} />
+            <div className="flex flex-wrap gap-2.5">
+              <Link href={`/albums/${latest.id}`} className="btn btn-primary h-11 px-5">
+                Open album
               </Link>
-              <UploadButton albums={albumOptions} className="btn h-12 px-6 text-base">
+              <UploadButton albums={albumOptions} className="btn h-11 px-5">
                 <IconUpload size={18} />
                 Upload photos
               </UploadButton>
             </div>
-
-            <dl className="mt-10 grid max-w-lg grid-cols-4 gap-2 border-t-2 border-dashed border-line pt-5">
-              <HeroStat value={albums.length} label="Albums" />
-              <HeroStat value={totalPhotos} label="Photos" accent />
-              <HeroStat value={places} label="Places" />
-              <HeroStat value={years.length} label="Years" />
-            </dl>
           </div>
-
-          <PrintStack albums={albums.slice(0, 3)} />
         </section>
 
-        {/* ---------- Lối tắt ---------- */}
-        <SectionHeading eyebrow="Where to start" title="Shortcuts" />
-        <div className="mb-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <ShortcutCard
-            n={1}
-            href="/albums"
-            color="bg-accent"
-            icon={<IconGrid size={26} />}
-            tag="Library"
-            title="All albums"
-            desc="Search by name, filter by year or place, sort by photo count."
-            cta="Open library"
-          />
-          {latest && (
-            <ShortcutCard
-              n={2}
-              href={`/albums/${latest.id}`}
-              color="bg-teal"
-              icon={<IconImage size={26} />}
-              tag="Latest"
-              title={latest.title}
-              desc={`${latest.location} · ${formatDate(latest.tripDate)} · ${plural(latest.photoCount, "photo")}.`}
-              cta="See this trip"
-            />
-          )}
-          <UploadButton albums={albumOptions} className="group card flex flex-col p-5 text-left transition-[transform,box-shadow] duration-150 hover:-translate-y-1 hover:shadow-hard-lg">
-            <ShortcutBody
-              n={3}
-              color="bg-butter"
-              icon={<IconFolder size={26} />}
-              tag="Contribute"
-              title="Upload photos / folders"
-              desc="Drop in a whole folder from your last trip — we'll suggest a new album named after it."
-              cta="Open uploader"
-            />
-          </UploadButton>
-          <ShortcutCard
-            n={4}
-            href="#timeline"
-            color="bg-lilac"
-            icon={<IconTimeline size={26} />}
-            tag="Memories"
-            title="Timeline"
-            desc={`${plural(years.length, "year")}, ${plural(albums.length, "trip")} — relive them year by year.`}
-            cta="Scroll down"
-          />
-        </div>
+        <ContactSheet album={latest} photos={latestPhotos} />
 
-        {/* ---------- Chuyến gần nhất ---------- */}
-        {latest && (
-          <section className="mb-16">
-            <SectionHeading eyebrow="Just got back" title="Latest trip" />
-            <div className="card overflow-hidden p-0">
-              <div className="grid lg:grid-cols-[1.2fr_1fr]">
-                <Link href={`/albums/${latest.id}`} className="group relative block aspect-[16/10] border-b-2 border-line lg:aspect-auto lg:min-h-[340px] lg:border-r-2 lg:border-b-0">
-                  <SmartImage
-                    src={latest.coverUrl}
-                    alt={`Cover of ${latest.title}`}
-                    fill
-                    sizes="(max-width: 1024px) 100vw, 55vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                  />
-                </Link>
-                <div className="flex flex-col gap-5 p-6 sm:p-8">
-                  <div>
-                    <span className="eyebrow">Album №01</span>
-                    <h2 className="mt-1 font-display text-4xl leading-none font-extrabold tracking-[-0.03em]">
-                      {latest.title}
-                      <span className="text-accent">.</span>
-                    </h2>
-                    <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-ink-soft">
-                      <span className="flex items-center gap-1.5">
-                        <IconPin size={15} />
-                        <b className="font-semibold text-ink">{latest.location}</b>
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <IconCalendar size={15} />
-                        {formatDate(latest.tripDate)}
-                      </span>
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Pill label="Photos" value={latestPhotos.length} />
-                    <Pill label="People" value={new Set(latestPhotos.map((p) => p.uploadedBy)).size} />
-                    <Pill label="Days" value={new Set(latestPhotos.map((p) => dayKey(p.takenAt))).size} highlight />
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-2">
-                    {latestPhotos.slice(0, 4).map((p, i) => (
-                      <Link
-                        key={p.id}
-                        href={`/albums/${latest.id}?photo=${p.id}`}
-                        className="relative aspect-square overflow-hidden rounded-lg border-2 border-line bg-surface-2 transition-transform hover:-translate-y-0.5"
-                        aria-label={`View photo ${i + 1}`}
-                      >
-                        <SmartImage src={p.thumbUrl} alt="" fill sizes="120px" className="object-cover" />
-                        {i === 3 && latestPhotos.length > 4 && (
-                          <span className="absolute inset-0 flex items-center justify-center bg-black/55 font-display text-lg font-bold text-white">
-                            +{latestPhotos.length - 4}
-                          </span>
-                        )}
-                      </Link>
-                    ))}
-                  </div>
-
-                  <Link href={`/albums/${latest.id}`} className="btn btn-primary mt-auto self-start">
-                    Open album
-                    <IconArrowRight size={16} />
-                  </Link>
-                </div>
-              </div>
+        {/* ---------- Sổ chuyến đi ---------- */}
+        <section id="timeline" className="mx-auto max-w-[1280px] scroll-mt-24 px-4 pt-16 pb-16 sm:px-6 sm:pt-20">
+          <div className="mb-10 flex flex-col gap-3 border-b border-line pb-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="font-display text-3xl font-extrabold tracking-[-0.03em] sm:text-4xl">Every trip</h2>
+              <p className="mt-1.5 text-ink-soft">
+                {plural(albums.length, "trip")}, {plural(totalPhotos, "photo")}, {plural(places, "place")} since{" "}
+                {years[years.length - 1]}.
+              </p>
             </div>
-          </section>
-        )}
+            <Link href="/albums" className="btn self-start sm:self-auto">
+              Search and filter
+              <IconArrowRight size={16} />
+            </Link>
+          </div>
 
-        {/* ---------- Dòng thời gian ---------- */}
-        <section id="timeline" className="mb-8 scroll-mt-24">
-          <SectionHeading eyebrow="Year by year" title="Timeline" />
-          <Timeline albums={albums} years={years} />
+          <div className="flex flex-col gap-12">
+            {years.map((year) => (
+              <YearGroup key={year} year={year} trips={albums.filter((a) => yearOf(a.tripDate) === year)} />
+            ))}
+          </div>
         </section>
       </main>
 
-      <footer className="border-t-2 border-line">
-        <div className="mx-auto flex max-w-[1280px] flex-col gap-2 px-4 py-6 font-mono text-xs text-ink-soft sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-[1280px] flex-col gap-2 px-4 py-6 text-sm text-ink-soft sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <span>
-            © 2026 <b className="text-ink">B6 PhotoArchive</b> · Private archive, members only.
+            <b className="font-display text-ink">thesix</b> is a private archive for the crew.
           </span>
-          <span className="flex gap-4">
+          <span className="flex gap-5">
             <Link href="/albums" className="hover:text-ink">
-              Album
+              Albums
             </Link>
             <Link href="/login" className="hover:text-ink">
-              Sign in
+              Switch person
             </Link>
           </span>
         </div>
@@ -211,190 +120,112 @@ export default async function HomePage() {
   );
 }
 
-function HeroStat({ value, label, accent = false }: { value: number; label: string; accent?: boolean }) {
-  return (
-    <div>
-      <dd className={`font-display text-3xl font-extrabold tabular-nums ${accent ? "text-accent" : ""}`}>{value}</dd>
-      <dt className="font-mono text-[0.62rem] font-bold tracking-[0.12em] text-ink-soft uppercase">{label}</dt>
-    </div>
-  );
-}
-
-/** 3 ảnh bìa gần nhất xếp chồng như ảnh in để trên bàn. */
-function PrintStack({ albums }: { albums: Album[] }) {
-  const placements = [
-    "left-[2%] top-[12%] w-[58%] -rotate-[7deg] z-10",
-    "right-[2%] top-[2%] w-[52%] rotate-[5deg] z-20",
-    "left-[22%] bottom-[2%] w-[56%] -rotate-[1deg] z-30",
-  ];
-  return (
-    <div className="relative mx-auto aspect-[5/4] w-full max-w-[560px]" aria-hidden="true">
-      {albums.map((a, i) => (
-        <Link
-          key={a.id}
-          href={`/albums/${a.id}`}
-          tabIndex={-1}
-          className={`absolute rounded-md border-2 border-line bg-surface p-2 pb-8 shadow-hard-lg transition-transform duration-200 hover:z-40 hover:rotate-0 hover:scale-[1.03] ${placements[i]}`}
-        >
-          <div className="relative aspect-[4/3] overflow-hidden rounded-sm bg-surface-2">
-            <SmartImage src={a.coverUrl} alt="" fill preload={i === 2} sizes="320px" className="object-cover" />
-          </div>
-          <span className="absolute bottom-2 left-3 font-mono text-[0.65rem] font-bold text-ink-soft">
-            {a.location.toUpperCase()} · {yearOf(a.tripDate)}
-          </span>
-        </Link>
-      ))}
-      {/* Mẩu băng dính */}
-      <span className="absolute top-[4%] left-[38%] z-40 h-6 w-20 -rotate-12 bg-butter/80 shadow-sm" />
-    </div>
-  );
-}
-
-function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
-  return (
-    <div className="mb-6 flex items-end justify-between gap-4 border-b-2 border-dashed border-line pb-3">
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h2 className="font-display text-3xl font-extrabold tracking-[-0.03em]">{title}</h2>
-      </div>
-    </div>
-  );
-}
-
-type ShortcutContent = {
-  n: number;
-  color: string;
-  icon: ReactNode;
-  tag: string;
-  title: string;
-  desc: string;
-  cta: string;
-};
-
-function ShortcutBody({ n, color, icon, tag, title, desc, cta }: ShortcutContent) {
-  return (
-    <>
-      <span className="mb-5 flex items-center justify-between">
-        <span className="font-mono text-sm font-bold text-ink-soft">{pad2(n)}</span>
-        <span className="tag">{tag}</span>
-      </span>
-      <span
-        className={`mb-5 flex h-14 w-14 rotate-[-6deg] items-center justify-center rounded-xl border-2 border-line text-on-accent shadow-hard-sm transition-transform group-hover:rotate-0 ${color}`}
-      >
-        {icon}
-      </span>
-      <span className="block font-display text-xl leading-tight font-bold tracking-tight">{title}</span>
-      <span className="mt-2 mb-5 block flex-1 text-sm text-ink-soft">{desc}</span>
-      <span className="flex items-center justify-between border-t-2 border-dashed border-line pt-3 text-sm font-bold">
-        {cta}
-        <IconArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
-      </span>
-    </>
-  );
-}
-
-function ShortcutCard({ href, ...content }: ShortcutContent & { href: string }) {
-  return (
-    <Link
-      href={href}
-      className="group card flex flex-col p-5 transition-[transform,box-shadow] duration-150 hover:-translate-y-1 hover:shadow-hard-lg"
-    >
-      <ShortcutBody {...content} />
-    </Link>
-  );
-}
-
-function Pill({ label, value, highlight = false }: { label: string; value: number; highlight?: boolean }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-2 rounded-full border-2 border-line px-3 py-1 text-sm ${
-        highlight ? "bg-accent text-on-accent" : "bg-surface-2"
-      }`}
-    >
-      <span className={highlight ? "" : "text-ink-soft"}>{label}</span>
-      <b className="font-display">{value}</b>
-    </span>
-  );
-}
-
 /**
- * Dòng thời gian dạng trục dọc (Oy): mới nhất ở trên.
- * Cột trái: mốc thời gian · giữa: trục + chấm · phải: chuyến đi. Mobile: trục bên trái, ngày nằm trên thẻ.
+ * Dải phim chạy hết chiều ngang: mỗi khung là một ảnh thật của chuyến gần nhất,
+ * số khung in màu hổ phách ở mép phim. Ảnh "hiện hình" lần lượt khi tải trang.
  */
-function Timeline({ albums, years }: { albums: Album[]; years: string[] }) {
-  // Cột: [ngày 9rem] [trục 2.5rem] [thẻ] trên md; [trục 1.5rem] [nội dung] trên mobile
-  const cols = "grid grid-cols-[1.5rem_1fr] gap-x-3 md:grid-cols-[9rem_2.5rem_1fr] md:gap-x-4";
-  return (
-    <div className="relative max-w-4xl">
-      {/* Trục */}
-      <div
-        aria-hidden="true"
-        className="absolute top-2 bottom-2 left-[calc(0.75rem-1.5px)] w-[3px] rounded-full bg-ink md:left-[calc(9rem+1rem+1.25rem-1.5px)]"
-      />
-      <ol className="relative flex flex-col gap-5">
-        {years.map((year) => {
-          const trips = albums.filter((a) => yearOf(a.tripDate) === year);
-          return (
-            <li key={year} className="flex flex-col gap-5">
-              {/* Mốc năm trên trục */}
-              <div className={`${cols} items-center`}>
-                <span className="hidden text-right font-mono text-xs text-ink-soft md:block">{plural(trips.length, "trip")}</span>
-                <span className="relative z-10 flex justify-center">
-                  <span className="rounded-md border-2 border-line bg-butter px-1.5 py-0.5 font-mono text-[0.7rem] font-bold text-on-accent shadow-hard-sm md:px-2 md:text-xs">
-                    {year}
-                  </span>
-                </span>
-                <span className="font-display text-2xl font-extrabold tracking-[-0.03em] md:hidden">{year}</span>
-              </div>
+function ContactSheet({ album, photos }: { album: Album; photos: Photo[] }) {
+  const frames = photos.slice(0, SHEET_FRAMES);
+  const more = photos.length - frames.length;
+  if (frames.length === 0) return null;
 
-              <ol className="flex flex-col gap-4">
-                {trips.map((a) => (
-                  <li key={a.id} className={`${cols} items-center`}>
-                    {/* Mốc thời gian (desktop) */}
-                    <time dateTime={a.tripDate} className="hidden text-right md:block">
-                      <span className="block font-display text-lg leading-tight font-bold">{formatDate(a.tripDate)}</span>
-                      <span className="font-mono text-[0.68rem] text-ink-soft uppercase">{weekday(a.tripDate)}</span>
-                    </time>
-                    {/* Chấm trên trục */}
-                    <span className="relative z-10 flex justify-center">
-                      <span className="h-4 w-4 rounded-full border-[3px] border-ink bg-accent md:h-5 md:w-5" />
-                    </span>
-                    <div className="min-w-0">
-                      <time dateTime={a.tripDate} className="mb-1 block font-mono text-xs text-ink-soft md:hidden">
-                        {formatDate(a.tripDate)} · {weekday(a.tripDate)}
-                      </time>
-                      <TimelineRow album={a} />
-                    </div>
-                  </li>
-                ))}
-              </ol>
+  return (
+    <div className="bg-film text-white">
+      <div className="sprockets h-4" aria-hidden="true" />
+      <ol
+        className="scrollbar-none mx-auto flex max-w-[1440px] snap-x snap-mandatory scroll-px-4 gap-2 overflow-x-auto px-4 sm:scroll-px-6 sm:gap-3 sm:px-6 md:grid md:overflow-visible"
+        style={{ gridTemplateColumns: `repeat(${SHEET_FRAMES}, minmax(0, 1fr))` }}
+        aria-label={`First photos from ${album.title}`}
+      >
+        {frames.map((p, i) => {
+          const last = i === frames.length - 1 && more > 0;
+          return (
+            <li key={p.id} className="w-[64vw] shrink-0 snap-start sm:w-[38vw] md:w-auto">
+              <span className="frame-no flex justify-between px-0.5 pb-1 text-[0.7rem]" aria-hidden="true">
+                <span>{i + 1}</span>
+                <span>&#9656; {i + 1}A</span>
+              </span>
+              <Link
+                href={last ? `/albums/${album.id}` : `/albums/${album.id}?photo=${p.id}`}
+                className="animate-develop group relative block aspect-[3/2] overflow-hidden rounded-[2px] bg-white/5"
+                style={{ animationDelay: `${150 + i * 140}ms` }}
+                aria-label={last ? `Open all ${photos.length} photos` : `View photo ${i + 1} by ${p.uploadedBy}`}
+              >
+                <SmartImage
+                  src={p.thumbUrl}
+                  alt=""
+                  fill
+                  preload={i < 3}
+                  sizes="(max-width: 768px) 64vw, 17vw"
+                  className="object-cover transition-[filter] duration-200 group-hover:brightness-110"
+                />
+                {last && (
+                  <span className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-black/60 font-display">
+                    <span className="text-2xl font-extrabold">+{more}</span>
+                    <span className="text-xs font-medium text-white/80">more photos</span>
+                  </span>
+                )}
+              </Link>
             </li>
           );
         })}
       </ol>
+      <div className="sprockets mt-3 h-4" aria-hidden="true" />
     </div>
   );
 }
 
-const weekdayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "Asia/Ho_Chi_Minh" });
+const weekdayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: "Asia/Ho_Chi_Minh" });
 function weekday(isoDate: string) {
   return weekdayFmt.format(new Date(`${isoDate}T12:00:00+07:00`));
 }
 
-function TimelineRow({ album }: { album: Album }) {
+/** Một năm trong sổ: năm lớn bên trái (dính khi cuộn trên desktop), các chuyến xếp thành hàng bên phải. */
+function YearGroup({ year, trips }: { year: string; trips: Album[] }) {
+  return (
+    <section className="grid gap-4 md:grid-cols-[11rem_1fr] md:gap-8">
+      <div className="md:sticky md:top-24 md:self-start">
+        <h3 className="font-display text-5xl leading-none font-extrabold tracking-[-0.04em] tabular-nums" style={{ fontStretch: "125%" }}>
+          {year}
+        </h3>
+        <p className="mt-1 text-sm text-ink-soft">{plural(trips.length, "trip")}</p>
+      </div>
+      <ol className="border-t border-line">
+        {trips.map((a) => (
+          <li key={a.id} className="border-b border-line">
+            <TripRow album={a} />
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function TripRow({ album }: { album: Album }) {
   return (
     <Link
       href={`/albums/${album.id}`}
-      className="group flex items-center gap-3 rounded-xl border-2 border-line bg-surface p-2 pr-4 transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-hard-sm"
+      className="group -mx-2 flex items-center gap-4 rounded-lg px-2 py-3 transition-colors hover:bg-surface/70 sm:gap-5"
     >
-      <span className="relative h-16 w-20 shrink-0 overflow-hidden rounded-lg border-2 border-line bg-surface-2">
-        <SmartImage src={album.coverUrl} alt="" fill sizes="96px" className="object-cover" />
+      <span className="print shrink-0 p-1">
+        <span className="relative block h-14 w-20 overflow-hidden rounded-[1px] bg-surface-2 sm:h-[4.5rem] sm:w-24">
+          <SmartImage src={album.coverUrl} alt="" fill sizes="96px" className="object-cover" />
+        </span>
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-display font-bold">{album.title}</span>
-        <span className="block truncate text-sm text-ink-soft">{album.location}</span>
+        <span className="block truncate font-display text-lg font-bold tracking-[-0.01em] group-hover:text-accent">
+          {album.title}
+        </span>
+        <span className="flex items-center gap-1 truncate text-sm text-ink-soft">
+          <IconPin size={14} className="shrink-0" />
+          {album.location}
+        </span>
       </span>
-      <span className="tag shrink-0">{plural(album.photoCount, "photo")}</span>
+      <time dateTime={album.tripDate} className="hidden shrink-0 text-right text-sm sm:block">
+        <span className="block font-semibold tabular-nums">{formatDate(album.tripDate)}</span>
+        <span className="text-ink-soft">{weekday(album.tripDate)}</span>
+      </time>
+      <span className="w-20 shrink-0 text-right text-sm text-ink-soft tabular-nums">{plural(album.photoCount, "photo")}</span>
     </Link>
   );
 }

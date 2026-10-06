@@ -28,7 +28,7 @@ export function IdentityChip() {
   if (!me) {
     const href = pathname === "/login" ? "/login" : `/login?next=${encodeURIComponent(pathname)}`;
     return (
-      <Link href={href} className="btn h-[42px] px-3" title="Choose who you are">
+      <Link href={href} className="btn px-3" title="Choose who you are">
         <IconUser size={17} />
         <span className="max-sm:hidden">Who are you?</span>
       </Link>
@@ -38,12 +38,12 @@ export function IdentityChip() {
   return (
     <Link
       href="/profile"
-      className={`btn h-[42px] gap-2 pr-3 pl-1.5 ${admin ? "btn-primary" : ""}`}
+      className="btn gap-2 pr-3 pl-1.5"
       title={admin ? "Admin — your profile" : "Your profile"}
     >
       <Avatar name={me.name} url={me.avatarUrl} size={28} />
       <span className="max-w-[9ch] truncate max-sm:hidden">{me.name}</span>
-      {admin && <IconLock size={14} />}
+      {admin && <IconLock size={14} className="text-ink-soft" />}
     </Link>
   );
 }

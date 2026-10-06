@@ -25,7 +25,7 @@ export function PhotoGrid({ photos, onOpen, isFavorite, onToggleFavorite, eagerC
               type="button"
               onClick={() => onOpen(photo)}
               aria-label={`View photo by ${photo.uploadedBy}`}
-              className="relative block w-full overflow-hidden rounded-xl border-2 border-line bg-surface-2 shadow-hard-sm transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-hard"
+              className="relative block w-full overflow-hidden rounded-[3px] bg-surface-2 transition-[filter] duration-150 hover:brightness-[1.06]"
               style={{ aspectRatio: `${photo.width} / ${photo.height}` }}
             >
               <SmartImage
@@ -45,9 +45,9 @@ export function PhotoGrid({ photos, onOpen, isFavorite, onToggleFavorite, eagerC
               onClick={() => onToggleFavorite(photo.id)}
               aria-pressed={fav}
               aria-label={fav ? "Remove favorite" : "Favorite"}
-              className={`absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all ${
+              className={`absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border transition-all ${
                 fav
-                  ? "border-line bg-accent text-on-accent opacity-100"
+                  ? "border-transparent bg-accent text-on-accent opacity-100"
                   : "border-transparent bg-black/45 text-white backdrop-blur-sm sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
               }`}
             >

@@ -73,14 +73,14 @@ export function IdentityForm({ members, current, next }: { members: Member[]; cu
                 disabled={!!busy}
                 onClick={() => pick(m)}
                 aria-pressed={selected}
-                className={`flex w-full flex-col items-center gap-2 rounded-xl border-2 border-line px-2 py-3 transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-hard-sm disabled:opacity-60 ${
+                className={`flex w-full flex-col items-center gap-2 rounded-xl border border-line px-2 py-3 transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-hard-sm disabled:opacity-60 ${
                   selected ? "bg-ink text-bg" : "bg-surface"
                 }`}
               >
                 <span className="relative">
                   <Avatar name={m.name} url={m.avatarUrl} size={44} />
                   {selected && (
-                    <span className="absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-line bg-accent text-on-accent">
+                    <span className="absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full border border-line bg-accent text-on-accent">
                       <IconCheck size={11} />
                     </span>
                   )}
@@ -92,7 +92,7 @@ export function IdentityForm({ members, current, next }: { members: Member[]; cu
         })}
       </ul>
 
-      <div className="rounded-xl border-2 border-dashed border-line">
+      <div className="rounded-xl border border-dashed border-line">
         <button
           type="button"
           onClick={() => setAdminOpen((v) => !v)}
@@ -105,7 +105,7 @@ export function IdentityForm({ members, current, next }: { members: Member[]; cu
           <span className="text-ink-soft">{adminOpen ? "−" : "+"}</span>
         </button>
         {adminOpen && (
-          <form onSubmit={adminLogin} className="flex flex-col gap-2.5 border-t-2 border-dashed border-line p-4">
+          <form onSubmit={adminLogin} className="flex flex-col gap-2.5 border-t border-dashed border-line p-4">
             <input value="ADMIN" readOnly aria-label="Admin account" className="field bg-surface-2 text-ink-soft" />
             <input
               type="password"

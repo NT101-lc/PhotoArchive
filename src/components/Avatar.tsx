@@ -23,7 +23,7 @@ export function initials(name: string) {
 export function Avatar({ name, url, size = 32 }: { name: string; url?: string | null; size?: number }) {
   return (
     <span
-      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-line font-display font-bold text-on-accent ${
+      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-display font-bold text-on-accent ring-1 ring-black/10 ${
         url ? "bg-surface-2" : colorFor(name)
       }`}
       style={{ width: size, height: size, fontSize: Math.max(10, size * 0.38) }}

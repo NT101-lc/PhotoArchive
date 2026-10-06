@@ -331,7 +331,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
     >
       <div className="flex flex-col gap-5 p-5">
         {storageReady === false && (
-          <p role="alert" className="rounded-xl border-2 border-accent bg-accent/10 px-4 py-3 text-sm">
+          <p role="alert" className="rounded-lg border border-danger bg-danger/10 px-4 py-3 text-sm">
             <b>Storage isn’t configured yet.</b> Set <code className="font-mono">R2_BUCKET</code> (and the other R2
             variables) in <code className="font-mono">.env</code>, then restart the server to enable uploads.
           </p>
@@ -420,7 +420,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
             </Link>
           </p>
         ) : (
-          <p role="alert" className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-accent bg-accent/10 px-4 py-3 text-sm">
+          <p role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-danger bg-danger/10 px-4 py-3 text-sm">
             <b>Pick your name before uploading.</b>
             <Link href="/login" className="btn btn-primary ml-auto h-9">
               Choose who you are
@@ -439,11 +439,11 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
             if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
           }}
           onDrop={onDrop}
-          className={`flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
+          className={`flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed px-4 py-8 text-center transition-colors ${
             dragging ? "border-accent bg-accent/10" : "border-line bg-surface-2/40"
           }`}
         >
-          <span className="flex h-14 w-14 rotate-[-6deg] items-center justify-center rounded-xl border-2 border-line bg-butter text-on-accent shadow-hard-sm">
+          <span className="flex h-14 w-14 items-center justify-center rounded-xl border border-line bg-butter text-on-accent shadow-hard-sm">
             {reading ? (
               <span className="h-6 w-6 animate-spin rounded-full border-[3px] border-on-accent/20 border-t-on-accent" />
             ) : (
@@ -527,7 +527,7 @@ function FolderGroup({
   const shown = showAll ? items : items.slice(0, PREVIEW_LIMIT);
 
   return (
-    <section className="rounded-xl border-2 border-line bg-surface">
+    <section className="rounded-xl border border-line bg-surface">
       <div className="flex items-center gap-2 px-3 py-2">
         <button type="button" onClick={() => setOpen((v) => !v)} className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={open}>
           <IconChevronDown size={16} className={`shrink-0 transition-transform ${open ? "" : "-rotate-90"}`} />
@@ -537,12 +537,12 @@ function FolderGroup({
             {items.length} · {formatBytes(size)}
           </span>
         </button>
-        <button type="button" onClick={onRemoveGroup} className="rounded-md p-1 text-ink-soft hover:bg-surface-2 hover:text-accent" aria-label={`Remove ${folder || "loose photos"}`}>
+        <button type="button" onClick={onRemoveGroup} className="rounded-md p-1 text-ink-soft hover:bg-surface-2 hover:text-danger" aria-label={`Remove ${folder || "loose photos"}`}>
           <IconClose size={15} />
         </button>
       </div>
       {open && (
-        <div className="border-t-2 border-dashed border-line p-3">
+        <div className="border-t border-dashed border-line p-3">
           <ul className="grid grid-cols-4 gap-2 sm:grid-cols-6">
             {shown.map((f) => (
               <PreviewTile
@@ -582,7 +582,7 @@ function PreviewTile({
   return (
     <li className="group relative" title={`${item.path} · ${formatBytes(item.file.size)}`}>
       <div
-        className={`aspect-square overflow-hidden rounded-lg border-2 bg-surface-2 ${
+        className={`aspect-square overflow-hidden rounded-lg border bg-surface-2 ${
           isCover ? "border-accent ring-2 ring-accent" : "border-line"
         }`}
       >
@@ -599,7 +599,7 @@ function PreviewTile({
       <button
         type="button"
         onClick={onRemove}
-        className="absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-line bg-surface opacity-100 shadow-hard-sm sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+        className="absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-line bg-surface opacity-100 shadow-hard-sm sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
         aria-label={`Remove ${name}`}
       >
         <IconClose size={11} />
@@ -616,7 +616,7 @@ function PreviewTile({
           aria-pressed={isCover}
           title={isCover ? "Unset cover (use first photo)" : "Use as album cover"}
           aria-label={isCover ? `Unset ${name} as cover` : `Use ${name} as cover`}
-          className={`absolute -top-1.5 -left-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-line shadow-hard-sm ${
+          className={`absolute -top-1.5 -left-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-line shadow-hard-sm ${
             isCover
               ? "bg-accent text-on-accent"
               : "bg-surface opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"

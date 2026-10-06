@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Push mới lên cùng nhánh / PR → huỷ lần chạy cũ
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  quality:
+    name: Typecheck · Lint · Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+
+  migrations:
+    name: DB migrations in sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Migration history is consistent
+        run: npx drizzle-kit check
+      - name: Schema has no un-generated changes
+        # Sửa src/db/schema.ts mà quên `npm run db:generate` → bước này đỏ
+        run: |
+          npx drizzle-kit generate
+          if [ -n "$(git status --porcelain drizzle/)" ]; then
+            echo "::error::src/db/schema.ts changed but no migration was committed. Run 'npm run db:generate' and commit drizzle/."
+            git status --porcelain drizzle/
+            exit 1
+          fi
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**') }}
+          restore-keys: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+      # Build không cần secret: DB / R2 / SESSION_SECRET chỉ đọc lúc chạy (giống Vercel khi chưa đặt biến)
+      - run: npm run build
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Runtime dependencies (blocking, high+)
+        run: npm audit --omit=dev --audit-level=high
+      - name: All dependencies (report only)
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+  # Tự áp migration lên DB production sau khi mọi kiểm tra trên main đều xanh.
+  # Mặc định TẮT — bật bằng repo variable AUTO_MIGRATE=true và secret DATABASE_URL
+  # (Settings → Secrets and variables → Actions). Environment "production" cho phép đặt người duyệt.
+  migrate:
+    name: Apply migrations (production)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AUTO_MIGRATE == 'true'
+    needs: [quality, migrations, build, audit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    concurrency:
+      group: migrate-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: drizzle-kit migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Secret DATABASE_URL is not set"
+            exit 1
+          fi
+          npm run db:migrate

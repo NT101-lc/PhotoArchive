@@ -62,9 +62,9 @@ export function Modal({ open, onClose, title, eyebrow, children, footer, maxWidt
       <div
         role="dialog"
         aria-modal="true"
-        className={`animate-rise flex max-h-[92dvh] w-full flex-col rounded-t-2xl border-2 border-line bg-surface shadow-hard-lg sm:max-h-[88vh] sm:rounded-2xl ${maxWidth}`}
+        className={`animate-rise flex max-h-[92dvh] w-full flex-col rounded-t-2xl border border-line bg-surface shadow-hard-lg sm:max-h-[88vh] sm:rounded-2xl ${maxWidth}`}
       >
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b-2 border-dashed border-line px-5 pt-4 pb-3.5">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-dashed border-line px-5 pt-4 pb-3.5">
           <div className="min-w-0">
             {eyebrow && <p className="eyebrow mb-0.5">{eyebrow}</p>}
             <h2 className="font-display text-xl leading-tight font-extrabold tracking-tight">{title}</h2>
@@ -74,7 +74,7 @@ export function Modal({ open, onClose, title, eyebrow, children, footer, maxWidt
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">{children}</div>
-        {footer && <div className="shrink-0 rounded-b-2xl border-t-2 border-line bg-surface-2/60 px-5 py-4">{footer}</div>}
+        {footer && <div className="shrink-0 rounded-b-2xl border-t border-line bg-surface-2/60 px-5 py-4">{footer}</div>}
       </div>
     </div>
   );

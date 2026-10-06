@@ -1,6 +1,6 @@
-# B6 PhotoArchive
+# thesix
 
-Website riêng tư để nhóm B6 lưu và xem lại ảnh các chuyến đi.
+**thesix** — website riêng tư để nhóm lưu và xem lại ảnh các chuyến đi (repo / package: `b6-photoarchive`).
 Next.js full-stack: giao diện + API trong cùng một app, dữ liệu ở Postgres (Neon) qua Drizzle, ảnh ở Cloudflare R2.
 Không cần đăng nhập: thành viên chỉ chọn tên mình; riêng tài khoản **ADMIN** đăng nhập bằng mật khẩu (xem [Vai trò](#vai-trò)).
 
@@ -23,6 +23,8 @@ Mở http://localhost:3000. Thiếu biến R2 thì app vẫn chạy, chỉ tắt
 | `npm run build`       | Build production                                                |
 | `npm run start`       | Chạy bản đã build                                               |
 | `npm run lint`        | ESLint                                                          |
+| `npm run typecheck`   | Sinh type route rồi chạy `tsc --noEmit`                         |
+| `npm test`            | Unit test (`node:test` + tsx): phân quyền, format, mật khẩu      |
 | `npm run db:generate` | Sinh file migration SQL từ `src/db/schema.ts` vào `drizzle/`    |
 | `npm run db:migrate`  | Áp migration lên DB                                             |
 | `npm run db:push`     | Đẩy schema thẳng lên DB, không tạo migration (chỉ dùng khi thử) |
@@ -57,6 +59,22 @@ Giao diện hiển thị bằng tiếng Anh (tên chuyến đi / địa danh tro
   Người upload = người đang dùng (chọn ở trang "Who are you?").
   **Ảnh bìa**: bấm ★ trên ảnh xem trước để chọn bìa; không chọn gì thì bìa là ảnh đầu tiên (chụp sớm nhất) của album.
 - Ảnh yêu thích tạm lưu trong `localStorage` của từng máy.
+
+## CI
+
+`.github/workflows/ci.yml` chạy trên mọi push lên `main`, mọi pull request, và bấm tay (Run workflow):
+
+| Job                       | Kiểm tra                                                                                  |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| Typecheck · Lint · Test   | `npm run typecheck`, `npm run lint`, `npm test`                                          |
+| DB migrations in sync     | `drizzle-kit check` + sửa `schema.ts` mà quên `npm run db:generate` thì báo đỏ            |
+| Production build          | `npm run build` không cần secret (cache `.next/cache`)                                    |
+| Dependency audit          | Chặn nếu dependency chạy thật có lỗ hổng mức high; dependency dev chỉ báo cáo               |
+| Apply migrations (prod)   | **Mặc định tắt.** Tự chạy `db:migrate` lên DB thật sau khi mọi job trên `main` xanh       |
+
+Bật job migrate: Settings → Secrets and variables → Actions → thêm secret `DATABASE_URL` và variable `AUTO_MIGRATE=true`;
+nên tạo environment `production` có người duyệt để mỗi lần migrate phải bấm đồng ý.
+Dependabot (`.github/dependabot.yml`) mở PR cập nhật npm + GitHub Actions hằng tuần.
 
 ## Vai trò
 

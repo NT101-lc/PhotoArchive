@@ -181,12 +181,12 @@ export function Lightbox({
       role="dialog"
       aria-modal="true"
       aria-label={`Photo ${index + 1} of ${total}`}
-      className="animate-fade fixed inset-0 z-[1100] flex flex-col bg-[#0e0d0c] text-[#f1ebe0]"
+      className="animate-fade fixed inset-0 z-[1100] flex flex-col bg-[#0b0e0d] text-[#e4e9e5]"
     >
       {/* Thanh tiến trình slideshow */}
       {playing && !zoomed && (
         <div className="absolute inset-x-0 top-0 z-10 h-[3px] bg-white/10">
-          <div key={index} className="h-full origin-left bg-[#ff6b47]" style={{ animation: `lb-progress ${SLIDESHOW_MS}ms linear forwards` }} />
+          <div key={index} className="h-full origin-left bg-[#6cc79c]" style={{ animation: `lb-progress ${SLIDESHOW_MS}ms linear forwards` }} />
         </div>
       )}
 
@@ -264,7 +264,7 @@ export function Lightbox({
       <div className="shrink-0 border-t border-white/10 bg-black/40">
         <div className="flex items-center justify-between gap-3 px-3 pt-2 font-mono text-[0.7rem] sm:px-5">
           <span className="truncate">
-            <span className="text-[#ff6b47]">{photo.uploadedBy}</span>
+            <span className="text-[#6cc79c]">{photo.uploadedBy}</span>
             <span className="opacity-60"> · {formatDateTime(photo.takenAt)}</span>
           </span>
           <span className="hidden opacity-40 md:inline">← → navigate · Space slideshow · Z zoom · F favorite · Esc close</span>
@@ -281,8 +281,8 @@ export function Lightbox({
               }}
               aria-label={`Photo ${i + 1}`}
               aria-current={i === index}
-              className={`relative h-12 shrink-0 overflow-hidden rounded-md border-2 transition-all sm:h-14 ${
-                i === index ? "border-[#ff6b47] opacity-100" : "border-transparent opacity-45 hover:opacity-80"
+              className={`relative h-12 shrink-0 overflow-hidden rounded-md border transition-all sm:h-14 ${
+                i === index ? "border-[#6cc79c] opacity-100" : "border-transparent opacity-45 hover:opacity-80"
               }`}
               style={{ aspectRatio: `${p.width} / ${p.height}` }}
             >
@@ -300,7 +300,7 @@ export function Lightbox({
 function Spinner() {
   return (
     <div className="absolute inset-0 flex items-center justify-center">
-      <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-white/15 border-t-[#ff6b47]" />
+      <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-white/15 border-t-[#6cc79c]" />
     </div>
   );
 }
@@ -367,7 +367,7 @@ function NavButton({ side, onClick }: { side: "left" | "right"; onClick: () => v
       type="button"
       onClick={onClick}
       aria-label={side === "left" ? "Previous photo (←)" : "Next photo (→)"}
-      className={`absolute top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/5 backdrop-blur-sm transition-colors hover:bg-[#ff6b47] hover:text-[#1d1b18] sm:flex ${
+      className={`absolute top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/5 backdrop-blur-sm transition-colors hover:bg-[#6cc79c] hover:text-[#0b1a14] sm:flex ${
         side === "left" ? "left-4" : "right-4"
       }`}
     >
@@ -399,7 +399,7 @@ function LbButton({
       aria-label={label}
       aria-pressed={active}
       className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors sm:h-10 sm:w-10 ${
-        active ? (accent ? "bg-[#ff6b47] text-[#1d1b18]" : "bg-[#f1ebe0] text-[#1d1b18]") : "hover:bg-white/10"
+        active ? (accent ? "bg-[#6cc79c] text-[#0b1a14]" : "bg-[#e4e9e5] text-[#0b1a14]") : "hover:bg-white/10"
       } ${className}`}
     >
       {children}
@@ -427,9 +427,9 @@ function InfoPanel({
   ];
 
   return (
-    <aside className="animate-rise absolute inset-x-2 bottom-2 z-10 rounded-2xl border border-white/15 bg-[#1e1c19]/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-auto sm:top-2 sm:right-4 sm:bottom-auto sm:w-[300px]">
+    <aside className="animate-rise absolute inset-x-2 bottom-2 z-10 rounded-2xl border border-white/15 bg-[#171c1b]/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-auto sm:top-2 sm:right-4 sm:bottom-auto sm:w-[300px]">
       <div className="mb-3 flex items-center justify-between">
-        <span className="font-mono text-[0.7rem] tracking-[0.14em] text-[#a89f92] uppercase">Photo details</span>
+        <span className="text-xs font-medium text-[#97a29e]">Photo details</span>
         <button type="button" onClick={onClose} className="rounded-full p-1 hover:bg-white/10" aria-label="Close details">
           <IconClose size={14} />
         </button>
@@ -437,12 +437,12 @@ function InfoPanel({
       <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5">
         {rows.map(([k, v]) => (
           <div key={k}>
-            <dt className="text-[0.7rem] text-[#a89f92]">{k}</dt>
+            <dt className="text-[0.7rem] text-[#97a29e]">{k}</dt>
             <dd className="text-sm font-semibold">{v}</dd>
           </div>
         ))}
         <div className="col-span-2">
-          <dt className="text-[0.7rem] text-[#a89f92]">Photo ID</dt>
+          <dt className="text-[0.7rem] text-[#97a29e]">Photo ID</dt>
           <dd className="truncate font-mono text-xs">{photo.id}</dd>
         </div>
       </dl>

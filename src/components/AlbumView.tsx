@@ -122,16 +122,16 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
 
   return (
     <>
-      <div className="mb-6 flex flex-col gap-3 border-y-2 border-dashed border-line py-3 lg:flex-row lg:items-center">
+      <div className="-mt-4 mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="eyebrow shrink-0">Taken by</span>
           <div className="scrollbar-none -my-1 flex min-w-0 gap-1.5 overflow-x-auto py-1 pr-1">
             <button type="button" className="chip" aria-pressed={person === ALL} onClick={() => setPerson(ALL)}>
-              All · {photos.length}
+              All <span className="opacity-60 tabular-nums">{photos.length}</span>
             </button>
             {people.map(([name, count]) => (
               <button key={name} type="button" className="chip" aria-pressed={person === name} onClick={() => setPerson(name)}>
-                {name} · {count}
+                {name} <span className="opacity-60 tabular-nums">{count}</span>
               </button>
             ))}
           </div>
@@ -146,9 +146,9 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
             title="Only show hearted photos (saved on this device)"
           >
             <IconHeart size={14} filled={favOnly} />
-            Favorites · {photos.filter((p) => favorites.ids.has(p.id)).length}
+            Favorites <span className="opacity-60 tabular-nums">{photos.filter((p) => favorites.ids.has(p.id)).length}</span>
           </button>
-          <div className="ml-auto flex rounded-full border-2 border-line bg-surface p-0.5 lg:ml-0" role="group" aria-label="View mode">
+          <div className="ml-auto flex rounded-full border border-line bg-surface p-0.5 lg:ml-0" role="group" aria-label="View mode">
             <ViewButton active={view === "grid"} onClick={() => setView("grid")} label="Grid">
               <IconGrid size={16} />
             </ViewButton>
@@ -187,8 +187,8 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
           {days.map(([key, list], i) => (
             <section key={key}>
               <h3 className="mb-4 flex items-baseline gap-3">
-                <span className="rounded-md border-2 border-line bg-butter px-2 py-0.5 font-mono text-xs font-bold text-on-accent">
-                  DAY {i + 1}
+                <span className="frame-no text-sm">
+                  Day {i + 1}
                 </span>
                 <span className="font-display text-xl font-bold tracking-tight">{formatDayHeading(list[0].takenAt)}</span>
                 <span className="font-mono text-xs text-ink-soft">{plural(list.length, "photo")}</span>

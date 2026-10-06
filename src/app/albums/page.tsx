@@ -35,9 +35,9 @@ export default async function AlbumsPage({ searchParams }: PageProps<"/albums">)
         title="Every trip we took"
         description="All of the crew's travel photos, grouped by trip — come back to them any time."
         stats={[
-          { value: albums.length, label: "Albums" },
-          { value: totalPhotos, label: "Photos", color: "accent" },
-          { value: places, label: "Places", color: "teal" },
+          { value: albums.length, label: "albums" },
+          { value: totalPhotos, label: "photos" },
+          { value: places, label: "places" },
         ]}
         actions={<UploadButton albums={albums.map(({ id, title, createdById }) => ({ id, title, createdById }))} />}
       />

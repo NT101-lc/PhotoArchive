@@ -50,7 +50,7 @@ export function AlbumDetailButton({ album, photos }: { album: Album; photos: Pho
                 {contributors.map(([name, count], i) => (
                   <li key={name} className="flex items-center gap-3">
                     <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-line text-xs font-bold text-on-accent ${
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-xs font-bold text-on-accent ${
                         AVATAR_BG[i % AVATAR_BG.length]
                       }`}
                     >

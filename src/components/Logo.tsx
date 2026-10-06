@@ -1,15 +1,20 @@
-/** Logo "B6": tấm ảnh in nghiêng nhẹ, có dải lỗ phim phía trên. */
-export function Logo({ size = 40 }: { size?: number }) {
+/** Logo thesix: một khung phim nhỏ, hai hàng lỗ răng cưa, số 6 ở giữa khung. */
+export function Logo({ size = 36 }: { size?: number }) {
+  const rail = Math.max(5, Math.round(size * 0.17));
   return (
     <span
       aria-hidden="true"
-      className="relative inline-flex shrink-0 -rotate-6 flex-col overflow-hidden rounded-[10px] border-2 border-line bg-accent text-on-accent shadow-hard-sm transition-transform group-hover:rotate-0"
+      className="inline-flex shrink-0 flex-col overflow-hidden rounded-[5px] bg-film"
       style={{ width: size, height: size }}
     >
-      <span className="sprockets h-[7px] shrink-0 bg-ink" />
-      <span className="flex flex-1 items-center justify-center font-display font-extrabold tracking-tight" style={{ fontSize: size * 0.42 }}>
-        B6
+      <span className="sprockets shrink-0" style={{ height: rail, backgroundSize: `${rail + 3}px 100%` }} />
+      <span
+        className="mx-[3px] flex flex-1 items-center justify-center rounded-[2px] bg-edge font-display leading-none font-extrabold text-film"
+        style={{ fontSize: size * 0.42, fontStretch: "125%" }}
+      >
+        6
       </span>
+      <span className="sprockets shrink-0" style={{ height: rail, backgroundSize: `${rail + 3}px 100%` }} />
     </span>
   );
 }

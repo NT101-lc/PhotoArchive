@@ -12,7 +12,7 @@ const ToastContext = createContext<ToastApi | null>(null);
 
 const TONE_DOT: Record<ToastTone, string> = {
   info: "bg-sky",
-  warn: "bg-accent",
+  warn: "bg-danger",
   success: "bg-teal",
 };
 
@@ -44,7 +44,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             role="status"
-            className="animate-rise pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border-2 border-line bg-ink py-3 pr-2 pl-4 text-bg shadow-hard"
+            className="animate-rise pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border border-line bg-ink py-3 pr-2 pl-4 text-bg shadow-hard"
           >
             <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${TONE_DOT[t.tone]}`} />
             <div className="flex-1">

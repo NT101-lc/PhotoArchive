@@ -88,7 +88,7 @@ export function AlbumBrowser({ albums, initial }: Props) {
     <>
       <section className="mb-8 flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row">
-          <label className="flex h-12 flex-1 items-center gap-2.5 rounded-full border-2 border-line bg-surface px-4 shadow-hard-sm focus-within:border-accent">
+          <label className="flex h-11 flex-1 items-center gap-2.5 rounded-lg border border-line bg-surface px-3.5 focus-within:border-accent">
             <IconSearch className="shrink-0 text-ink-soft" />
             <input
               ref={searchRef}
@@ -113,7 +113,7 @@ export function AlbumBrowser({ albums, initial }: Props) {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
-              className="field h-12 rounded-full pr-9 sm:w-[170px]"
+              className="field h-11 pr-9 sm:w-[170px]"
             >
               {Object.entries(SORTS).map(([k, label]) => (
                 <option key={k} value={k}>
@@ -142,9 +142,9 @@ export function AlbumBrowser({ albums, initial }: Props) {
       </section>
 
       {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((album, i) => (
-            <div key={album.id} className="animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 30}ms`, animationFillMode: "both" }}>
+            <div key={album.id}>
               <AlbumCard album={album} index={albums.indexOf(album)} preload={i < 3} />
             </div>
           ))}
@@ -208,7 +208,7 @@ function ChipRow({
         disabled={value.length === 0}
         title={`Reset ${label.toLowerCase()} filter`}
         aria-label={`Reset ${label.toLowerCase()} filter`}
-        className="flex h-8 shrink-0 items-center gap-1 rounded-full border-2 border-line px-2.5 text-xs font-semibold text-ink-soft transition-colors hover:text-accent disabled:opacity-35"
+        className="flex h-8 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-semibold text-ink-soft transition-colors hover:text-ink disabled:opacity-35"
       >
         <IconReset size={13} />
         {value.length > 0 && <span className="tabular-nums">{value.length}</span>}

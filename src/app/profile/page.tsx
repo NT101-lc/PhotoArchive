@@ -13,7 +13,7 @@ export default async function ProfilePage() {
   return (
     <main className="flex min-h-[calc(100dvh-4rem)] items-start justify-center px-4 py-10 sm:items-center">
       <div className="card w-full max-w-[460px] overflow-hidden">
-        <div className="sprockets h-3 bg-ink" aria-hidden="true" />
+        <div className="sprockets h-3 bg-film" aria-hidden="true" />
         <div className="p-6 sm:p-8">
           <p className="eyebrow mb-1">{me.role === 0 ? "Admin account" : "Your profile"}</p>
           <h1 className="mb-6 font-display text-[2rem] leading-none font-extrabold tracking-[-0.03em]">Profile</h1>

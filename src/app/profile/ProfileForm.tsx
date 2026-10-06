@@ -124,7 +124,7 @@ export function ProfileForm({ me, storageReady }: { me: Me; storageReady: boolea
         </p>
       </form>
 
-      <div className="flex items-center justify-between border-t-2 border-dashed border-line pt-4 text-sm font-semibold">
+      <div className="flex items-center justify-between border-t border-dashed border-line pt-4 text-sm font-semibold">
         <Link href="/login?next=/profile" className="text-ink-soft underline hover:text-accent">
           Switch person
         </Link>

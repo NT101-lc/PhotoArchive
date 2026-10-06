@@ -72,7 +72,7 @@ export function AlbumAdminActions({ album }: { album: Pick<Album, "id" | "title"
           </button>
         )}
         {canDeleteAlbum(me) && (
-          <button type="button" className="btn hover:bg-accent hover:text-on-accent" onClick={() => setDeleting(true)}>
+          <button type="button" className="btn hover:border-danger hover:text-danger" onClick={() => setDeleting(true)}>
             <IconTrash size={16} />
             Delete
           </button>
