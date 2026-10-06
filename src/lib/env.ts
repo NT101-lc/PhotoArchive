@@ -5,6 +5,8 @@ import { z } from "zod";
 
 const schema = z.object({
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+  // Ký cookie danh tính; chuỗi ngẫu nhiên ≥ 32 ký tự
+  SESSION_SECRET: z.string().min(32).optional(),
   R2_ACCOUNT_ID: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_SECRET_ACCESS_KEY: z.string().optional(),

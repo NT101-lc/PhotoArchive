@@ -26,7 +26,7 @@ export default async function HomePage() {
   const totalPhotos = albums.reduce((s, a) => s + a.photoCount, 0);
   const places = new Set(albums.map((a) => a.location)).size;
   const years = [...new Set(albums.map((a) => yearOf(a.tripDate)))];
-  const albumOptions = albums.map(({ id, title }) => ({ id, title }));
+  const albumOptions = albums.map(({ id, title, createdById }) => ({ id, title, createdById }));
 
   return (
     <>
@@ -188,25 +188,7 @@ export default async function HomePage() {
         {/* ---------- Dòng thời gian ---------- */}
         <section id="timeline" className="mb-8 scroll-mt-24">
           <SectionHeading eyebrow="Year by year" title="Timeline" />
-          <ol className="flex flex-col gap-8">
-            {years.map((year) => (
-              <li key={year} className="grid gap-4 md:grid-cols-[140px_1fr]">
-                <div className="flex items-baseline gap-3 md:block">
-                  <span className="font-display text-5xl leading-none font-extrabold tracking-[-0.04em]">{year}</span>
-                  <span className="font-mono text-xs text-ink-soft md:mt-2 md:block">
-                    {plural(albums.filter((a) => yearOf(a.tripDate) === year).length, "trip")}
-                  </span>
-                </div>
-                <div className="grid gap-3 lg:grid-cols-2">
-                  {albums
-                    .filter((a) => yearOf(a.tripDate) === year)
-                    .map((a) => (
-                      <TimelineRow key={a.id} album={a} />
-                    ))}
-                </div>
-              </li>
-            ))}
-          </ol>
+          <Timeline albums={albums} years={years} />
         </section>
       </main>
 
@@ -335,6 +317,70 @@ function Pill({ label, value, highlight = false }: { label: string; value: numbe
   );
 }
 
+/**
+ * Dòng thời gian dạng trục dọc (Oy): mới nhất ở trên.
+ * Cột trái: mốc thời gian · giữa: trục + chấm · phải: chuyến đi. Mobile: trục bên trái, ngày nằm trên thẻ.
+ */
+function Timeline({ albums, years }: { albums: Album[]; years: string[] }) {
+  // Cột: [ngày 9rem] [trục 2.5rem] [thẻ] trên md; [trục 1.5rem] [nội dung] trên mobile
+  const cols = "grid grid-cols-[1.5rem_1fr] gap-x-3 md:grid-cols-[9rem_2.5rem_1fr] md:gap-x-4";
+  return (
+    <div className="relative max-w-4xl">
+      {/* Trục */}
+      <div
+        aria-hidden="true"
+        className="absolute top-2 bottom-2 left-[calc(0.75rem-1.5px)] w-[3px] rounded-full bg-ink md:left-[calc(9rem+1rem+1.25rem-1.5px)]"
+      />
+      <ol className="relative flex flex-col gap-5">
+        {years.map((year) => {
+          const trips = albums.filter((a) => yearOf(a.tripDate) === year);
+          return (
+            <li key={year} className="flex flex-col gap-5">
+              {/* Mốc năm trên trục */}
+              <div className={`${cols} items-center`}>
+                <span className="hidden text-right font-mono text-xs text-ink-soft md:block">{plural(trips.length, "trip")}</span>
+                <span className="relative z-10 flex justify-center">
+                  <span className="rounded-md border-2 border-line bg-butter px-1.5 py-0.5 font-mono text-[0.7rem] font-bold text-on-accent shadow-hard-sm md:px-2 md:text-xs">
+                    {year}
+                  </span>
+                </span>
+                <span className="font-display text-2xl font-extrabold tracking-[-0.03em] md:hidden">{year}</span>
+              </div>
+
+              <ol className="flex flex-col gap-4">
+                {trips.map((a) => (
+                  <li key={a.id} className={`${cols} items-center`}>
+                    {/* Mốc thời gian (desktop) */}
+                    <time dateTime={a.tripDate} className="hidden text-right md:block">
+                      <span className="block font-display text-lg leading-tight font-bold">{formatDate(a.tripDate)}</span>
+                      <span className="font-mono text-[0.68rem] text-ink-soft uppercase">{weekday(a.tripDate)}</span>
+                    </time>
+                    {/* Chấm trên trục */}
+                    <span className="relative z-10 flex justify-center">
+                      <span className="h-4 w-4 rounded-full border-[3px] border-ink bg-accent md:h-5 md:w-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <time dateTime={a.tripDate} className="mb-1 block font-mono text-xs text-ink-soft md:hidden">
+                        {formatDate(a.tripDate)} · {weekday(a.tripDate)}
+                      </time>
+                      <TimelineRow album={a} />
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+const weekdayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "Asia/Ho_Chi_Minh" });
+function weekday(isoDate: string) {
+  return weekdayFmt.format(new Date(`${isoDate}T12:00:00+07:00`));
+}
+
 function TimelineRow({ album }: { album: Album }) {
   return (
     <Link
@@ -346,9 +392,7 @@ function TimelineRow({ album }: { album: Album }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-display font-bold">{album.title}</span>
-        <span className="block truncate text-sm text-ink-soft">
-          {album.location} · {formatDate(album.tripDate)}
-        </span>
+        <span className="block truncate text-sm text-ink-soft">{album.location}</span>
       </span>
       <span className="tag shrink-0">{plural(album.photoCount, "photo")}</span>
     </Link>

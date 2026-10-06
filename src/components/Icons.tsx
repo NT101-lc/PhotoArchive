@@ -172,6 +172,19 @@ export const IconHeart = ({ filled = false, ...p }: IconProps & { filled?: boole
   </Svg>
 );
 
+export const IconStar = ({ filled = false, ...p }: IconProps & { filled?: boolean }) => (
+  <Svg {...p} fill={filled ? "currentColor" : "none"}>
+    <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z" />
+  </Svg>
+);
+
+export const IconEdit = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 20h4L19 9l-4-4L4 16z" />
+    <path d="M13.5 6.5l4 4" />
+  </Svg>
+);
+
 export const IconPlay = (p: IconProps) => (
   <Svg {...p} fill="currentColor">
     <path d="M8 5.5v13l10.5-6.5z" />

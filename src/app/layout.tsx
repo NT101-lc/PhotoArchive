@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro, Bricolage_Grotesque, Space_Mono } from "next/font/google";
 import { AppBar } from "@/components/AppBar";
+import { IdentityProvider } from "@/components/Identity";
 import { ToastProvider } from "@/components/Toast";
+import { getCurrentMember } from "@/lib/auth";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -38,7 +40,8 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const member = await getCurrentMember();
   return (
     <html
       lang="en"
@@ -51,10 +54,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body>
-        <ToastProvider>
-          <AppBar />
-          {children}
-        </ToastProvider>
+        <IdentityProvider member={member}>
+          <ToastProvider>
+            <AppBar />
+            {children}
+          </ToastProvider>
+        </IdentityProvider>
       </body>
     </html>
   );

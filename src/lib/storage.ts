@@ -62,6 +62,30 @@ export function presignDownload(key: string) {
   return presign("GET", key, GET_EXPIRES_S);
 }
 
+/**
+ * Xoá file trên R2. Không ném lỗi nếu một số file xoá hỏng — trả về danh sách key lỗi
+ * để ghi log (file mồ côi trên R2 không làm hỏng app).
+ */
+export async function deleteObjects(keys: string[]): Promise<string[]> {
+  const c = r2();
+  if (!c || keys.length === 0) return c ? [] : keys;
+  const failed: string[] = [];
+  const queue = [...keys];
+  await Promise.all(
+    Array.from({ length: Math.min(8, queue.length) }, async () => {
+      for (let key = queue.shift(); key; key = queue.shift()) {
+        try {
+          const res = await c.aws.fetch(objectUrl(c.cfg, key), { method: "DELETE" });
+          if (!res.ok && res.status !== 404) failed.push(key);
+        } catch {
+          failed.push(key);
+        }
+      }
+    }),
+  );
+  return failed;
+}
+
 // Ảnh hiển thị: ký với mốc giờ làm tròn → trong cùng một giờ URL không đổi, nên trình duyệt
 // và bộ tối ưu ảnh của Next cache được. Hạn 2 giờ ⇒ URL nào trả ra cũng còn hạn ít nhất 1 giờ.
 const VIEW_WINDOW_MS = 60 * 60 * 1000;

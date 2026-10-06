@@ -1,8 +1,8 @@
 // Seed DB bằng dữ liệu mẫu: npm run db:seed  (thêm -- --reset để xoá dữ liệu cũ trước)
 import { loadEnvConfig } from "@next/env";
-import { sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { createDb } from "./client";
-import { albums, members, photos } from "./schema";
+import { albums, members, photos, ROLE_USER } from "./schema";
 import { MEMBERS, MOCK_ALBUMS, MOCK_PHOTOS } from "./seed-data";
 
 loadEnvConfig(process.cwd());
@@ -19,14 +19,19 @@ async function main() {
     return;
   }
   if (reset) {
-    await db.execute(sql`truncate table ${photos}, ${albums}, ${members} restart identity cascade`);
-    console.log("Đã xoá dữ liệu cũ.");
+    // Giữ bảng members (có tài khoản ADMIN + mật khẩu), chỉ xoá album / ảnh
+    await db.execute(sql`truncate table ${photos}, ${albums} cascade`);
+    console.log("Đã xoá album và ảnh cũ.");
   }
 
-  const memberRows = await db
+  await db
     .insert(members)
-    .values(MEMBERS.map((name) => ({ name })))
-    .returning({ id: members.id, name: members.name });
+    .values(MEMBERS.map((name) => ({ name, role: ROLE_USER })))
+    .onConflictDoNothing({ target: members.name });
+  const memberRows = await db
+    .select({ id: members.id, name: members.name })
+    .from(members)
+    .where(inArray(members.name, MEMBERS));
   const memberId = new Map(memberRows.map((m) => [m.name, m.id]));
 
   const albumRows = await db

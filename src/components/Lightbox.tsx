@@ -15,6 +15,8 @@ import {
   IconLink,
   IconPause,
   IconPlay,
+  IconStar,
+  IconTrash,
   IconZoomIn,
   IconZoomOut,
 } from "./Icons";
@@ -28,6 +30,12 @@ type Props = {
   onClose: () => void;
   isFavorite: (id: string) => boolean;
   onToggleFavorite: (id: string) => void;
+  /** Có thì hiện nút "Set as cover" cho ảnh này (người dùng có quyền đổi bìa) */
+  cover?: { isCover: (id: string) => boolean; onSet: (photo: Photo) => void };
+  /** Có thì hiện nút xoá cho những ảnh `canDelete` trả về true */
+  remove?: { canDelete: (photo: Photo) => boolean; onDelete: (photo: Photo) => void };
+  /** Tắt phím tắt khi có hộp thoại khác mở phía trên (vd xác nhận xoá) */
+  paused?: boolean;
 };
 
 const SWIPE_MIN_PX = 50;
@@ -39,7 +47,17 @@ const DOUBLE_TAP_MS = 280;
  * Mobile: vuốt trái/phải để chuyển, vuốt xuống để đóng, chạm 2 lần để phóng to.
  * Luôn dùng tông tối (phòng tối) bất kể theme.
  */
-export function Lightbox({ photos, index, onIndexChange, onClose, isFavorite, onToggleFavorite }: Props) {
+export function Lightbox({
+  photos,
+  index,
+  onIndexChange,
+  onClose,
+  isFavorite,
+  onToggleFavorite,
+  cover,
+  remove,
+  paused = false,
+}: Props) {
   const toast = useToast();
   const [showInfo, setShowInfo] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -63,12 +81,13 @@ export function Lightbox({ photos, index, onIndexChange, onClose, isFavorite, on
 
   // Slideshow: tự chuyển ảnh; dừng khi đang phóng to
   useEffect(() => {
-    if (!playing || zoomed || total < 2) return;
+    if (!playing || zoomed || paused || total < 2) return;
     const t = setTimeout(() => go(1), SLIDESHOW_MS);
     return () => clearTimeout(t);
-  }, [playing, zoomed, go, total, index]);
+  }, [playing, zoomed, paused, go, total, index]);
 
   useEffect(() => {
+    if (paused) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (zoomed) setZoomed(false);
@@ -84,7 +103,7 @@ export function Lightbox({ photos, index, onIndexChange, onClose, isFavorite, on
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, onClose, zoomed, photo, onToggleFavorite]);
+  }, [go, onClose, zoomed, photo, onToggleFavorite, paused]);
 
   // Tải trước ảnh kế bên để chuyển ảnh mượt hơn
   useEffect(() => {
@@ -192,6 +211,20 @@ export function Lightbox({ photos, index, onIndexChange, onClose, isFavorite, on
           <LbButton onClick={copyLink} label="Copy photo link" className="max-sm:hidden">
             <IconLink size={18} />
           </LbButton>
+          {cover && (
+            <LbButton
+              onClick={() => cover.onSet(photo)}
+              label={cover.isCover(photo.id) ? "This is the album cover" : "Set as album cover"}
+              active={cover.isCover(photo.id)}
+            >
+              <IconStar size={18} filled={cover.isCover(photo.id)} />
+            </LbButton>
+          )}
+          {remove?.canDelete(photo) && (
+            <LbButton onClick={() => remove.onDelete(photo)} label="Delete photo">
+              <IconTrash size={18} />
+            </LbButton>
+          )}
           <LbButton onClick={() => setShowInfo((v) => !v)} label="Info (I)" active={showInfo}>
             <IconInfo size={18} />
           </LbButton>

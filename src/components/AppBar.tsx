@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconUser } from "./Icons";
+import { IdentityChip } from "./Identity";
 import { Logo } from "./Logo";
 import { NavLinks } from "./NavLinks";
 import { ThemeToggle } from "./ThemeToggle";
@@ -19,9 +19,7 @@ export function AppBar() {
         <nav className="flex items-center gap-2">
           <NavLinks />
           <ThemeToggle />
-          <Link href="/login" className="btn btn-icon" title="Account" aria-label="Account / sign in">
-            <IconUser />
-          </Link>
+          <IdentityChip />
         </nav>
       </div>
     </div>

@@ -1,12 +1,14 @@
 import "server-only";
-import { eq, like, or } from "drizzle-orm";
+import { and, eq, isNotNull, like, or } from "drizzle-orm";
 import { z } from "zod";
-import { albums, db, members, photos } from "@/db";
+import { albums, db, photos } from "@/db";
+import { ForbiddenError } from "./auth";
 import { slugify } from "./format";
-import { presignUpload } from "./storage";
+import { canDeleteAlbum, canDeletePhoto, canEditAlbum, canSetCover, type Actor } from "./permissions";
+import { deleteObjects, presignUpload } from "./storage";
 
-// Các thao tác ghi. Mọi input từ client đều đi qua schema zod bên dưới trước khi chạm DB.
-// TODO(auth): khi có đăng nhập Google, kiểm tra người gọi là thành viên ở đây.
+// Các thao tác ghi. Mọi input từ client đi qua schema zod, mọi thao tác nhận `actor`
+// (người đang dùng, lấy từ cookie đã ký) và kiểm tra quyền theo lib/permissions.ts.
 
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 export const MAX_FILES_PER_REQUEST = 100;
@@ -26,37 +28,120 @@ const imageType = z.enum(Object.keys(IMAGE_TYPES) as [ImageType, ...ImageType[]]
 export class NotFoundError extends Error {}
 export class BadRequestError extends Error {}
 
+async function findAlbum(slug: string) {
+  const [row] = await db
+    .select({ id: albums.id, createdById: albums.createdById })
+    .from(albums)
+    .where(eq(albums.slug, slug))
+    .limit(1);
+  if (!row) throw new NotFoundError(`Album “${slug}” not found`);
+  return row;
+}
+
+async function uniqueSlug(title: string, tripDate: string, exceptId?: string) {
+  const base = slugify(`${title} ${tripDate.slice(0, 4)}`) || "album";
+  const taken = await db
+    .select({ id: albums.id, slug: albums.slug })
+    .from(albums)
+    .where(or(eq(albums.slug, base), like(albums.slug, `${base}-%`)));
+  const used = new Set(taken.filter((t) => t.id !== exceptId).map((t) => t.slug));
+  let slug = base;
+  for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
+  return slug;
+}
+
 // ---------- Album ----------
 
 export const createAlbumInput = z.object({
   title: z.string().trim().min(1).max(120),
   location: z.string().trim().min(1).max(120),
   tripDate: z.iso.date(),
-  createdById: z.uuid().optional(),
 });
 
-/** Tạo album mới với slug không trùng (`sapa-2026`, `sapa-2026-2`, ...). */
-export async function createAlbum(input: z.infer<typeof createAlbumInput>) {
-  const base = slugify(`${input.title} ${input.tripDate.slice(0, 4)}`) || "album";
-  const taken = await db
-    .select({ slug: albums.slug })
-    .from(albums)
-    .where(or(eq(albums.slug, base), like(albums.slug, `${base}-%`)));
-  const used = new Set(taken.map((t) => t.slug));
-  let slug = base;
-  for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
-
+/** Tạo album mới (mọi thành viên). Slug không trùng: `sapa-2026`, `sapa-2026-2`, ... */
+export async function createAlbum(actor: Actor, input: z.infer<typeof createAlbumInput>) {
+  const slug = await uniqueSlug(input.title, input.tripDate);
   const [row] = await db
     .insert(albums)
-    .values({ ...input, slug })
+    .values({ ...input, slug, createdById: actor.id })
     .returning({ id: albums.id, slug: albums.slug });
   return row;
 }
 
-async function findAlbumId(slug: string) {
-  const [row] = await db.select({ id: albums.id }).from(albums).where(eq(albums.slug, slug)).limit(1);
-  if (!row) throw new NotFoundError(`Album “${slug}” not found`);
-  return row.id;
+export const updateAlbumInput = z
+  .object({
+    title: z.string().trim().min(1).max(120),
+    location: z.string().trim().min(1).max(120),
+    tripDate: z.iso.date(),
+    // null = bỏ ảnh bìa đã chọn, quay về ảnh đầu tiên
+    coverPhotoId: z.uuid().nullable(),
+  })
+  .partial();
+
+/** Sửa album. Tên / nơi / ngày: chỉ admin. Ảnh bìa: admin hoặc người tạo album. */
+export async function updateAlbum(actor: Actor, slug: string, input: z.infer<typeof updateAlbumInput>) {
+  const album = await findAlbum(slug);
+  const { coverPhotoId, ...info } = input;
+  const editsInfo = Object.keys(info).length > 0;
+
+  if (editsInfo && !canEditAlbum(actor)) throw new ForbiddenError("Only the admin can edit album details.");
+  if (coverPhotoId !== undefined && !canSetCover(actor, album)) {
+    throw new ForbiddenError("Only the admin or the album’s creator can change its cover.");
+  }
+  if (coverPhotoId) {
+    const [p] = await db
+      .select({ id: photos.id })
+      .from(photos)
+      .where(and(eq(photos.id, coverPhotoId), eq(photos.albumId, album.id)))
+      .limit(1);
+    if (!p) throw new BadRequestError("Cover photo must belong to this album.");
+  }
+
+  const patch: Partial<typeof albums.$inferInsert> = { ...info };
+  if (coverPhotoId !== undefined) patch.coverPhotoId = coverPhotoId;
+  if (info.title || info.tripDate) {
+    const [cur] = await db.select().from(albums).where(eq(albums.id, album.id));
+    patch.slug = await uniqueSlug(info.title ?? cur.title, info.tripDate ?? cur.tripDate, album.id);
+  }
+  if (Object.keys(patch).length === 0) return { slug };
+
+  const [row] = await db.update(albums).set(patch).where(eq(albums.id, album.id)).returning({ slug: albums.slug });
+  return row;
+}
+
+/** Xoá album + toàn bộ ảnh (DB và file trên R2). Chỉ admin. */
+export async function deleteAlbum(actor: Actor, slug: string) {
+  if (!canDeleteAlbum(actor)) throw new ForbiddenError("Only the admin can delete albums.");
+  const album = await findAlbum(slug);
+  const files = await db
+    .select({ key: photos.storageKey })
+    .from(photos)
+    .where(and(eq(photos.albumId, album.id), isNotNull(photos.storageKey)));
+  await db.delete(albums).where(eq(albums.id, album.id)); // ảnh xoá theo (cascade)
+  const failed = await deleteObjects(files.map((f) => f.key!));
+  if (failed.length) console.error(`R2: could not delete ${failed.length} file(s) of album ${slug}`, failed);
+  return { deletedPhotos: files.length };
+}
+
+// ---------- Ảnh ----------
+
+/** Xoá một ảnh: admin, hoặc người đã upload. Nếu ảnh đang là bìa thì album quay về ảnh đầu tiên. */
+export async function deletePhoto(actor: Actor, photoId: string) {
+  if (!z.uuid().safeParse(photoId).success) throw new NotFoundError("Photo not found");
+  const [p] = await db
+    .select({ id: photos.id, uploadedById: photos.uploadedById, storageKey: photos.storageKey })
+    .from(photos)
+    .where(eq(photos.id, photoId))
+    .limit(1);
+  if (!p) throw new NotFoundError("Photo not found");
+  if (!canDeletePhoto(actor, p)) throw new ForbiddenError("You can only delete photos you uploaded.");
+
+  await db.delete(photos).where(eq(photos.id, p.id)); // cover_photo_id tự về null (on delete set null)
+  if (p.storageKey) {
+    const failed = await deleteObjects([p.storageKey]);
+    if (failed.length) console.error("R2: could not delete", failed);
+  }
+  return { deleted: 1 };
 }
 
 // ---------- Upload ----------
@@ -76,18 +161,17 @@ export const presignInput = z.object({
 });
 
 /** Bước 1: cấp URL đã ký để trình duyệt PUT từng file thẳng lên R2. */
-export async function presignPhotoUploads(input: z.infer<typeof presignInput>) {
-  const albumId = await findAlbumId(input.albumSlug);
+export async function presignPhotoUploads(_actor: Actor, input: z.infer<typeof presignInput>) {
+  const album = await findAlbum(input.albumSlug);
   return Promise.all(
     input.files.map(async (f) => {
-      const key = `albums/${albumId}/${crypto.randomUUID()}.${IMAGE_TYPES[f.type]}`;
+      const key = `albums/${album.id}/${crypto.randomUUID()}.${IMAGE_TYPES[f.type]}`;
       return { name: f.name, key, contentType: f.type, uploadUrl: await presignUpload(key, f.type) };
     }),
   );
 }
 
 export const addPhotosInput = z.object({
-  uploadedById: z.uuid().optional(),
   photos: z
     .array(
       z.object({
@@ -101,39 +185,46 @@ export const addPhotosInput = z.object({
     )
     .min(1)
     .max(MAX_FILES_PER_REQUEST),
+  // Ảnh được chọn làm bìa (một trong các key ở trên). Bỏ trống → bìa vẫn là ảnh đầu tiên.
+  coverKey: z.string().optional(),
 });
 
-/** Bước 2: sau khi upload xong, ghi thông tin ảnh vào DB. */
-export async function addPhotos(albumSlug: string, input: z.infer<typeof addPhotosInput>) {
-  const albumId = await findAlbumId(albumSlug);
+/** Bước 2: sau khi upload xong, ghi ảnh vào DB (người upload = actor) và đặt ảnh bìa nếu có chọn. */
+export async function addPhotos(actor: Actor, albumSlug: string, input: z.infer<typeof addPhotosInput>) {
+  const album = await findAlbum(albumSlug);
 
   // Chỉ nhận key do bước presign của đúng album này cấp ra
-  const prefix = `albums/${albumId}/`;
+  const prefix = `albums/${album.id}/`;
   const bad = input.photos.find((p) => !p.key.startsWith(prefix) || p.key.includes(".."));
   if (bad) throw new BadRequestError(`Key does not belong to this album: ${bad.key}`);
-
-  if (input.uploadedById) {
-    const [m] = await db.select({ id: members.id }).from(members).where(eq(members.id, input.uploadedById)).limit(1);
-    if (!m) throw new BadRequestError("Member not found");
+  if (input.coverKey && !input.photos.some((p) => p.key === input.coverKey)) {
+    throw new BadRequestError("coverKey must be one of the uploaded photos.");
+  }
+  if (input.coverKey && !canSetCover(actor, album)) {
+    throw new ForbiddenError("Only the admin or the album’s creator can change its cover.");
   }
 
   const rows = await db
     .insert(photos)
     .values(
       input.photos.map((p) => ({
-        albumId,
+        albumId: album.id,
         storageKey: p.key,
         width: p.width,
         height: p.height,
         sizeBytes: p.sizeBytes,
         mimeType: p.mimeType,
-        uploadedById: input.uploadedById,
+        uploadedById: actor.id,
         takenAt: p.takenAt ? new Date(p.takenAt) : undefined,
       })),
     )
     .onConflictDoNothing({ target: photos.storageKey })
-    .returning({ id: photos.id });
-  return { added: rows.length };
+    .returning({ id: photos.id, storageKey: photos.storageKey });
+
+  const cover = input.coverKey && rows.find((r) => r.storageKey === input.coverKey);
+  if (cover) await db.update(albums).set({ coverPhotoId: cover.id }).where(eq(albums.id, album.id));
+
+  return { added: rows.length, coverSet: !!cover };
 }
 
 export async function getPhotoStorageKey(photoId: string) {

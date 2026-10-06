@@ -1,10 +1,16 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { deletePhoto, updateAlbum } from "@/lib/api-client";
 import { useFavorites } from "@/lib/favorites";
 import { dayKey, formatDayHeading, plural } from "@/lib/format";
-import type { Photo } from "@/lib/types";
+import { canDeletePhoto, canSetCover } from "@/lib/permissions";
+import type { Album, Photo } from "@/lib/types";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { EmptyState } from "./EmptyState";
+import { useIdentity } from "./Identity";
+import { useToast } from "./Toast";
 import { IconGrid, IconHeart, IconImage, IconTimeline } from "./Icons";
 import { Lightbox } from "./Lightbox";
 import { PhotoGrid } from "./PhotoGrid";
@@ -12,11 +18,21 @@ import { PhotoGrid } from "./PhotoGrid";
 type View = "grid" | "days";
 const ALL = "all";
 
-type Props = { photos: Photo[]; initialPhotoId?: string };
+type Props = {
+  album: Pick<Album, "id" | "coverPhotoId" | "createdById">;
+  photos: Photo[];
+  initialPhotoId?: string;
+};
 
-/** Phần thân trang album: thanh lọc, lưới / dòng thời gian, lightbox. */
-export function AlbumView({ photos, initialPhotoId }: Props) {
+/** Phần thân trang album: thanh lọc, lưới / dòng thời gian, lightbox, đặt bìa / xoá ảnh. */
+export function AlbumView({ album, photos, initialPhotoId }: Props) {
   const favorites = useFavorites();
+  const me = useIdentity();
+  const router = useRouter();
+  const toast = useToast();
+  const [toDelete, setToDelete] = useState<Photo | null>(null);
+  // Bìa hiện tại: ảnh đã chọn, nếu chưa chọn thì ảnh đầu tiên (photos đã xếp theo thời gian chụp)
+  const coverId = album.coverPhotoId ?? photos[0]?.id;
   const [person, setPerson] = useState(ALL);
   const [favOnly, setFavOnly] = useState(false);
   const [view, setView] = useState<View>("grid");
@@ -66,6 +82,35 @@ export function AlbumView({ photos, initialPhotoId }: Props) {
     isFavorite: favorites.has,
     onToggleFavorite: favorites.toggle,
   };
+
+  async function setCover(photo: Photo) {
+    if (photo.id === coverId) return;
+    try {
+      await updateAlbum(album.id, { coverPhotoId: photo.id });
+      toast.show({ tone: "success", title: "Album cover updated" });
+      router.refresh();
+    } catch (err) {
+      toast.show({ tone: "warn", title: "Couldn’t change cover", message: (err as Error).message });
+    }
+  }
+
+  async function confirmDelete() {
+    const photo = toDelete;
+    if (!photo) return;
+    try {
+      await deletePhoto(photo.id);
+      // Bỏ khỏi danh sách lightbox; chuyển sang ảnh kế tiếp (hoặc đóng nếu hết ảnh)
+      const i = lightboxList.findIndex((p) => p.id === photo.id);
+      const rest = lightboxList.filter((p) => p.id !== photo.id);
+      setLightboxList(rest);
+      setOpenId(rest.length ? rest[Math.min(i, rest.length - 1)].id : null);
+      toast.show({ tone: "success", title: "Photo deleted" });
+      setToDelete(null);
+      router.refresh();
+    } catch (err) {
+      toast.show({ tone: "warn", title: "Couldn’t delete photo", message: (err as Error).message });
+    }
+  }
 
   if (photos.length === 0) {
     return (
@@ -162,8 +207,22 @@ export function AlbumView({ photos, initialPhotoId }: Props) {
           onClose={() => setOpenId(null)}
           isFavorite={favorites.has}
           onToggleFavorite={favorites.toggle}
+          cover={canSetCover(me, album) ? { isCover: (id) => id === coverId, onSet: setCover } : undefined}
+          remove={{ canDelete: (p) => canDeletePhoto(me, p), onDelete: setToDelete }}
+          paused={!!toDelete}
         />
       )}
+
+      <ConfirmDialog
+        open={!!toDelete}
+        title="Delete this photo?"
+        confirmLabel="Delete photo"
+        onConfirm={confirmDelete}
+        onClose={() => setToDelete(null)}
+      >
+        The photo{toDelete?.uploadedBy ? ` uploaded by ${toDelete.uploadedBy}` : ""} will be removed from the album and
+        from storage.
+      </ConfirmDialog>
     </>
   );
 }

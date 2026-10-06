@@ -7,8 +7,6 @@ import { AlbumCard } from "./AlbumCard";
 import { EmptyState } from "./EmptyState";
 import { IconClose, IconReset, IconSearch } from "./Icons";
 
-const ALL = "all";
-
 export const SORTS = {
   newest: "Newest",
   oldest: "Oldest",
@@ -16,14 +14,15 @@ export const SORTS = {
 } as const;
 export type SortKey = keyof typeof SORTS;
 
-export type AlbumFilters = { q: string; year: string; place: string; sort: SortKey };
+/** `year` / `place` rỗng = tất cả. Chọn nhiều: cùng hàng là "hoặc", khác hàng là "và". */
+export type AlbumFilters = { q: string; year: string[]; place: string[]; sort: SortKey };
 
 type Props = { albums: Album[]; initial: AlbumFilters };
 
 export function AlbumBrowser({ albums, initial }: Props) {
   const [query, setQuery] = useState(initial.q);
-  const [year, setYear] = useState(initial.year);
-  const [place, setPlace] = useState(initial.place);
+  const [year, setYear] = useState<string[]>(initial.year);
+  const [place, setPlace] = useState<string[]>(initial.place);
   const [sort, setSort] = useState<SortKey>(initial.sort);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -40,8 +39,8 @@ export function AlbumBrowser({ albums, initial }: Props) {
     const q = normalizeText(query);
     const list = albums.filter(
       (a) =>
-        (year === ALL || yearOf(a.tripDate) === year) &&
-        (place === ALL || a.location === place) &&
+        (year.length === 0 || year.includes(yearOf(a.tripDate))) &&
+        (place.length === 0 || place.includes(a.location)) &&
         (!q || normalizeText(`${a.title} ${a.location}`).includes(q)),
     );
     return list.sort((a, b) =>
@@ -57,8 +56,8 @@ export function AlbumBrowser({ albums, initial }: Props) {
   useEffect(() => {
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
-    if (year !== ALL) params.set("year", year);
-    if (place !== ALL) params.set("place", place);
+    year.forEach((y) => params.append("year", y));
+    place.forEach((p) => params.append("place", p));
     if (sort !== "newest") params.set("sort", sort);
     const qs = params.toString();
     window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
@@ -76,12 +75,13 @@ export function AlbumBrowser({ albums, initial }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const isFiltering = query.trim() !== "" || year !== ALL || place !== ALL;
+  const isFiltering = query.trim() !== "" || year.length > 0 || place.length > 0 || sort !== "newest";
 
   function resetFilters() {
     setQuery("");
-    setYear(ALL);
-    setPlace(ALL);
+    setYear([]);
+    setPlace([]);
+    setSort("newest");
   }
 
   return (
@@ -134,7 +134,7 @@ export function AlbumBrowser({ albums, initial }: Props) {
             {isFiltering && (
               <button type="button" onClick={resetFilters} className="chip border-accent text-accent">
                 <IconReset size={13} />
-                Clear
+                Clear all
               </button>
             )}
           </div>
@@ -169,6 +169,7 @@ export function AlbumBrowser({ albums, initial }: Props) {
   );
 }
 
+/** Hàng chip chọn nhiều. "All" = bỏ chọn hết; nút ↺ bên cạnh reset riêng hàng này. */
 function ChipRow({
   label,
   value,
@@ -176,21 +177,42 @@ function ChipRow({
   onChange,
 }: {
   label: string;
-  value: string;
+  value: string[];
   options: string[];
-  onChange: (v: string) => void;
+  onChange: (v: string[]) => void;
 }) {
+  const toggle = (opt: string) =>
+    onChange(value.includes(opt) ? value.filter((v) => v !== opt) : [...value, opt]);
+
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       <span className="eyebrow w-11 shrink-0">{label}</span>
       {/* Mobile: cuộn ngang thay vì xuống nhiều dòng */}
-      <div className="scrollbar-none -my-1 flex min-w-0 gap-1.5 overflow-x-auto py-1 pr-1 lg:flex-wrap lg:overflow-visible">
-        {[ALL, ...options].map((opt) => (
-          <button key={opt} type="button" className="chip" aria-pressed={value === opt} onClick={() => onChange(opt)}>
-            {opt === ALL ? "All" : opt}
+      <div
+        role="group"
+        aria-label={`Filter by ${label.toLowerCase()} (multiple allowed)`}
+        className="scrollbar-none -my-1 flex min-w-0 gap-1.5 overflow-x-auto py-1 pr-1 lg:flex-wrap lg:overflow-visible"
+      >
+        <button type="button" className="chip" aria-pressed={value.length === 0} onClick={() => onChange([])}>
+          All
+        </button>
+        {options.map((opt) => (
+          <button key={opt} type="button" className="chip" aria-pressed={value.includes(opt)} onClick={() => toggle(opt)}>
+            {opt}
           </button>
         ))}
       </div>
+      <button
+        type="button"
+        onClick={() => onChange([])}
+        disabled={value.length === 0}
+        title={`Reset ${label.toLowerCase()} filter`}
+        aria-label={`Reset ${label.toLowerCase()} filter`}
+        className="flex h-8 shrink-0 items-center gap-1 rounded-full border-2 border-line px-2.5 text-xs font-semibold text-ink-soft transition-colors hover:text-accent disabled:opacity-35"
+      >
+        <IconReset size={13} />
+        {value.length > 0 && <span className="tabular-nums">{value.length}</span>}
+      </button>
     </div>
   );
 }

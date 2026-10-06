@@ -8,6 +8,20 @@
       "when": 1791262560989,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791264235129,
+      "tag": "0001_member_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791264236828,
+      "tag": "0002_seed_members_and_admin",
+      "breakpoints": true
     }
   ]
 }

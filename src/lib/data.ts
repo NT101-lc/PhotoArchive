@@ -2,7 +2,7 @@ import "server-only";
 import { asc, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { connection } from "next/server";
 import { cache } from "react";
-import { albums, db, members, photos, type AlbumRow } from "@/db";
+import { albums, db, members, photos, ROLE_USER, type AlbumRow } from "@/db";
 import { resolvePhotoUrl } from "./storage";
 import type { Album, Member, Photo } from "./types";
 
@@ -46,6 +46,8 @@ function toAlbum(row: AlbumRow & { photoCount: number }, coverUrl: string): Albu
     tripDate: row.tripDate,
     coverUrl,
     photoCount: row.photoCount,
+    coverPhotoId: row.coverPhotoId,
+    createdById: row.createdById,
   };
 }
 
@@ -96,15 +98,20 @@ export const getPhotos = cache(async (slug: string): Promise<Photo[]> => {
         width: photo.width,
         height: photo.height,
         uploadedBy: uploader ?? "Unknown",
+        uploadedById: photo.uploadedById,
         takenAt: photo.takenAt.toISOString(),
       };
     }),
   );
 });
 
-/** Thành viên nhóm (để chọn "Uploading as" khi chưa có đăng nhập). */
+/** Thành viên thường (role 1) để chọn "Bạn là ai". Tài khoản admin không nằm trong danh sách này. */
 export const getMembers = cache(async (): Promise<Member[]> => {
   await connection();
-  return db.select({ id: members.id, name: members.name }).from(members).orderBy(asc(members.name));
+  return db
+    .select({ id: members.id, name: members.name })
+    .from(members)
+    .where(eq(members.role, ROLE_USER))
+    .orderBy(asc(members.createdAt), asc(members.name));
 });
 

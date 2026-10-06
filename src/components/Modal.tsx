@@ -54,7 +54,7 @@ export function Modal({ open, onClose, title, eyebrow, children, footer, maxWidt
 
   return (
     <div
-      className="animate-fade fixed inset-0 z-[1000] flex items-end justify-center bg-veil backdrop-blur-[2px] sm:items-center sm:p-5"
+      className="animate-fade fixed inset-0 z-[1200] flex items-end justify-center bg-veil backdrop-blur-[2px] sm:items-center sm:p-5"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

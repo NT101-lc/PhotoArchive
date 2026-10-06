@@ -10,6 +10,11 @@ function first(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v;
 }
 
+/** `?year=2025&year=2024` → ["2025", "2024"] */
+function list(v: string | string[] | undefined) {
+  return (Array.isArray(v) ? v : v ? [v] : []).filter(Boolean);
+}
+
 export default async function AlbumsPage({ searchParams }: PageProps<"/albums">) {
   const [albums, sp] = await Promise.all([getAlbums(), searchParams]);
   const totalPhotos = albums.reduce((sum, a) => sum + a.photoCount, 0);
@@ -18,8 +23,8 @@ export default async function AlbumsPage({ searchParams }: PageProps<"/albums">)
   const sort = first(sp.sort);
   const initial = {
     q: first(sp.q) ?? "",
-    year: first(sp.year) ?? "all",
-    place: first(sp.place) ?? "all",
+    year: list(sp.year),
+    place: list(sp.place),
     sort: (sort && sort in SORTS ? sort : "newest") as SortKey,
   };
 
@@ -34,7 +39,7 @@ export default async function AlbumsPage({ searchParams }: PageProps<"/albums">)
           { value: totalPhotos, label: "Photos", color: "accent" },
           { value: places, label: "Places", color: "teal" },
         ]}
-        actions={<UploadButton albums={albums.map(({ id, title }) => ({ id, title }))} />}
+        actions={<UploadButton albums={albums.map(({ id, title, createdById }) => ({ id, title, createdById }))} />}
       />
       <AlbumBrowser albums={albums} initial={initial} />
     </main>

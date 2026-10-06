@@ -1,3 +1,5 @@
+import { api } from "./api-client";
+
 // Gọi API upload từ trình duyệt. Luồng: xin URL đã ký → PUT thẳng lên R2 → báo server ghi vào DB.
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -23,26 +25,8 @@ export function mimeOf(file: File) {
   return MIME_BY_EXT[ext] ?? file.type;
 }
 
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);
-  return body as T;
-}
-
 export function getUploadStatus() {
   return api<{ configured: boolean; maxBytes: number }>("/api/uploads");
-}
-
-export async function getMembers() {
-  return (await api<{ members: { id: string; name: string }[] }>("/api/members")).members;
-}
-
-export function createAlbum(input: { title: string; location: string; tripDate: string; createdById?: string }) {
-  return api<{ id: string; slug: string }>("/api/albums", { method: "POST", body: JSON.stringify(input) });
 }
 
 async function imageSize(file: File) {
@@ -67,11 +51,14 @@ async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>
 
 export type UploadProgress = { done: number; failed: number; total: number };
 
-/** Upload file vào album; trả về số ảnh đã lưu và số file lỗi. */
+/**
+ * Upload file vào album (người upload = người đang dùng, server lấy từ cookie).
+ * `coverIndex`: vị trí file được chọn làm ảnh bìa; bỏ trống → bìa là ảnh đầu tiên.
+ */
 export async function uploadPhotos(
   albumSlug: string,
   files: File[],
-  uploadedById: string | undefined,
+  coverIndex: number | undefined,
   onProgress: (p: UploadProgress) => void,
 ) {
   const progress = { done: 0, failed: 0, total: files.length };
@@ -91,6 +78,8 @@ export async function uploadPhotos(
       },
     );
 
+    // Key R2 của file được chọn làm bìa (nếu nằm trong đợt này và upload thành công)
+    let coverKey: string | undefined;
     const uploaded: Array<{
       key: string;
       width: number;
@@ -101,9 +90,9 @@ export async function uploadPhotos(
     }> = [];
 
     await pool(
-      chunk.map((file, i) => ({ file, up: uploads[i] })),
+      chunk.map((file, i) => ({ file, up: uploads[i], isCover: start + i === coverIndex })),
       CONCURRENCY,
-      async ({ file, up }) => {
+      async ({ file, up, isCover }) => {
         try {
           const [size, res] = await Promise.all([
             imageSize(file),
@@ -118,6 +107,7 @@ export async function uploadPhotos(
             // Chưa đọc EXIF: tạm dùng thời gian sửa file làm thời điểm chụp
             takenAt: new Date(file.lastModified || Date.now()).toISOString(),
           });
+          if (isCover) coverKey = up.key;
           progress.done++;
         } catch {
           progress.failed++;
@@ -129,7 +119,7 @@ export async function uploadPhotos(
     if (uploaded.length > 0) {
       const res = await api<{ added: number }>(`/api/albums/${encodeURIComponent(albumSlug)}/photos`, {
         method: "POST",
-        body: JSON.stringify({ uploadedById, photos: uploaded }),
+        body: JSON.stringify({ photos: uploaded, coverKey }),
       });
       added += res.added;
     }

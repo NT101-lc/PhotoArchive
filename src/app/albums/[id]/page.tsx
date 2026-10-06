@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { AlbumAdminActions } from "@/components/AlbumAdminActions";
 import { AlbumDetailButton } from "@/components/AlbumDetailButton";
 import { AlbumView } from "@/components/AlbumView";
 import { IconCalendar, IconPin } from "@/components/Icons";
@@ -46,13 +47,14 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
         ]}
         actions={
           <>
-            <UploadButton albums={albums.map(({ id, title }) => ({ id, title }))} defaultAlbumId={album.id} />
+            <UploadButton albums={albums.map(({ id, title, createdById }) => ({ id, title, createdById }))} defaultAlbumId={album.id} />
             <AlbumDetailButton album={album} photos={photos} />
+            <AlbumAdminActions album={album} />
           </>
         }
       />
 
-      <AlbumView photos={photos} initialPhotoId={photoParam} />
+      <AlbumView album={album} photos={photos} initialPhotoId={photoParam} />
     </main>
   );
 }

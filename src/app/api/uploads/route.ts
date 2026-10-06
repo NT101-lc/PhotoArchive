@@ -1,4 +1,5 @@
 import { handle, json, readJson } from "@/lib/api";
+import { requireMember } from "@/lib/auth";
 import { MAX_FILES_PER_REQUEST, MAX_UPLOAD_BYTES, presignInput, presignPhotoUploads } from "@/lib/mutations";
 import { isStorageConfigured } from "@/lib/storage";
 
@@ -12,6 +13,7 @@ export const GET = handle(async () =>
  * Body: { albumSlug, files: [{ name, type, size }] } → { uploads: [{ name, key, contentType, uploadUrl }] }
  */
 export const POST = handle(async (req: Request) => {
+  const actor = await requireMember();
   const input = await readJson(req, presignInput);
-  return json({ uploads: await presignPhotoUploads(input) });
+  return json({ uploads: await presignPhotoUploads(actor, input) });
 });

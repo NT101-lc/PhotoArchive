@@ -1,6 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ForbiddenError, UnauthorizedError } from "./auth";
 import { BadRequestError, NotFoundError } from "./mutations";
 import { StorageNotConfiguredError } from "./storage";
 
@@ -25,6 +26,8 @@ export function errorResponse(err: unknown) {
     return json({ error: "Invalid input", issues: z.flattenError(err).fieldErrors }, { status: 400 });
   }
   if (err instanceof BadRequestError) return json({ error: err.message }, { status: 400 });
+  if (err instanceof UnauthorizedError) return json({ error: err.message }, { status: 401 });
+  if (err instanceof ForbiddenError) return json({ error: err.message }, { status: 403 });
   if (err instanceof NotFoundError) return json({ error: err.message }, { status: 404 });
   if (err instanceof StorageNotConfiguredError) return json({ error: err.message }, { status: 503 });
   console.error(err);

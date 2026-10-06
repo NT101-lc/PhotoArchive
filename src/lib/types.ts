@@ -6,6 +6,9 @@ export type Album = {
   tripDate: string;
   coverUrl: string;
   photoCount: number;
+  /** Ảnh bìa đã chọn; null → bìa là ảnh đầu tiên */
+  coverPhotoId: string | null;
+  createdById: string | null;
 };
 
 export type Photo = {
@@ -18,6 +21,7 @@ export type Photo = {
   width: number;
   height: number;
   uploadedBy: string;
+  uploadedById: string | null;
   /** Thời điểm chụp, ISO datetime */
   takenAt: string;
 };

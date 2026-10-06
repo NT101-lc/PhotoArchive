@@ -3,24 +3,19 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { formatBytes, plural } from "@/lib/format";
-import type { Album, Member } from "@/lib/types";
-import {
-  ACCEPTED_EXT,
-  createAlbum,
-  getMembers,
-  getUploadStatus,
-  mimeOf,
-  uploadPhotos,
-  type UploadProgress,
-} from "@/lib/upload-client";
-import { IconChevronDown, IconClose, IconFolder, IconImage, IconPlus, IconUpload } from "./Icons";
+import Link from "next/link";
+import { createAlbum } from "@/lib/api-client";
+import { canSetCover } from "@/lib/permissions";
+import type { Album } from "@/lib/types";
+import { ACCEPTED_EXT, getUploadStatus, mimeOf, uploadPhotos, type UploadProgress } from "@/lib/upload-client";
+import { IconChevronDown, IconClose, IconFolder, IconImage, IconPlus, IconStar, IconUpload, IconUser } from "./Icons";
+import { useIdentity } from "./Identity";
 import { Modal } from "./Modal";
 import { useToast } from "./Toast";
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const PREVIEW_LIMIT = 24; // số ảnh preview mỗi thư mục trước khi bấm "xem thêm"
 const LOOSE = ""; // nhóm ảnh lẻ (không nằm trong thư mục)
-const UPLOADER_KEY = "b6-uploader"; // chưa có đăng nhập → nhớ "Uploading as" trên máy này
 
 /** `YYYY-MM-DD` theo giờ máy */
 function localDate(ms: number) {
@@ -43,7 +38,7 @@ type Target =
   | { mode: "new"; title: string; location: string; tripDate: string };
 
 type Props = {
-  albums: Pick<Album, "id" | "title">[];
+  albums: Pick<Album, "id" | "title" | "createdById">[];
   /** Album chọn sẵn (khi mở từ trang album) */
   defaultAlbumId?: string;
 };
@@ -130,28 +125,18 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
   const [dragging, setDragging] = useState(false);
   const [reading, setReading] = useState(false);
   const [storageReady, setStorageReady] = useState<boolean | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [uploaderId, setUploaderId] = useState("");
+  const me = useIdentity();
+  // Ảnh được chọn làm bìa; null = mặc định (ảnh đầu tiên của album)
+  const [coverKey, setCoverKey] = useState<string | null>(null);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const uploading = progress !== null;
 
-  // Kiểm tra R2 đã cấu hình chưa + lấy danh sách thành viên
+  // Kiểm tra R2 đã cấu hình chưa
   useEffect(() => {
     let alive = true;
     getUploadStatus()
       .then((s) => alive && setStorageReady(s.configured))
       .catch(() => alive && setStorageReady(false));
-    getMembers()
-      .then((list) => {
-        if (!alive) return;
-        setMembers(list);
-        let saved = "";
-        try {
-          saved = localStorage.getItem(UPLOADER_KEY) ?? "";
-        } catch {}
-        if (list.some((m) => m.id === saved)) setUploaderId(saved);
-      })
-      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -241,6 +226,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
   }
 
   function removeWhere(pred: (p: Picked) => boolean) {
+    setCoverKey((k) => (k && itemsRef.current.some((p) => p.key === k && pred(p)) ? null : k));
     setItems((prev) => {
       prev.filter(pred).forEach((p) => URL.revokeObjectURL(p.previewUrl));
       return prev.filter((p) => !pred(p));
@@ -261,10 +247,12 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
       ? !!target.albumId
       : !!target.title.trim() && !!target.location.trim() && !!target.tripDate;
 
+  // Album mới: người tạo luôn được chọn bìa. Album có sẵn: admin hoặc người tạo album đó.
+  const targetAlbum = target.mode === "existing" ? albums.find((a) => a.id === target.albumId) : undefined;
+  const canPickCover = target.mode === "new" || (!!targetAlbum && canSetCover(me, targetAlbum));
+  const coverItem = canPickCover && coverKey ? items.find((i) => i.key === coverKey) : undefined;
+
   async function onSave() {
-    try {
-      localStorage.setItem(UPLOADER_KEY, uploaderId);
-    } catch {}
     setProgress({ done: 0, failed: 0, total: items.length });
     try {
       const slug =
@@ -275,14 +263,13 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
                 title: target.title.trim(),
                 location: target.location.trim(),
                 tripDate: target.tripDate,
-                createdById: uploaderId || undefined,
               })
             ).slug;
 
       const { added, failed } = await uploadPhotos(
         slug,
         items.map((i) => i.file),
-        uploaderId || undefined,
+        coverItem ? items.indexOf(coverItem) : undefined,
         setProgress,
       );
 
@@ -315,11 +302,16 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
             {items.length > 0
               ? `${plural(items.length, "photo")} · ${formatBytes(totalSize)}${folderCount ? ` · ${plural(folderCount, "folder")}` : ""}`
               : "No photos selected"}
+            {items.length > 0 && canPickCover && (
+              <span className="block">
+                Cover: {coverItem ? coverItem.path.split("/").pop() : "first photo (default)"}
+              </span>
+            )}
           </p>
           <button
             type="button"
             className="btn btn-primary h-11 px-6"
-            disabled={items.length === 0 || !targetValid || uploading || storageReady !== true}
+            disabled={items.length === 0 || !targetValid || uploading || storageReady !== true || !me}
             onClick={onSave}
           >
             {uploading ? (
@@ -419,17 +411,22 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
           )}
         </fieldset>
 
-        <label className="flex flex-col gap-2">
-          <span className="eyebrow">Uploading as</span>
-          <select value={uploaderId} onChange={(e) => setUploaderId(e.target.value)} className="field">
-            <option value="">— Choose your name —</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {me ? (
+          <p className="flex items-center gap-2 text-sm text-ink-soft">
+            <IconUser size={15} />
+            Uploading as <b className="text-ink">{me.name}</b>
+            <Link href="/login" className="ml-auto font-semibold underline hover:text-accent">
+              Not you?
+            </Link>
+          </p>
+        ) : (
+          <p role="alert" className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-accent bg-accent/10 px-4 py-3 text-sm">
+            <b>Pick your name before uploading.</b>
+            <Link href="/login" className="btn btn-primary ml-auto h-9">
+              Choose who you are
+            </Link>
+          </p>
+        )}
 
         {/* Vùng thả */}
         <div
@@ -493,6 +490,8 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
                 items={list}
                 onRemoveGroup={() => removeWhere((p) => p.folder === folder)}
                 onRemoveItem={(key) => removeWhere((p) => p.key === key)}
+                coverKey={canPickCover ? coverKey : undefined}
+                onToggleCover={canPickCover ? (key) => setCoverKey((k) => (k === key ? null : key)) : undefined}
               />
             ))}
             {items.length > 1 && (
@@ -512,11 +511,15 @@ function FolderGroup({
   items,
   onRemoveGroup,
   onRemoveItem,
+  coverKey,
+  onToggleCover,
 }: {
   folder: string;
   items: Picked[];
   onRemoveGroup: () => void;
   onRemoveItem: (key: string) => void;
+  coverKey?: string | null;
+  onToggleCover?: (key: string) => void;
 }) {
   const [open, setOpen] = useState(true);
   const [showAll, setShowAll] = useState(false);
@@ -542,7 +545,13 @@ function FolderGroup({
         <div className="border-t-2 border-dashed border-line p-3">
           <ul className="grid grid-cols-4 gap-2 sm:grid-cols-6">
             {shown.map((f) => (
-              <PreviewTile key={f.key} item={f} onRemove={() => onRemoveItem(f.key)} />
+              <PreviewTile
+                key={f.key}
+                item={f}
+                onRemove={() => onRemoveItem(f.key)}
+                isCover={coverKey === f.key}
+                onToggleCover={onToggleCover && (() => onToggleCover(f.key))}
+              />
             ))}
           </ul>
           {items.length > PREVIEW_LIMIT && (
@@ -556,13 +565,27 @@ function FolderGroup({
   );
 }
 
-function PreviewTile({ item, onRemove }: { item: Picked; onRemove: () => void }) {
+function PreviewTile({
+  item,
+  onRemove,
+  isCover = false,
+  onToggleCover,
+}: {
+  item: Picked;
+  onRemove: () => void;
+  isCover?: boolean;
+  onToggleCover?: () => void;
+}) {
   const [broken, setBroken] = useState(false); // vd HEIC: đa số trình duyệt không hiển thị được
   const name = item.path.split("/").pop();
 
   return (
     <li className="group relative" title={`${item.path} · ${formatBytes(item.file.size)}`}>
-      <div className="aspect-square overflow-hidden rounded-lg border-2 border-line bg-surface-2">
+      <div
+        className={`aspect-square overflow-hidden rounded-lg border-2 bg-surface-2 ${
+          isCover ? "border-accent ring-2 ring-accent" : "border-line"
+        }`}
+      >
         {broken ? (
           <div className="flex h-full flex-col items-center justify-center gap-1 p-1 text-ink-soft">
             <IconImage size={18} />
@@ -581,6 +604,27 @@ function PreviewTile({ item, onRemove }: { item: Picked; onRemove: () => void })
       >
         <IconClose size={11} />
       </button>
+      {isCover && (
+        <span className="absolute inset-x-1 bottom-1 rounded bg-accent px-1 text-center font-mono text-[0.55rem] font-bold text-on-accent">
+          COVER
+        </span>
+      )}
+      {onToggleCover && (
+        <button
+          type="button"
+          onClick={onToggleCover}
+          aria-pressed={isCover}
+          title={isCover ? "Unset cover (use first photo)" : "Use as album cover"}
+          aria-label={isCover ? `Unset ${name} as cover` : `Use ${name} as cover`}
+          className={`absolute -top-1.5 -left-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-line shadow-hard-sm ${
+            isCover
+              ? "bg-accent text-on-accent"
+              : "bg-surface opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+          }`}
+        >
+          <IconStar size={12} filled={isCover} />
+        </button>
+      )}
     </li>
   );
 }

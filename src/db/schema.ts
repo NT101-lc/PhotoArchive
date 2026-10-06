@@ -4,6 +4,7 @@ import {
   index,
   integer,
   pgTable,
+  smallint,
   text,
   timestamp,
   uuid,
@@ -21,13 +22,24 @@ const timestamps = {
     .$onUpdate(() => new Date()),
 };
 
-/** Thành viên nhóm. `email` để sau này khớp với tài khoản Google khi có auth. */
-export const members = pgTable("members", {
-  id: uuid().primaryKey().defaultRandom(),
-  name: text().notNull().unique(),
-  email: text().unique(),
-  ...timestamps,
-});
+/** Vai trò: 0 = admin (toàn quyền, đăng nhập bằng mật khẩu), 1 = user (chỉ chọn tên, không mật khẩu). */
+export const ROLE_ADMIN = 0;
+export const ROLE_USER = 1;
+
+/** Thành viên nhóm. */
+export const members = pgTable(
+  "members",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    name: text().notNull().unique(),
+    email: text().unique(),
+    role: smallint().notNull().default(ROLE_USER),
+    // Chỉ admin có mật khẩu (scrypt, dạng `salt:hash` hex)
+    passwordHash: text(),
+    ...timestamps,
+  },
+  (t) => [check("members_role_valid", sql`${t.role} in (0, 1)`)],
+);
 
 /** Một chuyến đi. `slug` dùng trên URL (/albums/da-lat-2025). */
 export const albums = pgTable(

@@ -1,9 +1,13 @@
 import type { Album, Photo } from "../lib/types";
 
+// Kiểu dữ liệu mẫu: chỉ các trường cần để seed (không có các id sinh ra trong DB)
+type SeedAlbum = Omit<Album, "coverPhotoId" | "createdById">;
+type SeedPhoto = Omit<Photo, "uploadedById">;
+
 // Dữ liệu mẫu để seed DB (npm run db:seed).
 // Mọi giá trị đều tất định (không dùng Math.random) để server/client render giống nhau.
 
-export const MEMBERS = ["Nam Anh", "Minh", "Thảo", "Huy", "Linh", "Quân"];
+export const MEMBERS = ["Nam Anh", "Diệp", "Thảo", "Hoàng", "Nam", "Hưng"];
 
 // Các tỉ lệ ảnh hay gặp: ngang 3:2, dọc 2:3, 4:3, 3:4, 16:9
 const SHAPES: Array<[number, number]> = [
@@ -16,7 +20,7 @@ const SHAPES: Array<[number, number]> = [
 
 const THUMB_WIDTH = 600;
 
-type AlbumSeed = Omit<Album, "coverUrl" | "photoCount"> & { count: number };
+type AlbumSeed = Omit<SeedAlbum, "coverUrl" | "photoCount"> & { count: number };
 
 const ALBUM_SEEDS: AlbumSeed[] = [
   { id: "da-lat-2025", title: "Đà Lạt mùa sương", location: "Đà Lạt", tripDate: "2025-12-20", count: 14 },
@@ -31,7 +35,7 @@ function picsum(seed: string, w: number, h: number) {
   return `https://picsum.photos/seed/${seed}/${w}/${h}`;
 }
 
-function buildPhotos(album: AlbumSeed): Photo[] {
+function buildPhotos(album: AlbumSeed): SeedPhoto[] {
   const start = new Date(`${album.tripDate}T07:30:00+07:00`).getTime();
   const albumIndex = ALBUM_SEEDS.indexOf(album);
 
@@ -54,9 +58,9 @@ function buildPhotos(album: AlbumSeed): Photo[] {
   });
 }
 
-export const MOCK_PHOTOS: Photo[] = ALBUM_SEEDS.flatMap(buildPhotos);
+export const MOCK_PHOTOS: SeedPhoto[] = ALBUM_SEEDS.flatMap(buildPhotos);
 
-export const MOCK_ALBUMS: Album[] = ALBUM_SEEDS.map(({ count, ...album }) => ({
+export const MOCK_ALBUMS: SeedAlbum[] = ALBUM_SEEDS.map(({ count, ...album }) => ({
   ...album,
   coverUrl: picsum(`b6-${album.id}-cover`, 1200, 800),
   photoCount: count,
