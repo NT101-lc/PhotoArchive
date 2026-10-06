@@ -93,11 +93,7 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <div className="flex flex-col gap-12">
-            {years.map((year) => (
-              <YearGroup key={year} year={year} trips={albums.filter((a) => yearOf(a.tripDate) === year)} />
-            ))}
-          </div>
+          <Timeline albums={albums} years={years} />
         </section>
       </main>
 
@@ -180,24 +176,64 @@ function weekday(isoDate: string) {
   return weekdayFmt.format(new Date(`${isoDate}T12:00:00+07:00`));
 }
 
-/** Một năm trong sổ: năm lớn bên trái (dính khi cuộn trên desktop), các chuyến xếp thành hàng bên phải. */
-function YearGroup({ year, trips }: { year: string; trips: Album[] }) {
+/**
+ * Dòng thời gian dạng trục dọc, mới nhất ở trên.
+ * Desktop: [ngày + thứ] — trục có chấm — [chuyến đi]. Mobile: trục bên trái, ngày nằm trên thẻ.
+ * Mốc năm là nhãn màu mép phim nằm ngay trên trục.
+ */
+function Timeline({ albums, years }: { albums: Album[]; years: string[] }) {
+  // Cột: [ngày 8.5rem] [trục 2.5rem] [thẻ] trên md; [trục 1.5rem] [nội dung] trên mobile
+  const cols = "grid grid-cols-[1.5rem_1fr] gap-x-3 md:grid-cols-[8.5rem_2.5rem_1fr] md:gap-x-4";
   return (
-    <section className="grid gap-4 md:grid-cols-[11rem_1fr] md:gap-8">
-      <div className="md:sticky md:top-24 md:self-start">
-        <h3 className="font-display text-5xl leading-none font-extrabold tracking-[-0.04em] tabular-nums" style={{ fontStretch: "125%" }}>
-          {year}
-        </h3>
-        <p className="mt-1 text-sm text-ink-soft">{plural(trips.length, "trip")}</p>
-      </div>
-      <ol className="border-t border-line">
-        {trips.map((a) => (
-          <li key={a.id} className="border-b border-line">
-            <TripRow album={a} />
-          </li>
-        ))}
+    <div className="relative max-w-4xl">
+      {/* Trục: tâm cột trục = 0.75rem (mobile) / 8.5rem + 1rem + 1.25rem (md) */}
+      <div
+        aria-hidden="true"
+        className="absolute top-3 bottom-3 left-[calc(0.75rem-1px)] w-[2px] rounded-full bg-ink/25 md:left-[calc(10.75rem-1px)]"
+      />
+      <ol className="relative flex flex-col gap-6">
+        {years.map((year) => {
+          const trips = albums.filter((a) => yearOf(a.tripDate) === year);
+          return (
+            <li key={year} className="flex flex-col gap-5">
+              {/* Mobile: nhãn năm đè lên trục ở mép trái; desktop: căn giữa trên trục */}
+              <div className="flex items-center gap-2.5 md:grid md:grid-cols-[8.5rem_2.5rem_1fr] md:gap-x-4">
+                <span className="hidden text-right text-sm text-ink-soft md:block">{plural(trips.length, "trip")}</span>
+                <span className="relative z-10 flex md:justify-center">
+                  <span
+                    className="rounded-[3px] bg-edge px-1.5 py-0.5 font-display text-xs leading-none font-extrabold text-film tabular-nums md:px-2 md:text-sm"
+                    style={{ fontStretch: "125%" }}
+                  >
+                    {year}
+                  </span>
+                </span>
+                <span className="text-sm text-ink-soft md:hidden">{plural(trips.length, "trip")}</span>
+              </div>
+
+              <ol className="flex flex-col gap-3">
+                {trips.map((a) => (
+                  <li key={a.id} className={`${cols} items-center`}>
+                    <time dateTime={a.tripDate} className="hidden text-right md:block">
+                      <span className="block font-semibold tabular-nums">{formatDate(a.tripDate)}</span>
+                      <span className="text-sm text-ink-soft">{weekday(a.tripDate)}</span>
+                    </time>
+                    <span className="relative z-10 flex justify-center">
+                      <span className="h-3.5 w-3.5 rounded-full bg-accent ring-4 ring-bg md:h-4 md:w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <time dateTime={a.tripDate} className="mb-0.5 block text-sm text-ink-soft tabular-nums md:hidden">
+                        {formatDate(a.tripDate)}, {weekday(a.tripDate)}
+                      </time>
+                      <TripRow album={a} />
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </li>
+          );
+        })}
       </ol>
-    </section>
+    </div>
   );
 }
 
@@ -205,10 +241,10 @@ function TripRow({ album }: { album: Album }) {
   return (
     <Link
       href={`/albums/${album.id}`}
-      className="group -mx-2 flex items-center gap-4 rounded-lg px-2 py-3 transition-colors hover:bg-surface/70 sm:gap-5"
+      className="group -mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-surface/70 sm:gap-5"
     >
       <span className="print shrink-0 p-1">
-        <span className="relative block h-14 w-20 overflow-hidden rounded-[1px] bg-surface-2 sm:h-[4.5rem] sm:w-24">
+        <span className="relative block h-12 w-16 overflow-hidden rounded-[1px] bg-surface-2 sm:h-[4.5rem] sm:w-24">
           <SmartImage src={album.coverUrl} alt="" fill sizes="96px" className="object-cover" />
         </span>
       </span>
@@ -218,14 +254,15 @@ function TripRow({ album }: { album: Album }) {
         </span>
         <span className="flex items-center gap-1 truncate text-sm text-ink-soft">
           <IconPin size={14} className="shrink-0" />
-          {album.location}
+          <span className="truncate">
+            {album.location}
+            <span className="sm:hidden">, {plural(album.photoCount, "photo")}</span>
+          </span>
         </span>
       </span>
-      <time dateTime={album.tripDate} className="hidden shrink-0 text-right text-sm sm:block">
-        <span className="block font-semibold tabular-nums">{formatDate(album.tripDate)}</span>
-        <span className="text-ink-soft">{weekday(album.tripDate)}</span>
-      </time>
-      <span className="w-20 shrink-0 text-right text-sm text-ink-soft tabular-nums">{plural(album.photoCount, "photo")}</span>
+      <span className="hidden w-20 shrink-0 text-right text-sm text-ink-soft tabular-nums sm:block">
+        {plural(album.photoCount, "photo")}
+      </span>
     </Link>
   );
 }
