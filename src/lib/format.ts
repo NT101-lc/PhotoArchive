@@ -19,6 +19,24 @@ export function formatDate(isoDate: string) {
   return dateFmt.format(new Date(`${isoDate.slice(0, 10)}T12:00:00+07:00`));
 }
 
+/**
+ * Khoảng ngày của chuyến đi, gộp phần trùng:
+ * `20 Dec 2025` · `20–22 Dec 2025` · `30 Nov – 2 Dec 2025` · `30 Dec 2025 – 2 Jan 2026`
+ */
+export function formatDateRange(start: string, end: string | null | undefined) {
+  if (!end || end <= start) return formatDate(start);
+  const [a, b] = [start, end].map((d) => formatDate(d).split(" ")); // [day, month, year]
+  if (a[2] !== b[2]) return `${a.join(" ")} – ${b.join(" ")}`;
+  if (a[1] !== b[1]) return `${a[0]} ${a[1]} – ${b.join(" ")}`;
+  return `${a[0]}–${b.join(" ")}`;
+}
+
+/** Số ngày của chuyến (tính cả ngày đầu và cuối). */
+export function tripDays(start: string, end: string | null | undefined) {
+  if (!end || end <= start) return 1;
+  return Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1;
+}
+
 export function formatDateTime(iso: string) {
   return dateTimeFmt.format(new Date(iso));
 }

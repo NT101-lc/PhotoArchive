@@ -29,6 +29,13 @@
       "when": 1791267756540,
       "tag": "0003_member_avatar",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791271943493,
+      "tag": "0004_album_end_date",
+      "breakpoints": true
     }
   ]
 }

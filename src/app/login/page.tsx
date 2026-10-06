@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Logo } from "@/components/Logo";
 import { getCurrentMember } from "@/lib/auth";
 import { getMembers } from "@/lib/data";
-import { IdentityForm } from "./IdentityForm";
+import { IdentityForm } from "@/components/IdentityForm";
 
 export const metadata: Metadata = { title: "Who are you?" };
 

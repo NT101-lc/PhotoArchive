@@ -114,9 +114,9 @@ Xoá album sẽ xoá luôn ảnh (cascade). Số ảnh của album được đ�
 | Method & path                      | Việc làm                                                                 |
 | ---------------------------------- | ------------------------------------------------------------------------ |
 | `GET /api/albums`                  | Danh sách album                                                          |
-| `POST /api/albums`                 | Tạo album `{ title, location, tripDate }` → `{ id, slug }` (cần đã chọn tên) |
+| `POST /api/albums`                 | Tạo album `{ title, location, tripDate, endDate? }` → `{ id, slug }` (cần đã chọn tên; `endDate` = ngày về, bỏ trống nếu đi trong ngày) |
 | `GET /api/albums/:slug`            | Album + danh sách ảnh                                                    |
-| `PATCH /api/albums/:slug`          | `{ title?, location?, tripDate?, coverPhotoId? }` — tên/nơi: admin; ngày: mọi thành viên; bìa: admin / người tạo |
+| `PATCH /api/albums/:slug`          | `{ title?, location?, tripDate?, endDate?, coverPhotoId? }` — tên/nơi: admin; ngày đi/về: mọi thành viên; bìa: admin / người tạo |
 | `DELETE /api/albums/:slug`         | Xoá album + ảnh (DB và R2) — admin                                       |
 | `POST /api/albums/:slug/photos`    | Ghi ảnh đã upload `{ photos: [{ key, width, height, sizeBytes, mimeType, takenAt? }], coverKey? }` |
 | `DELETE /api/photos/:id`           | Xoá ảnh (DB và R2) — admin / người upload                                |

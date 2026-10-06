@@ -3,15 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { formatBytes, plural } from "@/lib/format";
-import Link from "next/link";
-import { createAlbum } from "@/lib/api-client";
+import { api, createAlbum } from "@/lib/api-client";
 import { canSetCover } from "@/lib/permissions";
-import type { Album } from "@/lib/types";
+import type { Album, Member } from "@/lib/types";
 import { ACCEPTED_EXT, getUploadStatus, mimeOf, uploadPhotos, type UploadProgress } from "@/lib/upload-client";
 import { IconChevronDown, IconClose, IconFolder, IconImage, IconPlus, IconStar, IconUpload, IconUser } from "./Icons";
 import { useIdentity } from "./Identity";
+import { IdentityForm } from "./IdentityForm";
 import { Modal } from "./Modal";
 import { useToast } from "./Toast";
+import { DateRangeFields } from "./DateRangeFields";
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const PREVIEW_LIMIT = 24; // số ảnh preview mỗi thư mục trước khi bấm "xem thêm"
@@ -35,7 +36,7 @@ type Picked = {
 
 type Target =
   | { mode: "existing"; albumId: string }
-  | { mode: "new"; title: string; location: string; tripDate: string };
+  | { mode: "new"; title: string; location: string; tripDate: string; endDate: string };
 
 type Props = {
   albums: Pick<Album, "id" | "title" | "createdById">[];
@@ -74,8 +75,8 @@ function isImage(file: File) {
   return ACCEPTED_EXT.test(file.name) || mimeOf(file).startsWith("image/");
 }
 
-function newTarget(title = "", tripDate = localDate(Date.now())): Target {
-  return { mode: "new", title, location: "", tripDate };
+function newTarget(title = "", tripDate = localDate(Date.now()), endDate = ""): Target {
+  return { mode: "new", title, location: "", tripDate, endDate };
 }
 
 function dirname(path: string) {
@@ -126,6 +127,12 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
   const [reading, setReading] = useState(false);
   const [storageReady, setStorageReady] = useState<boolean | null>(null);
   const me = useIdentity();
+  // Chọn tên ngay trong modal (không rời trang) để không mất ảnh / thông tin đang điền
+  const [picking, setPicking] = useState(false);
+  const [members, setMembers] = useState<Member[] | null>(null);
+  // Tên vừa chọn, chờ server làm mới danh tính (router.refresh) xong
+  const [pickedName, setPickedName] = useState<string | null>(null);
+  const switching = pickedName !== null && me?.name !== pickedName;
   // Ảnh được chọn làm bìa; null = mặc định (ảnh đầu tiên của album)
   const [coverKey, setCoverKey] = useState<string | null>(null);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
@@ -141,6 +148,15 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
       alive = false;
     };
   }, []);
+
+  function openPicker() {
+    setPicking(true);
+    if (!members) {
+      api<{ members: Member[] }>("/api/members")
+        .then((r) => setMembers(r.members))
+        .catch(() => toast.show({ tone: "warn", title: "Couldn’t load the crew list" }));
+    }
+  }
 
   // Giải phóng object URL của preview khi đóng modal
   const itemsRef = useRef(items);
@@ -190,11 +206,12 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
     setItems((prev) => [...prev, ...added]);
 
     // Có thư mục → gợi ý tạo album mới theo tên thư mục gốc (nếu người dùng chưa tự chọn)
-    // Ngày đi gợi ý = ngày của file cũ nhất
+    // Khoảng ngày gợi ý = từ file cũ nhất tới file mới nhất
     const rootFolder = added.find((a) => a.folder)?.folder.split("/")[0];
     if (rootFolder && !targetTouched) {
-      const earliest = Math.min(...added.map((a) => a.file.lastModified || Date.now()));
-      setTarget(newTarget(rootFolder, localDate(earliest)));
+      const times = added.map((a) => a.file.lastModified || Date.now());
+      const [first, last] = [localDate(Math.min(...times)), localDate(Math.max(...times))];
+      setTarget(newTarget(rootFolder, first, last === first ? "" : last));
     }
   }
 
@@ -263,6 +280,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
                 title: target.title.trim(),
                 location: target.location.trim(),
                 tripDate: target.tripDate,
+                endDate: target.endDate || null,
               })
             ).slug;
 
@@ -311,7 +329,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
           <button
             type="button"
             className="btn btn-primary h-11 px-6"
-            disabled={items.length === 0 || !targetValid || uploading || storageReady !== true || !me}
+            disabled={items.length === 0 || !targetValid || uploading || storageReady !== true || !me || switching || picking}
             onClick={onSave}
           >
             {uploading ? (
@@ -382,7 +400,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
               ))}
             </select>
           ) : (
-            <div className="grid gap-2 sm:grid-cols-[2fr_1.4fr_1fr]">
+            <div className="grid gap-2 sm:grid-cols-[3fr_2fr]">
               <input
                 value={target.title}
                 onChange={(e) => {
@@ -400,31 +418,64 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
                 className="field"
                 aria-label="Place"
               />
-              <input
-                type="date"
-                value={target.tripDate}
-                onChange={(e) => setTarget({ ...target, tripDate: e.target.value })}
-                className="field"
-                aria-label="Trip date"
+              <DateRangeFields
+                className="sm:col-span-2"
+                start={target.tripDate}
+                end={target.endDate}
+                onChange={({ start, end }) => {
+                  setTargetTouched(true);
+                  setTarget({ ...target, tripDate: start, endDate: end });
+                }}
               />
             </div>
           )}
         </fieldset>
 
-        {me ? (
+        {picking ? (
+          <section className="rounded-xl border border-line bg-surface-2/40 p-4" aria-label="Choose who you are">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-sm">
+                <b>Who’s uploading?</b> <span className="text-ink-soft">Your photos and album details stay as they are.</span>
+              </p>
+              {me && (
+                <button type="button" onClick={() => setPicking(false)} className="shrink-0 text-sm font-semibold underline hover:text-accent">
+                  Cancel
+                </button>
+              )}
+            </div>
+            {members ? (
+              <IdentityForm
+                members={members}
+                current={me}
+                onDone={(name) => {
+                  setPickedName(name);
+                  setPicking(false);
+                }}
+              />
+            ) : (
+              <p className="text-sm text-ink-soft">Loading the crew…</p>
+            )}
+          </section>
+        ) : switching ? (
+          <p className="flex items-center gap-2 text-sm text-ink-soft" aria-live="polite">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-accent" />
+            Switching to <b className="text-ink">{pickedName}</b>…
+          </p>
+        ) : me ? (
           <p className="flex items-center gap-2 text-sm text-ink-soft">
             <IconUser size={15} />
             Uploading as <b className="text-ink">{me.name}</b>
-            <Link href="/login" className="ml-auto font-semibold underline hover:text-accent">
+            <button type="button" onClick={openPicker} disabled={uploading} className="ml-auto font-semibold underline hover:text-accent">
               Not you?
-            </Link>
+            </button>
           </p>
         ) : (
           <p role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-danger bg-danger/10 px-4 py-3 text-sm">
             <b>Pick your name before uploading.</b>
-            <Link href="/login" className="btn btn-primary ml-auto h-9">
+            <span className="text-ink-soft">You won’t lose anything you’ve added.</span>
+            <button type="button" onClick={openPicker} className="btn btn-primary ml-auto h-9">
               Choose who you are
-            </Link>
+            </button>
           </p>
         )}
 

@@ -4,7 +4,7 @@ import { IconArrowRight, IconImage, IconPin, IconUpload } from "@/components/Ico
 import { SmartImage } from "@/components/SmartImage";
 import { UploadButton } from "@/components/UploadModal";
 import { getAlbums, getPhotos } from "@/lib/data";
-import { dayKey, formatDate, plural, yearOf } from "@/lib/format";
+import { dayKey, formatDateRange, plural, tripDays, yearOf } from "@/lib/format";
 import type { Album, Photo } from "@/lib/types";
 
 const SHEET_FRAMES = 6;
@@ -47,7 +47,7 @@ export default async function HomePage() {
       <main>
         {/* ---------- Chuyến gần nhất ---------- */}
         <section className="mx-auto max-w-[1280px] px-4 pt-10 pb-8 sm:px-6 sm:pt-14">
-          <p className="eyebrow">Latest trip, {formatDate(latest.tripDate)}</p>
+          <p className="eyebrow">Latest trip, {formatDateRange(latest.tripDate, latest.endDate)}</p>
           <h1
             className="mt-2 max-w-[16ch] font-display text-[clamp(2.6rem,8vw,6.25rem)] leading-[0.9] font-extrabold tracking-[-0.04em] text-balance"
             style={{ fontStretch: "125%" }}
@@ -176,6 +176,12 @@ function weekday(isoDate: string) {
   return weekdayFmt.format(new Date(`${isoDate}T12:00:00+07:00`));
 }
 
+/** `Sat` cho chuyến trong ngày, `Sat–Mon · 3 days` cho chuyến nhiều ngày. */
+function tripLabel(a: Album) {
+  if (!a.endDate) return weekday(a.tripDate);
+  return `${weekday(a.tripDate)}–${weekday(a.endDate)} · ${plural(tripDays(a.tripDate, a.endDate), "day")}`;
+}
+
 /**
  * Dòng thời gian dạng trục dọc, mới nhất ở trên.
  * Desktop: [ngày + thứ] — trục có chấm — [chuyến đi]. Mobile: trục bên trái, ngày nằm trên thẻ.
@@ -214,15 +220,17 @@ function Timeline({ albums, years }: { albums: Album[]; years: string[] }) {
                 {trips.map((a) => (
                   <li key={a.id} className={`${cols} items-center`}>
                     <time dateTime={a.tripDate} className="hidden text-right md:block">
-                      <span className="block font-semibold tabular-nums">{formatDate(a.tripDate)}</span>
-                      <span className="text-sm text-ink-soft">{weekday(a.tripDate)}</span>
+                      <span className="block font-semibold text-balance tabular-nums">
+                        {formatDateRange(a.tripDate, a.endDate)}
+                      </span>
+                      <span className="text-sm text-ink-soft">{tripLabel(a)}</span>
                     </time>
                     <span className="relative z-10 flex justify-center">
                       <span className="h-3.5 w-3.5 rounded-full bg-accent ring-4 ring-bg md:h-4 md:w-4" />
                     </span>
                     <div className="min-w-0">
                       <time dateTime={a.tripDate} className="mb-0.5 block text-sm text-ink-soft tabular-nums md:hidden">
-                        {formatDate(a.tripDate)}, {weekday(a.tripDate)}
+                        {formatDateRange(a.tripDate, a.endDate)}, {tripLabel(a)}
                       </time>
                       <TripRow album={a} />
                     </div>

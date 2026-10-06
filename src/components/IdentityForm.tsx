@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Avatar } from "@/components/Avatar";
-import { IconCheck, IconLock } from "@/components/Icons";
-import { useToast } from "@/components/Toast";
 import type { Me, Member } from "@/lib/types";
+import { Avatar } from "./Avatar";
+import { IconCheck, IconLock } from "./Icons";
+import { useToast } from "./Toast";
 
 async function post(url: string, body?: unknown, method = "POST") {
   const res = await fetch(url, {
@@ -17,16 +17,36 @@ async function post(url: string, body?: unknown, method = "POST") {
   if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
 }
 
-export function IdentityForm({ members, current, next }: { members: Member[]; current: Me | null; next: string }) {
+/**
+ * Chọn tên / đăng nhập admin.
+ * - Trang /login: xong thì chuyển tới `next`.
+ * - Nhúng trong form khác (vd modal upload): truyền `onDone` → ở nguyên chỗ, chỉ làm mới dữ liệu
+ *   server nên những gì người dùng đang điền không bị mất.
+ */
+export function IdentityForm({
+  members,
+  current,
+  next = "/",
+  onDone,
+}: {
+  members: Member[];
+  current: Me | null;
+  next?: string;
+  /** Nhận tên người vừa chọn (admin: "ADMIN") */
+  onDone?: (name: string) => void;
+}) {
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const [adminOpen, setAdminOpen] = useState(current?.role === 0);
   const [password, setPassword] = useState("");
 
-  function done(title: string) {
+  function done(title: string, name: string) {
     toast.show({ tone: "success", title });
-    router.push(next);
+    if (onDone) {
+      onDone(name);
+      setBusy(null);
+    } else router.push(next);
     router.refresh();
   }
 
@@ -34,7 +54,7 @@ export function IdentityForm({ members, current, next }: { members: Member[]; cu
     setBusy(m.id);
     try {
       await post("/api/session", { memberId: m.id });
-      done(`Hi ${m.name}!`);
+      done(`Hi ${m.name}!`, m.name);
     } catch (err) {
       toast.show({ tone: "warn", title: "Couldn’t switch", message: (err as Error).message });
       setBusy(null);
@@ -46,7 +66,7 @@ export function IdentityForm({ members, current, next }: { members: Member[]; cu
     setBusy("admin");
     try {
       await post("/api/session/admin", { name: "ADMIN", password });
-      done("Signed in as admin");
+      done("Signed in as admin", "ADMIN");
     } catch (err) {
       toast.show({ tone: "warn", title: "Admin sign-in failed", message: (err as Error).message });
       setBusy(null);
@@ -124,7 +144,7 @@ export function IdentityForm({ members, current, next }: { members: Member[]; cu
         )}
       </div>
 
-      {current && (
+      {current && !onDone && (
         <button type="button" onClick={signOut} disabled={!!busy} className="text-sm font-semibold text-ink-soft underline hover:text-accent">
           Sign out ({current.name})
         </button>

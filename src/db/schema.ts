@@ -52,12 +52,17 @@ export const albums = pgTable(
     title: text().notNull(),
     location: text().notNull(),
     tripDate: date({ mode: "string" }).notNull(),
+    // Ngày về (chuyến nhiều ngày); null → đi trong một ngày
+    endDate: date({ mode: "string" }),
     // Ảnh bìa; null → lấy ảnh chụp sớm nhất của album
     coverPhotoId: uuid().references((): AnyPgColumn => photos.id, { onDelete: "set null" }),
     createdById: uuid().references(() => members.id, { onDelete: "set null" }),
     ...timestamps,
   },
-  (t) => [index("albums_trip_date_idx").on(t.tripDate)],
+  (t) => [
+    index("albums_trip_date_idx").on(t.tripDate),
+    check("albums_end_after_start", sql`${t.endDate} is null or ${t.endDate} >= ${t.tripDate}`),
+  ],
 );
 
 /**

@@ -4,6 +4,8 @@ export type Album = {
   location: string;
   /** Ngày đi, định dạng ISO `YYYY-MM-DD` */
   tripDate: string;
+  /** Ngày về (chuyến nhiều ngày), null nếu đi trong ngày */
+  endDate: string | null;
   coverUrl: string;
   photoCount: number;
   /** Ảnh bìa đã chọn; null → bìa là ảnh đầu tiên */

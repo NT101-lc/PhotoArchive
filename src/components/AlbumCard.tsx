@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDate, plural } from "@/lib/format";
+import { formatDateRange, plural } from "@/lib/format";
 import type { Album } from "@/lib/types";
 import { IconPin } from "./Icons";
 import { SmartImage } from "./SmartImage";
@@ -31,7 +31,7 @@ export function AlbumCard({ album, preload = false }: Props) {
         <p className="flex items-center gap-1 text-sm text-ink-soft">
           <IconPin size={15} className="shrink-0" />
           <span className="font-medium text-ink">{album.location}</span>
-          <span className="ml-auto tabular-nums">{formatDate(album.tripDate)}</span>
+          <span className="ml-auto tabular-nums">{formatDateRange(album.tripDate, album.endDate)}</span>
         </p>
       </div>
     </Link>

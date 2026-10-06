@@ -10,13 +10,19 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function createAlbum(input: { title: string; location: string; tripDate: string }) {
+export function createAlbum(input: { title: string; location: string; tripDate: string; endDate?: string | null }) {
   return api<{ id: string; slug: string }>("/api/albums", { method: "POST", body: JSON.stringify(input) });
 }
 
 export function updateAlbum(
   slug: string,
-  patch: { title?: string; location?: string; tripDate?: string; coverPhotoId?: string | null },
+  patch: {
+    title?: string;
+    location?: string;
+    tripDate?: string;
+    endDate?: string | null;
+    coverPhotoId?: string | null;
+  },
 ) {
   return api<{ slug: string }>(`/api/albums/${encodeURIComponent(slug)}`, {
     method: "PATCH",

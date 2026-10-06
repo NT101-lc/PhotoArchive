@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { dayKey, formatBytes, formatDate, normalizeText, plural, slugify, yearOf } from "./format";
+import { dayKey, formatBytes, formatDate, formatDateRange, normalizeText, plural, slugify, tripDays, yearOf } from "./format";
 
 describe("format", () => {
   it("normalizeText strips Vietnamese accents for search", () => {
@@ -13,6 +13,20 @@ describe("format", () => {
     assert.equal(slugify("  Hội An — đêm đèn lồng!! "), "hoi-an-dem-den-long");
     assert.equal(slugify("!!!"), "");
     assert.ok(slugify("a".repeat(100)).length <= 60);
+  });
+
+  it("formatDateRange merges shared month / year", () => {
+    assert.equal(formatDateRange("2025-12-20", null), "20 Dec 2025");
+    assert.equal(formatDateRange("2025-12-20", "2025-12-20"), "20 Dec 2025");
+    assert.equal(formatDateRange("2025-12-20", "2025-12-22"), "20–22 Dec 2025");
+    assert.equal(formatDateRange("2025-11-30", "2025-12-02"), "30 Nov – 2 Dec 2025");
+    assert.equal(formatDateRange("2025-12-30", "2026-01-02"), "30 Dec 2025 – 2 Jan 2026");
+  });
+
+  it("tripDays counts both ends", () => {
+    assert.equal(tripDays("2025-12-20", null), 1);
+    assert.equal(tripDays("2025-12-20", "2025-12-22"), 3);
+    assert.equal(tripDays("2025-12-30", "2026-01-02"), 4);
   });
 
   it("plural", () => {

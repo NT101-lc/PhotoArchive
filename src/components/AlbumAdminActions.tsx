@@ -7,6 +7,7 @@ import { plural } from "@/lib/format";
 import { canDeleteAlbum, canEditAlbum, canEditAlbumDate } from "@/lib/permissions";
 import type { Album } from "@/lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { DateRangeFields } from "./DateRangeFields";
 import { IconEdit, IconTrash } from "./Icons";
 import { useIdentity } from "./Identity";
 import { Modal } from "./Modal";
@@ -16,13 +17,18 @@ import { useToast } from "./Toast";
  * Nút sửa / xoá album. Admin: sửa tên, nơi, ngày + xoá. Thành viên thường: chỉ sửa ngày.
  * (API cũng kiểm tra lại quyền.)
  */
-export function AlbumAdminActions({ album }: { album: Pick<Album, "id" | "title" | "location" | "tripDate" | "photoCount"> }) {
+export function AlbumAdminActions({ album }: { album: Pick<Album, "id" | "title" | "location" | "tripDate" | "endDate" | "photoCount"> }) {
   const me = useIdentity();
   const router = useRouter();
   const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [form, setForm] = useState({ title: album.title, location: album.location, tripDate: album.tripDate });
+  const [form, setForm] = useState({
+    title: album.title,
+    location: album.location,
+    tripDate: album.tripDate,
+    endDate: album.endDate ?? "",
+  });
   const [saving, setSaving] = useState(false);
 
   const fullEdit = canEditAlbum(me);
@@ -33,11 +39,10 @@ export function AlbumAdminActions({ album }: { album: Pick<Album, "id" | "title"
     setSaving(true);
     try {
       // Chỉ gửi những trường người dùng được sửa
+      const dates = { tripDate: form.tripDate, endDate: form.endDate || null };
       const { slug } = await updateAlbum(
         album.id,
-        fullEdit
-          ? { title: form.title.trim(), location: form.location.trim(), tripDate: form.tripDate }
-          : { tripDate: form.tripDate },
+        fullEdit ? { title: form.title.trim(), location: form.location.trim(), ...dates } : dates,
       );
       toast.show({ tone: "success", title: "Album updated" });
       setEditing(false);
@@ -68,7 +73,7 @@ export function AlbumAdminActions({ album }: { album: Pick<Album, "id" | "title"
         {(fullEdit || canEditAlbumDate(me)) && (
           <button type="button" className="btn" onClick={() => setEditing(true)}>
             <IconEdit size={16} />
-            {fullEdit ? "Edit" : "Edit date"}
+            {fullEdit ? "Edit" : "Edit dates"}
           </button>
         )}
         {canDeleteAlbum(me) && (
@@ -82,8 +87,8 @@ export function AlbumAdminActions({ album }: { album: Pick<Album, "id" | "title"
       <Modal
         open={editing}
         onClose={() => !saving && setEditing(false)}
-        eyebrow={fullEdit ? "Admin" : "Fix the trip date"}
-        title={fullEdit ? "Edit album" : "Edit date"}
+        eyebrow={fullEdit ? "Admin" : "Fix the trip dates"}
+        title={fullEdit ? "Edit album" : "Edit dates"}
         maxWidth="max-w-[480px]"
       >
         <form onSubmit={save} className="flex flex-col gap-4 p-5">
@@ -107,15 +112,14 @@ export function AlbumAdminActions({ album }: { album: Pick<Album, "id" | "title"
               disabled={!fullEdit}
             />
           </Field>
-          <Field label="Trip date">
-            <input
-              type="date"
-              className="field disabled:bg-surface-2 disabled:text-ink-soft"
-              value={form.tripDate}
-              onChange={(e) => setForm({ ...form, tripDate: e.target.value })}
-              required
+          <fieldset className="flex flex-col gap-1.5">
+            <legend className="eyebrow mb-1.5">Trip dates</legend>
+            <DateRangeFields
+              start={form.tripDate}
+              end={form.endDate}
+              onChange={({ start, end }) => setForm({ ...form, tripDate: start, endDate: end })}
             />
-          </Field>
+          </fieldset>
           {!fullEdit && (
             <p className="text-xs text-ink-soft">Only the admin can rename an album or change its place.</p>
           )}

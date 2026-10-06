@@ -1,0 +1,2 @@
+ALTER TABLE "albums" ADD COLUMN "end_date" date;--> statement-breakpoint
+ALTER TABLE "albums" ADD CONSTRAINT "albums_end_after_start" CHECK ("albums"."end_date" is null or "albums"."end_date" >= "albums"."trip_date");

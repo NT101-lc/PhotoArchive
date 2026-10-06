@@ -60,18 +60,31 @@ async function uniqueSlug(title: string, tripDate: string, exceptId?: string) {
 
 // ---------- Album ----------
 
+// Ngày về trùng ngày đi → coi như đi trong ngày (lưu null)
+const endDateInput = z.iso.date().nullable();
+const END_BEFORE_START = "The last day can’t be before the first day.";
+
+/** Chuẩn hoá khoảng ngày: ngày về rỗng / trùng ngày đi → null; ngày về trước ngày đi → lỗi. */
+export function normalizeEndDate(tripDate: string, endDate: string | null | undefined) {
+  if (!endDate || endDate === tripDate) return null;
+  if (endDate < tripDate) throw new BadRequestError(END_BEFORE_START);
+  return endDate;
+}
+
 export const createAlbumInput = z.object({
   title: z.string().trim().min(1).max(120),
   location: z.string().trim().min(1).max(120),
   tripDate: z.iso.date(),
+  endDate: endDateInput.optional(),
 });
 
 /** Tạo album mới (mọi thành viên). Slug không trùng: `sapa-2026`, `sapa-2026-2`, ... */
 export async function createAlbum(actor: Actor, input: z.infer<typeof createAlbumInput>) {
   const slug = await uniqueSlug(input.title, input.tripDate);
+  const endDate = normalizeEndDate(input.tripDate, input.endDate);
   const [row] = await db
     .insert(albums)
-    .values({ ...input, slug, createdById: actor.id })
+    .values({ ...input, endDate, slug, createdById: actor.id })
     .returning({ id: albums.id, slug: albums.slug });
   return row;
 }
@@ -81,12 +94,13 @@ export const updateAlbumInput = z
     title: z.string().trim().min(1).max(120),
     location: z.string().trim().min(1).max(120),
     tripDate: z.iso.date(),
+    endDate: endDateInput,
     // null = bỏ ảnh bìa đã chọn, quay về ảnh đầu tiên
     coverPhotoId: z.uuid().nullable(),
   })
   .partial();
 
-/** Sửa album. Tên / nơi: chỉ admin. Ngày đi: mọi thành viên. Ảnh bìa: admin hoặc người tạo album. */
+/** Sửa album. Tên / nơi: chỉ admin. Ngày đi / về: mọi thành viên. Ảnh bìa: admin hoặc người tạo album. */
 export async function updateAlbum(actor: Actor, slug: string, input: z.infer<typeof updateAlbumInput>) {
   const album = await findAlbum(slug);
   const { coverPhotoId, ...info } = input;
@@ -94,7 +108,7 @@ export async function updateAlbum(actor: Actor, slug: string, input: z.infer<typ
   if ((info.title !== undefined || info.location !== undefined) && !canEditAlbum(actor)) {
     throw new ForbiddenError("Only the admin can rename an album or change its place.");
   }
-  if (info.tripDate !== undefined && !canEditAlbumDate(actor)) {
+  if ((info.tripDate !== undefined || info.endDate !== undefined) && !canEditAlbumDate(actor)) {
     throw new ForbiddenError("Choose who you are first.");
   }
   if (coverPhotoId !== undefined && !canSetCover(actor, album)) {
@@ -111,9 +125,17 @@ export async function updateAlbum(actor: Actor, slug: string, input: z.infer<typ
 
   const patch: Partial<typeof albums.$inferInsert> = { ...info };
   if (coverPhotoId !== undefined) patch.coverPhotoId = coverPhotoId;
-  if (info.title || info.tripDate) {
+  if (info.title || info.tripDate || info.endDate !== undefined) {
     const [cur] = await db.select().from(albums).where(eq(albums.id, album.id));
-    patch.slug = await uniqueSlug(info.title ?? cur.title, info.tripDate ?? cur.tripDate, album.id);
+    const start = info.tripDate ?? cur.tripDate;
+    // Đổi ngày đi mà không gửi ngày về → giữ ngày về cũ nếu vẫn sau ngày đi, không thì bỏ
+    patch.endDate =
+      info.endDate !== undefined
+        ? normalizeEndDate(start, info.endDate)
+        : cur.endDate && cur.endDate > start
+          ? cur.endDate
+          : null;
+    if (info.title || info.tripDate) patch.slug = await uniqueSlug(info.title ?? cur.title, start, album.id);
   }
   if (Object.keys(patch).length === 0) return { slug };
 

@@ -156,7 +156,9 @@ export function Lightbox({
       const blobUrl = URL.createObjectURL(await res.blob());
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = `${photo.id}.jpg`;
+      // Giữ đúng đuôi file gốc (key trên R2 có dạng .../uuid.png); ảnh seed không có đuôi → jpg
+      const ext = new URL(photo.url, location.href).pathname.match(/\.(\w{3,4})$/)?.[1] ?? "jpg";
+      a.download = `${photo.id}.${ext}`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } catch {

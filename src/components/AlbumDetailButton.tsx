@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatDate, formatDateTime, plural } from "@/lib/format";
+import { formatDate, formatDateRange, formatDateTime, plural, tripDays } from "@/lib/format";
 import type { Album, Photo } from "@/lib/types";
 import { IconInfo } from "./Icons";
 import { Modal } from "./Modal";
@@ -34,7 +34,14 @@ export function AlbumDetailButton({ album, photos }: { album: Album; photos: Pho
         <div className="flex flex-col gap-6 p-5">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-surface-2/70 p-4">
             <Meta k="Place" v={album.location} />
-            <Meta k="Trip date" v={formatDate(album.tripDate)} />
+            <Meta
+              k={album.endDate ? "Trip dates" : "Trip date"}
+              v={
+                album.endDate
+                  ? `${formatDateRange(album.tripDate, album.endDate)} (${plural(tripDays(album.tripDate, album.endDate), "day")})`
+                  : formatDate(album.tripDate)
+              }
+            />
             {first && <Meta k="First photo" v={formatDateTime(first)} />}
             {last && <Meta k="Last photo" v={formatDateTime(last)} />}
             <Meta k="Photos" v={String(album.photoCount)} />

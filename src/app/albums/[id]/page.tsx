@@ -7,7 +7,7 @@ import { IconCalendar, IconPin } from "@/components/Icons";
 import { PageHero } from "@/components/PageHero";
 import { UploadButton } from "@/components/UploadModal";
 import { getAlbum, getAlbums, getPhotos } from "@/lib/data";
-import { formatDate } from "@/lib/format";
+import { formatDateRange, plural, tripDays } from "@/lib/format";
 
 export async function generateMetadata({ params }: PageProps<"/albums/[id]">): Promise<Metadata> {
   const { id } = await params;
@@ -37,7 +37,8 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
             </span>
             <span className="flex items-center gap-1.5">
               <IconCalendar size={15} />
-              {formatDate(album.tripDate)}
+              {formatDateRange(album.tripDate, album.endDate)}
+              {album.endDate && <span>({plural(tripDays(album.tripDate, album.endDate), "day")})</span>}
             </span>
           </span>
         }
