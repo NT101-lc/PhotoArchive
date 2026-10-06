@@ -7,14 +7,14 @@ export default function NotFound() {
     <main className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 py-10">
       <EmptyState
         icon={<IconImage size={26} />}
-        title="Không tìm thấy album"
+        title="Album not found"
         action={
           <Link href="/" className="btn btn-primary">
-            <IconArrowLeft size={16} /> Về trang chủ
+            <IconArrowLeft size={16} /> Back home
           </Link>
         }
       >
-        Album này không tồn tại hoặc đã bị xoá. Quay lại kho ảnh để chọn chuyến đi khác.
+        This album doesn’t exist or has been deleted. Head back to the archive and pick another trip.
       </EmptyState>
     </main>
   );

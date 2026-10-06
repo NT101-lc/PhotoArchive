@@ -24,13 +24,13 @@ export function PhotoGrid({ photos, onOpen, isFavorite, onToggleFavorite, eagerC
             <button
               type="button"
               onClick={() => onOpen(photo)}
-              aria-label={`Xem ảnh của ${photo.uploadedBy}`}
+              aria-label={`View photo by ${photo.uploadedBy}`}
               className="relative block w-full overflow-hidden rounded-xl border-2 border-line bg-surface-2 shadow-hard-sm transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-hard"
               style={{ aspectRatio: `${photo.width} / ${photo.height}` }}
             >
               <SmartImage
                 src={photo.thumbUrl}
-                alt={`Ảnh của ${photo.uploadedBy}`}
+                alt={`Photo by ${photo.uploadedBy}`}
                 fill
                 loading={i < eagerCount ? "eager" : "lazy"}
                 sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
@@ -44,7 +44,7 @@ export function PhotoGrid({ photos, onOpen, isFavorite, onToggleFavorite, eagerC
               type="button"
               onClick={() => onToggleFavorite(photo.id)}
               aria-pressed={fav}
-              aria-label={fav ? "Bỏ yêu thích" : "Yêu thích"}
+              aria-label={fav ? "Remove favorite" : "Favorite"}
               className={`absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all ${
                 fav
                   ? "border-line bg-accent text-on-accent opacity-100"

@@ -19,7 +19,7 @@ export function AlbumCard({ album, index, preload = false }: Props) {
       <div className="relative aspect-[4/3] overflow-hidden rounded-[9px] border-2 border-line bg-surface-2">
         <SmartImage
           src={album.coverUrl}
-          alt={`Ảnh bìa ${album.title}`}
+          alt={`Cover of ${album.title}`}
           fill
           preload={preload}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

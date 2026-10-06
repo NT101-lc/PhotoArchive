@@ -29,7 +29,10 @@ Giao diện "Darkroom": giấy ảnh ấm + chấm lưới, viền mực, bóng 
 
 ## Tính năng
 
-- **Trang chủ**: tìm kiếm không dấu (phím `/`), lọc theo năm / nơi, sắp xếp, bộ lọc lưu trên URL để chia sẻ link.
+Giao diện hiển thị bằng tiếng Anh (tên chuyến đi / địa danh trong dữ liệu giữ nguyên).
+
+- **Trang chủ `/`** (landing): dải phim chạy tên các chuyến, hero + thống kê, 4 lối tắt, chuyến gần nhất, dòng thời gian theo năm.
+- **Thư viện `/albums`**: tìm kiếm không dấu (phím `/`), lọc theo năm / nơi, sắp xếp, bộ lọc lưu trên URL để chia sẻ link.
 - **Trang album**: lọc theo người chụp, chỉ xem ảnh yêu thích, xem dạng lưới masonry hoặc theo ngày, modal chi tiết chuyến đi.
 - **Lightbox**: ← → / vuốt để chuyển, dải phim, slideshow (`Space`), phóng to (`Z` / nhấp đúp / chạm 2 lần),
   thả tim (`F`), thông tin ảnh (`I`), tải ảnh gốc, copy link mở thẳng tới ảnh (`?photo=…`), `Esc` để đóng.
@@ -44,9 +47,12 @@ src/
 ├── app/
 │   ├── layout.tsx              # Font, theme script chống nháy, AppBar, ToastProvider
 │   ├── globals.css             # Design tokens sáng/tối + class dùng chung (btn, chip, card...)
-│   ├── page.tsx                # Trang chủ
+│   ├── page.tsx                # Trang chủ (landing)
 │   ├── loading.tsx             # Skeleton trang chủ
 │   ├── not-found.tsx           # 404
+│   ├── albums/
+│   │   ├── page.tsx            # Thư viện: tìm kiếm, lọc, sắp xếp album
+│   │   └── loading.tsx
 │   ├── albums/[id]/
 │   │   ├── page.tsx            # Trang album
 │   │   └── loading.tsx         # Skeleton trang album
@@ -54,7 +60,7 @@ src/
 │       ├── page.tsx            # Giao diện đăng nhập
 │       └── GoogleLoginButton.tsx  # Nút Google (chỉ chuyển về trang chủ)
 ├── components/
-│   ├── AppBar.tsx, Logo.tsx, ThemeToggle.tsx
+│   ├── AppBar.tsx, NavLinks.tsx, Logo.tsx, ThemeToggle.tsx, FilmTicker.tsx
 │   ├── PageHero.tsx            # Tiêu đề trang + thống kê + nút hành động
 │   ├── AlbumBrowser.tsx        # Tìm kiếm, lọc, sắp xếp, lưới album
 │   ├── AlbumCard.tsx

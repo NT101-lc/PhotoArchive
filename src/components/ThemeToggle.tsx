@@ -34,7 +34,7 @@ export function ThemeToggle() {
   }
 
   return (
-    <button type="button" onClick={toggle} className="btn btn-icon" title="Đổi giao diện sáng / tối" aria-label="Đổi giao diện sáng / tối">
+    <button type="button" onClick={toggle} className="btn btn-icon" title="Toggle light / dark" aria-label="Toggle light / dark mode">
       <IconMoon className="dark:hidden" />
       <IconSun className="hidden dark:block" />
     </button>

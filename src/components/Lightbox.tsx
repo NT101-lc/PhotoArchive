@@ -149,9 +149,9 @@ export function Lightbox({ photos, index, onIndexChange, onClose, isFavorite, on
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
-      toast.show({ tone: "success", title: "Đã copy link ảnh", message: "Mở link sẽ tới thẳng tấm ảnh này." });
+      toast.show({ tone: "success", title: "Photo link copied", message: "Opening it jumps straight to this photo." });
     } catch {
-      toast.show({ tone: "warn", title: "Không copy được", message: "Trình duyệt chặn clipboard." });
+      toast.show({ tone: "warn", title: "Couldn't copy", message: "The browser blocked clipboard access." });
     }
   }
 
@@ -161,7 +161,7 @@ export function Lightbox({ photos, index, onIndexChange, onClose, isFavorite, on
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`Ảnh ${index + 1} trên ${total}`}
+      aria-label={`Photo ${index + 1} of ${total}`}
       className="animate-fade fixed inset-0 z-[1100] flex flex-col bg-[#0e0d0c] text-[#f1ebe0]"
     >
       {/* Thanh tiến trình slideshow */}
@@ -177,26 +177,26 @@ export function Lightbox({ photos, index, onIndexChange, onClose, isFavorite, on
           {pad2(index + 1)} <span className="opacity-50">/ {pad2(total)}</span>
         </span>
         <div className="flex items-center gap-1 sm:gap-1.5">
-          <LbButton onClick={() => onToggleFavorite(photo.id)} label={fav ? "Bỏ yêu thích (F)" : "Yêu thích (F)"} active={fav} accent>
+          <LbButton onClick={() => onToggleFavorite(photo.id)} label={fav ? "Remove favorite (F)" : "Favorite (F)"} active={fav} accent>
             <IconHeart size={18} filled={fav} />
           </LbButton>
-          <LbButton onClick={() => setPlaying((v) => !v)} label={playing ? "Dừng slideshow (Space)" : "Slideshow (Space)"} active={playing}>
+          <LbButton onClick={() => setPlaying((v) => !v)} label={playing ? "Pause slideshow (Space)" : "Slideshow (Space)"} active={playing}>
             {playing ? <IconPause size={18} /> : <IconPlay size={16} />}
           </LbButton>
-          <LbButton onClick={() => setZoomed((v) => !v)} label={zoomed ? "Thu nhỏ (Z)" : "Phóng to (Z)"} active={zoomed} className="max-sm:hidden">
+          <LbButton onClick={() => setZoomed((v) => !v)} label={zoomed ? "Zoom out (Z)" : "Zoom in (Z)"} active={zoomed} className="max-sm:hidden">
             {zoomed ? <IconZoomOut size={18} /> : <IconZoomIn size={18} />}
           </LbButton>
-          <LbButton onClick={download} label="Tải ảnh gốc" className="max-sm:hidden">
+          <LbButton onClick={download} label="Download original" className="max-sm:hidden">
             <IconDownload size={18} />
           </LbButton>
-          <LbButton onClick={copyLink} label="Copy link ảnh" className="max-sm:hidden">
+          <LbButton onClick={copyLink} label="Copy photo link" className="max-sm:hidden">
             <IconLink size={18} />
           </LbButton>
-          <LbButton onClick={() => setShowInfo((v) => !v)} label="Thông tin (I)" active={showInfo}>
+          <LbButton onClick={() => setShowInfo((v) => !v)} label="Info (I)" active={showInfo}>
             <IconInfo size={18} />
           </LbButton>
           <span className="mx-0.5 h-6 w-px bg-white/15" aria-hidden="true" />
-          <LbButton onClick={onClose} label="Đóng (Esc)">
+          <LbButton onClick={onClose} label="Close (Esc)">
             <IconClose size={18} />
           </LbButton>
         </div>
@@ -234,7 +234,7 @@ export function Lightbox({ photos, index, onIndexChange, onClose, isFavorite, on
             <span className="text-[#ff6b47]">{photo.uploadedBy}</span>
             <span className="opacity-60"> · {formatDateTime(photo.takenAt)}</span>
           </span>
-          <span className="hidden opacity-40 md:inline">← → chuyển · Space slideshow · Z zoom · F tim · Esc đóng</span>
+          <span className="hidden opacity-40 md:inline">← → navigate · Space slideshow · Z zoom · F favorite · Esc close</span>
         </div>
         <div ref={stripRef} className="scrollbar-none flex gap-1.5 overflow-x-auto px-3 py-2.5 sm:px-5">
           {photos.map((p, i) => (
@@ -246,7 +246,7 @@ export function Lightbox({ photos, index, onIndexChange, onClose, isFavorite, on
                 setZoomed(false);
                 onIndexChange(i);
               }}
-              aria-label={`Ảnh ${i + 1}`}
+              aria-label={`Photo ${i + 1}`}
               aria-current={i === index}
               className={`relative h-12 shrink-0 overflow-hidden rounded-md border-2 transition-all sm:h-14 ${
                 i === index ? "border-[#ff6b47] opacity-100" : "border-transparent opacity-45 hover:opacity-80"
@@ -280,7 +280,7 @@ function FittedImage({ photo, onDoubleClick }: { photo: Photo; onDoubleClick: ()
       {/* unoptimized: hiển thị đúng ảnh gốc, không qua bộ resize của Next */}
       <Image
         src={photo.url}
-        alt={`Ảnh của ${photo.uploadedBy}`}
+        alt={`Photo by ${photo.uploadedBy}`}
         fill
         unoptimized
         sizes="100vw"
@@ -316,7 +316,7 @@ function ZoomedImage({ photo, onExit }: { photo: Photo; onExit: () => void }) {
         {/* eslint-disable-next-line @next/next/no-img-element -- cần kích thước thật để cuộn, đã được tải sẵn ở chế độ thường */}
         <img
           src={photo.url}
-          alt={`Ảnh của ${photo.uploadedBy} (phóng to)`}
+          alt={`Photo by ${photo.uploadedBy} (zoomed)`}
           width={photo.width}
           height={photo.height}
           draggable={false}
@@ -333,7 +333,7 @@ function NavButton({ side, onClick }: { side: "left" | "right"; onClick: () => v
     <button
       type="button"
       onClick={onClick}
-      aria-label={side === "left" ? "Ảnh trước (←)" : "Ảnh sau (→)"}
+      aria-label={side === "left" ? "Previous photo (←)" : "Next photo (→)"}
       className={`absolute top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/5 backdrop-blur-sm transition-colors hover:bg-[#ff6b47] hover:text-[#1d1b18] sm:flex ${
         side === "left" ? "left-4" : "right-4"
       }`}
@@ -387,17 +387,17 @@ function InfoPanel({
   onCopyLink: () => void;
 }) {
   const rows: Array<[string, string]> = [
-    ["Người chụp", photo.uploadedBy],
-    ["Thời điểm", formatDateTime(photo.takenAt)],
-    ["Kích thước", `${photo.width} × ${photo.height}`],
-    ["Hướng", photo.width >= photo.height ? "Ngang" : "Dọc"],
+    ["Taken by", photo.uploadedBy],
+    ["Taken at", formatDateTime(photo.takenAt)],
+    ["Size", `${photo.width} × ${photo.height}`],
+    ["Orientation", photo.width >= photo.height ? "Landscape" : "Portrait"],
   ];
 
   return (
     <aside className="animate-rise absolute inset-x-2 bottom-2 z-10 rounded-2xl border border-white/15 bg-[#1e1c19]/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-auto sm:top-2 sm:right-4 sm:bottom-auto sm:w-[300px]">
       <div className="mb-3 flex items-center justify-between">
-        <span className="font-mono text-[0.7rem] tracking-[0.14em] text-[#a89f92] uppercase">Chi tiết ảnh</span>
-        <button type="button" onClick={onClose} className="rounded-full p-1 hover:bg-white/10" aria-label="Đóng thông tin">
+        <span className="font-mono text-[0.7rem] tracking-[0.14em] text-[#a89f92] uppercase">Photo details</span>
+        <button type="button" onClick={onClose} className="rounded-full p-1 hover:bg-white/10" aria-label="Close details">
           <IconClose size={14} />
         </button>
       </div>
@@ -409,12 +409,12 @@ function InfoPanel({
           </div>
         ))}
         <div className="col-span-2">
-          <dt className="text-[0.7rem] text-[#a89f92]">Mã ảnh</dt>
+          <dt className="text-[0.7rem] text-[#a89f92]">Photo ID</dt>
           <dd className="truncate font-mono text-xs">{photo.id}</dd>
         </div>
       </dl>
       <div className="mt-4 grid grid-cols-3 gap-2">
-        <PanelAction onClick={onDownload} icon={<IconDownload size={16} />} label="Tải về" />
+        <PanelAction onClick={onDownload} icon={<IconDownload size={16} />} label="Download" />
         <PanelAction onClick={onCopyLink} icon={<IconLink size={16} />} label="Copy link" />
         <a
           href={photo.url}
@@ -422,7 +422,7 @@ function InfoPanel({
           rel="noopener noreferrer"
           className="flex flex-col items-center gap-1 rounded-xl border border-white/15 py-2 text-xs font-semibold hover:bg-white/10"
         >
-          <IconExternal size={16} /> Ảnh gốc
+          <IconExternal size={16} /> Original
         </a>
       </div>
     </aside>

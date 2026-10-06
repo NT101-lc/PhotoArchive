@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, plural } from "@/lib/format";
 import type { Album, Photo } from "@/lib/types";
 import { IconInfo } from "./Icons";
 import { Modal } from "./Modal";
@@ -25,26 +25,26 @@ export function AlbumDetailButton({ album, photos }: { album: Album; photos: Pho
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="btn" title="Chi tiết chuyến đi">
+      <button type="button" onClick={() => setOpen(true)} className="btn" title="Trip details">
         <IconInfo size={16} />
-        Chi tiết
+        Details
       </button>
 
-      <Modal open={open} onClose={() => setOpen(false)} eyebrow="Chi tiết chuyến đi" title={album.title}>
+      <Modal open={open} onClose={() => setOpen(false)} eyebrow="Trip details" title={album.title}>
         <div className="flex flex-col gap-6 p-5">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-surface-2/70 p-4">
-            <Meta k="Địa điểm" v={album.location} />
-            <Meta k="Ngày đi" v={formatDate(album.tripDate)} />
-            {first && <Meta k="Ảnh đầu tiên" v={formatDateTime(first)} />}
-            {last && <Meta k="Ảnh cuối cùng" v={formatDateTime(last)} />}
-            <Meta k="Số ảnh" v={String(album.photoCount)} />
-            <Meta k="Mã album" v={album.id} mono />
+            <Meta k="Place" v={album.location} />
+            <Meta k="Trip date" v={formatDate(album.tripDate)} />
+            {first && <Meta k="First photo" v={formatDateTime(first)} />}
+            {last && <Meta k="Last photo" v={formatDateTime(last)} />}
+            <Meta k="Photos" v={String(album.photoCount)} />
+            <Meta k="Album ID" v={album.id} mono />
           </dl>
 
           <section>
-            <h3 className="eyebrow mb-3">Ai chụp nhiều nhất</h3>
+            <h3 className="eyebrow mb-3">Top contributors</h3>
             {contributors.length === 0 ? (
-              <p className="text-sm text-ink-soft italic">Chưa có ai upload ảnh.</p>
+              <p className="text-sm text-ink-soft italic">Nobody has uploaded photos yet.</p>
             ) : (
               <ul className="flex flex-col gap-2.5">
                 {contributors.map(([name, count], i) => (
@@ -59,7 +59,7 @@ export function AlbumDetailButton({ album, photos }: { album: Album; photos: Pho
                     <div className="min-w-0 flex-1">
                       <div className="flex justify-between text-sm">
                         <span className="font-semibold">{name}</span>
-                        <span className="font-mono text-xs text-ink-soft">{count} ảnh</span>
+                        <span className="font-mono text-xs text-ink-soft">{plural(count, "photo")}</span>
                       </div>
                       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2">
                         <div className="h-full rounded-full bg-ink" style={{ width: `${(count / max) * 100}%` }} />

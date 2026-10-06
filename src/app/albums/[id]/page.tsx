@@ -11,7 +11,7 @@ import { formatDate } from "@/lib/format";
 export async function generateMetadata({ params }: PageProps<"/albums/[id]">): Promise<Metadata> {
   const { id } = await params;
   const album = await getAlbum(id);
-  return { title: album?.title ?? "Không tìm thấy album" };
+  return { title: album?.title ?? "Album not found" };
 }
 
 export default async function AlbumPage({ params, searchParams }: PageProps<"/albums/[id]">) {
@@ -25,8 +25,8 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
   return (
     <main className="mx-auto max-w-[1280px] px-4 pb-20 sm:px-6">
       <PageHero
-        backHref="/"
-        eyebrow="Album chuyến đi"
+        backHref="/albums"
+        eyebrow="Trip album"
         title={album.title}
         description={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">

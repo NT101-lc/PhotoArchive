@@ -10,7 +10,7 @@ export function GoogleLoginButton() {
   return (
     <button type="button" onClick={() => router.push("/")} className="btn h-12 w-full text-base">
       <IconGoogle size={20} />
-      Đăng nhập với Google
+      Sign in with Google
     </button>
   );
 }

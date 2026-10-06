@@ -69,7 +69,7 @@ export function Modal({ open, onClose, title, eyebrow, children, footer, maxWidt
             {eyebrow && <p className="eyebrow mb-0.5">{eyebrow}</p>}
             <h2 className="font-display text-xl leading-tight font-extrabold tracking-tight">{title}</h2>
           </div>
-          <button ref={closeRef} type="button" onClick={onClose} className="btn btn-icon h-9 w-9 shrink-0" aria-label="Đóng">
+          <button ref={closeRef} type="button" onClick={onClose} className="btn btn-icon h-9 w-9 shrink-0" aria-label="Close">
             <IconClose size={16} />
           </button>
         </div>

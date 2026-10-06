@@ -261,6 +261,12 @@
   }
 }
 
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 @keyframes fade {
   from {
     opacity: 0;

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useFavorites } from "@/lib/favorites";
-import { dayKey, formatDayHeading } from "@/lib/format";
+import { dayKey, formatDayHeading, plural } from "@/lib/format";
 import type { Photo } from "@/lib/types";
 import { EmptyState } from "./EmptyState";
 import { IconGrid, IconHeart, IconImage, IconTimeline } from "./Icons";
@@ -69,8 +69,8 @@ export function AlbumView({ photos, initialPhotoId }: Props) {
 
   if (photos.length === 0) {
     return (
-      <EmptyState icon={<IconImage size={26} />} title="Album còn trống">
-        Chưa có ảnh nào trong chuyến đi này. Bấm “Upload ảnh” để thêm những tấm đầu tiên.
+      <EmptyState icon={<IconImage size={26} />} title="This album is empty">
+        No photos from this trip yet. Hit “Upload photos” to add the first ones.
       </EmptyState>
     );
   }
@@ -79,10 +79,10 @@ export function AlbumView({ photos, initialPhotoId }: Props) {
     <>
       <div className="mb-6 flex flex-col gap-3 border-y-2 border-dashed border-line py-3 lg:flex-row lg:items-center">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="eyebrow shrink-0">Người chụp</span>
+          <span className="eyebrow shrink-0">Taken by</span>
           <div className="scrollbar-none -my-1 flex min-w-0 gap-1.5 overflow-x-auto py-1 pr-1">
             <button type="button" className="chip" aria-pressed={person === ALL} onClick={() => setPerson(ALL)}>
-              Tất cả · {photos.length}
+              All · {photos.length}
             </button>
             {people.map(([name, count]) => (
               <button key={name} type="button" className="chip" aria-pressed={person === name} onClick={() => setPerson(name)}>
@@ -98,16 +98,16 @@ export function AlbumView({ photos, initialPhotoId }: Props) {
             className="chip"
             aria-pressed={favOnly}
             onClick={() => setFavOnly((v) => !v)}
-            title="Chỉ hiện ảnh đã thả tim (lưu trên máy này)"
+            title="Only show hearted photos (saved on this device)"
           >
             <IconHeart size={14} filled={favOnly} />
-            Yêu thích · {photos.filter((p) => favorites.ids.has(p.id)).length}
+            Favorites · {photos.filter((p) => favorites.ids.has(p.id)).length}
           </button>
-          <div className="ml-auto flex rounded-full border-2 border-line bg-surface p-0.5 lg:ml-0" role="group" aria-label="Kiểu xem">
-            <ViewButton active={view === "grid"} onClick={() => setView("grid")} label="Lưới">
+          <div className="ml-auto flex rounded-full border-2 border-line bg-surface p-0.5 lg:ml-0" role="group" aria-label="View mode">
+            <ViewButton active={view === "grid"} onClick={() => setView("grid")} label="Grid">
               <IconGrid size={16} />
             </ViewButton>
-            <ViewButton active={view === "days"} onClick={() => setView("days")} label="Theo ngày">
+            <ViewButton active={view === "days"} onClick={() => setView("days")} label="By day">
               <IconTimeline size={16} />
             </ViewButton>
           </div>
@@ -117,7 +117,7 @@ export function AlbumView({ photos, initialPhotoId }: Props) {
       {visible.length === 0 ? (
         <EmptyState
           icon={<IconHeart size={26} />}
-          title={favOnly ? "Chưa thả tim ảnh nào" : "Không có ảnh khớp"}
+          title={favOnly ? "No favorites yet" : "No matching photos"}
           action={
             <button
               type="button"
@@ -127,13 +127,13 @@ export function AlbumView({ photos, initialPhotoId }: Props) {
                 setFavOnly(false);
               }}
             >
-              Xem tất cả ảnh
+              Show all photos
             </button>
           }
         >
           {favOnly
-            ? "Bấm vào trái tim trên ảnh (hoặc phím F trong lúc xem) để gom những tấm bạn thích về đây."
-            : "Người này chưa có ảnh nào trong bộ lọc hiện tại."}
+            ? "Tap the heart on a photo (or press F while viewing) to collect your favorites here."
+            : "This person has no photos in the current filter."}
         </EmptyState>
       ) : view === "grid" ? (
         <PhotoGrid photos={visible} eagerCount={4} {...tileProps} />
@@ -143,10 +143,10 @@ export function AlbumView({ photos, initialPhotoId }: Props) {
             <section key={key}>
               <h3 className="mb-4 flex items-baseline gap-3">
                 <span className="rounded-md border-2 border-line bg-butter px-2 py-0.5 font-mono text-xs font-bold text-on-accent">
-                  NGÀY {i + 1}
+                  DAY {i + 1}
                 </span>
                 <span className="font-display text-xl font-bold tracking-tight">{formatDayHeading(list[0].takenAt)}</span>
-                <span className="font-mono text-xs text-ink-soft">{list.length} ảnh</span>
+                <span className="font-mono text-xs text-ink-soft">{plural(list.length, "photo")}</span>
               </h3>
               <PhotoGrid photos={list} eagerCount={i === 0 ? 4 : 0} {...tileProps} />
             </section>

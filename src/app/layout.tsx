@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     default: "B6 PhotoArchive",
     template: "%s | B6 PhotoArchive",
   },
-  description: "Kho ảnh riêng tư của nhóm B6 — lưu và xem lại ảnh các chuyến đi.",
+  description: "The B6 crew's private photo archive — store and relive every trip.",
   robots: { index: false, follow: false },
 };
 
@@ -41,7 +41,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="vi"
+      lang="en"
       data-theme="light"
       suppressHydrationWarning
       className={`${bricolage.variable} ${beVietnam.variable} ${spaceMono.variable}`}

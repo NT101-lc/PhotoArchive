@@ -51,7 +51,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <p className="font-display font-bold">{t.title}</p>
               {t.message && <p className="mt-0.5 text-sm opacity-75">{t.message}</p>}
             </div>
-            <button type="button" onClick={() => dismiss(t.id)} aria-label="Đóng thông báo" className="rounded-md p-1 opacity-70 hover:opacity-100">
+            <button type="button" onClick={() => dismiss(t.id)} aria-label="Dismiss" className="rounded-md p-1 opacity-70 hover:opacity-100">
               <IconClose size={14} />
             </button>
           </div>
@@ -63,6 +63,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 export function useToast() {
   const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error("useToast phải nằm trong <ToastProvider>");
+  if (!ctx) throw new Error("useToast must be used inside <ToastProvider>");
   return ctx;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { normalizeText, yearOf } from "@/lib/format";
+import { normalizeText, plural, yearOf } from "@/lib/format";
 import type { Album } from "@/lib/types";
 import { AlbumCard } from "./AlbumCard";
 import { EmptyState } from "./EmptyState";
@@ -10,9 +10,9 @@ import { IconClose, IconReset, IconSearch } from "./Icons";
 const ALL = "all";
 
 export const SORTS = {
-  newest: "Mới nhất",
-  oldest: "Cũ nhất",
-  most: "Nhiều ảnh nhất",
+  newest: "Newest",
+  oldest: "Oldest",
+  most: "Most photos",
 } as const;
 export type SortKey = keyof typeof SORTS;
 
@@ -95,13 +95,13 @@ export function AlbumBrowser({ albums, initial }: Props) {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm chuyến đi, địa điểm…"
-              aria-label="Tìm album"
+              placeholder="Search trips, places…"
+              aria-label="Search albums"
               autoComplete="off"
               className="min-w-0 flex-1 bg-transparent font-medium outline-none placeholder:text-ink-soft/70 [&::-webkit-search-cancel-button]:hidden"
             />
             {query ? (
-              <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 hover:bg-surface-2" aria-label="Xoá từ khoá">
+              <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 hover:bg-surface-2" aria-label="Clear search">
                 <IconClose size={16} />
               </button>
             ) : (
@@ -109,7 +109,7 @@ export function AlbumBrowser({ albums, initial }: Props) {
             )}
           </label>
           <label className="flex items-center gap-2">
-            <span className="eyebrow shrink-0">Sắp xếp</span>
+            <span className="eyebrow shrink-0">Sort</span>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
@@ -125,16 +125,16 @@ export function AlbumBrowser({ albums, initial }: Props) {
         </div>
 
         <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-6">
-          <ChipRow label="Năm" value={year} onChange={setYear} options={years} />
-          <ChipRow label="Nơi" value={place} onChange={setPlace} options={places} />
+          <ChipRow label="Year" value={year} onChange={setYear} options={years} />
+          <ChipRow label="Place" value={place} onChange={setPlace} options={places} />
           <div className="flex items-center gap-3 lg:ml-auto">
             <span className="font-mono text-xs text-ink-soft">
-              {filtered.length}/{albums.length} album
+              {filtered.length}/{plural(albums.length, "album")}
             </span>
             {isFiltering && (
               <button type="button" onClick={resetFilters} className="chip border-accent text-accent">
                 <IconReset size={13} />
-                Bỏ lọc
+                Clear
               </button>
             )}
           </div>
@@ -152,17 +152,17 @@ export function AlbumBrowser({ albums, initial }: Props) {
       ) : (
         <EmptyState
           icon={<IconSearch size={26} />}
-          title="Không có chuyến đi nào khớp"
+          title="No trips match"
           action={
             <button type="button" onClick={resetFilters} className="btn btn-primary">
               <IconReset size={16} />
-              Xoá bộ lọc
+              Clear filters
             </button>
           }
         >
           {query.trim()
-            ? `Không tìm thấy “${query.trim()}”. Thử từ khoá ngắn hơn (gõ không dấu cũng được) hoặc bỏ lọc năm / nơi.`
-            : "Bộ lọc năm và nơi hiện tại không có album nào. Thử chọn tổ hợp khác."}
+            ? `Nothing found for “${query.trim()}”. Try a shorter keyword (accents optional) or clear the year / place filters.`
+            : "No albums match this year and place combination. Try another one."}
         </EmptyState>
       )}
     </>
@@ -182,12 +182,12 @@ function ChipRow({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <span className="eyebrow w-7 shrink-0">{label}</span>
+      <span className="eyebrow w-11 shrink-0">{label}</span>
       {/* Mobile: cuộn ngang thay vì xuống nhiều dòng */}
       <div className="scrollbar-none -my-1 flex min-w-0 gap-1.5 overflow-x-auto py-1 pr-1 lg:flex-wrap lg:overflow-visible">
         {[ALL, ...options].map((opt) => (
           <button key={opt} type="button" className="chip" aria-pressed={value === opt} onClick={() => onChange(opt)}>
-            {opt === ALL ? "Tất cả" : opt}
+            {opt === ALL ? "All" : opt}
           </button>
         ))}
       </div>

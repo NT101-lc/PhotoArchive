@@ -31,7 +31,7 @@ export function PageHero({ eyebrow, title, description, backHref, stats = [], ac
             <Link
               href={backHref}
               className="-ml-1 inline-flex items-center gap-1 rounded-full px-1 text-ink-soft hover:text-ink"
-              aria-label="Quay lại"
+              aria-label="Back"
             >
               <IconArrowLeft size={16} />
             </Link>

@@ -1,20 +1,20 @@
-const dateFmt = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
+const dateFmt = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
   year: "numeric",
   timeZone: "Asia/Ho_Chi_Minh",
 });
 
-const dateTimeFmt = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
+const dateTimeFmt = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
   year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
   timeZone: "Asia/Ho_Chi_Minh",
 });
 
-/** `2025-12-20` → `20/12/2025` */
+/** `2025-12-20` → `20 Dec 2025` */
 export function formatDate(isoDate: string) {
   return dateFmt.format(new Date(`${isoDate.slice(0, 10)}T12:00:00+07:00`));
 }
@@ -44,15 +44,20 @@ export function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/** `1 photo`, `3 photos` */
+export function plural(n: number, word: string) {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
 export function pad2(n: number) {
   return String(n).padStart(2, "0");
 }
 
 const dayKeyFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
-const dayHeadingFmt = new Intl.DateTimeFormat("vi-VN", {
+const dayHeadingFmt = new Intl.DateTimeFormat("en-GB", {
   weekday: "long",
   day: "numeric",
-  month: "numeric",
+  month: "short",
   timeZone: "Asia/Ho_Chi_Minh",
 });
 
@@ -61,7 +66,7 @@ export function dayKey(iso: string) {
   return dayKeyFmt.format(new Date(iso));
 }
 
-/** `Thứ Bảy, 20/12` */
+/** `Saturday 20 Dec` */
 export function formatDayHeading(iso: string) {
   const s = dayHeadingFmt.format(new Date(iso));
   return s.charAt(0).toUpperCase() + s.slice(1);

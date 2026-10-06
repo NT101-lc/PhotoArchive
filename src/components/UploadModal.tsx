@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
-import { formatBytes } from "@/lib/format";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { formatBytes, plural } from "@/lib/format";
 import type { Album } from "@/lib/types";
 import { IconChevronDown, IconClose, IconFolder, IconImage, IconPlus, IconUpload } from "./Icons";
 import { Modal } from "./Modal";
@@ -30,15 +30,27 @@ type Props = {
   defaultAlbumId?: string;
 };
 
-/** Nút "Upload ảnh" + modal. Chỉ là UI, chưa gửi file đi đâu. */
-export function UploadButton({ albums, defaultAlbumId }: Props) {
+/**
+ * Nút "Upload ảnh" + modal. Chỉ là UI, chưa gửi file đi đâu.
+ * Truyền `children` + `className` để đổi giao diện nút (vd thẻ lối tắt ở trang chủ).
+ */
+export function UploadButton({
+  albums,
+  defaultAlbumId,
+  className = "btn btn-primary",
+  children,
+}: Props & { className?: string; children?: ReactNode }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="btn btn-primary">
-        <IconUpload size={16} />
-        Upload ảnh
+      <button type="button" onClick={() => setOpen(true)} className={className}>
+        {children ?? (
+          <>
+            <IconUpload size={16} />
+            Upload photos
+          </>
+        )}
       </button>
       {open && <UploadModal albums={albums} defaultAlbumId={defaultAlbumId} onClose={() => setOpen(false)} />}
     </>
@@ -119,10 +131,10 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
     if (skippedType || skippedSize) {
       toast.show({
         tone: "warn",
-        title: `Bỏ qua ${skippedType + skippedSize} file`,
+        title: `Skipped ${plural(skippedType + skippedSize, "file")}`,
         message: [
-          skippedType && `${skippedType} file không phải ảnh`,
-          skippedSize && `${skippedSize} ảnh lớn hơn ${formatBytes(MAX_FILE_BYTES)}`,
+          skippedType && `${plural(skippedType, "file")} not an image`,
+          skippedSize && `${plural(skippedSize, "photo")} over ${formatBytes(MAX_FILE_BYTES)}`,
         ]
           .filter(Boolean)
           .join(" · "),
@@ -161,7 +173,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
     try {
       addFiles((await Promise.all(entries.map(walkEntry))).flat());
     } catch {
-      toast.show({ tone: "warn", title: "Không đọc được thư mục", message: "Thử dùng nút “Chọn thư mục”." });
+      toast.show({ tone: "warn", title: "Couldn't read the folder", message: "Try the “Choose folder” button instead." });
     } finally {
       setReading(false);
     }
@@ -191,11 +203,11 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
   const targetValid = target.mode === "existing" ? !!target.albumId : target.title.trim().length > 0;
 
   function onSave() {
-    const dest = target.mode === "new" ? `album mới “${target.title.trim()}”` : "album đã chọn";
+    const dest = target.mode === "new" ? `new album “${target.title.trim()}”` : "the selected album";
     toast.show({
       tone: "warn",
-      title: "Chưa kết nối backend",
-      message: `${items.length} ảnh chưa được lưu vào ${dest} — upload thật sẽ có khi nối API.`,
+      title: "Backend not connected",
+      message: `${plural(items.length, "photo")} not saved to ${dest} — real uploads arrive once the API is connected.`,
     });
   }
 
@@ -204,18 +216,18 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
       open
       onClose={onClose}
       maxWidth="max-w-[720px]"
-      eyebrow="Thêm ảnh"
-      title="Upload ảnh hoặc cả thư mục"
+      eyebrow="Add photos"
+      title="Upload photos or whole folders"
       footer={
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <p className="font-mono text-xs text-ink-soft sm:flex-1">
             {items.length > 0
-              ? `${items.length} ảnh · ${formatBytes(totalSize)}${folderCount ? ` · ${folderCount} thư mục` : ""}`
-              : "Chưa chọn ảnh nào"}
+              ? `${plural(items.length, "photo")} · ${formatBytes(totalSize)}${folderCount ? ` · ${plural(folderCount, "folder")}` : ""}`
+              : "No photos selected"}
           </p>
           <button type="button" className="btn btn-primary h-11 px-6" disabled={items.length === 0 || !targetValid} onClick={onSave}>
             <IconUpload size={16} />
-            Lưu {items.length > 0 ? `${items.length} ảnh` : ""}
+            Save {items.length > 0 ? plural(items.length, "photo") : ""}
           </button>
         </div>
       }
@@ -223,7 +235,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
       <div className="flex flex-col gap-5 p-5">
         {/* Album đích */}
         <fieldset className="flex flex-col gap-2">
-          <legend className="eyebrow mb-2">Lưu vào</legend>
+          <legend className="eyebrow mb-2">Save to</legend>
           <div className="flex gap-1.5">
             <button
               type="button"
@@ -234,7 +246,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
                 setTarget({ mode: "existing", albumId: defaultAlbumId ?? albums[0]?.id ?? "" });
               }}
             >
-              Album có sẵn
+              Existing album
             </button>
             <button
               type="button"
@@ -246,7 +258,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
               }}
             >
               <IconPlus size={13} />
-              Album mới
+              New album
             </button>
           </div>
           {target.mode === "existing" ? (
@@ -257,7 +269,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
                 setTarget({ mode: "existing", albumId: e.target.value });
               }}
               className="field"
-              aria-label="Chọn album"
+              aria-label="Choose album"
             >
               {albums.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -272,9 +284,9 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
                 setTargetTouched(true);
                 setTarget({ mode: "new", title: e.target.value });
               }}
-              placeholder="Tên chuyến đi, vd: Sapa tháng 3"
+              placeholder="Trip name, e.g. Sapa in March"
               className="field"
-              aria-label="Tên album mới"
+              aria-label="New album name"
             />
           )}
         </fieldset>
@@ -303,20 +315,20 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
           </span>
           <div>
             <p className="font-display text-lg font-bold">
-              {reading ? "Đang đọc thư mục…" : dragging ? "Thả vào đây" : "Kéo thả ảnh hoặc thư mục vào đây"}
+              {reading ? "Reading folder…" : dragging ? "Drop it here" : "Drag & drop photos or folders here"}
             </p>
-            <p className="text-sm text-ink-soft">Thư mục con cũng được đọc · JPG, PNG, HEIC, WEBP · tối đa 50 MB/ảnh</p>
+            <p className="text-sm text-ink-soft">Subfolders included · JPG, PNG, HEIC, WEBP · up to 50 MB per photo</p>
           </div>
           <div className="flex flex-wrap justify-center gap-2">
             <label className="btn cursor-pointer">
-              <IconImage size={16} /> Chọn ảnh
+              <IconImage size={16} /> Choose photos
               <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => {
                 onPick(e.target.files);
                 e.target.value = "";
               }} />
             </label>
             <label className="btn cursor-pointer">
-              <IconFolder size={16} /> Chọn thư mục
+              <IconFolder size={16} /> Choose folder
               <input
                 type="file"
                 multiple
@@ -345,7 +357,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
             ))}
             {items.length > 1 && (
               <button type="button" onClick={() => removeWhere(() => true)} className="self-end text-sm font-semibold text-ink-soft underline hover:text-accent">
-                Bỏ tất cả
+                Remove all
               </button>
             )}
           </div>
@@ -377,12 +389,12 @@ function FolderGroup({
         <button type="button" onClick={() => setOpen((v) => !v)} className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={open}>
           <IconChevronDown size={16} className={`shrink-0 transition-transform ${open ? "" : "-rotate-90"}`} />
           {folder ? <IconFolder size={16} className="shrink-0 text-accent" /> : <IconImage size={16} className="shrink-0" />}
-          <span className="truncate font-semibold">{folder || "Ảnh lẻ"}</span>
+          <span className="truncate font-semibold">{folder || "Loose photos"}</span>
           <span className="shrink-0 font-mono text-xs text-ink-soft">
             {items.length} · {formatBytes(size)}
           </span>
         </button>
-        <button type="button" onClick={onRemoveGroup} className="rounded-md p-1 text-ink-soft hover:bg-surface-2 hover:text-accent" aria-label={`Bỏ ${folder || "ảnh lẻ"}`}>
+        <button type="button" onClick={onRemoveGroup} className="rounded-md p-1 text-ink-soft hover:bg-surface-2 hover:text-accent" aria-label={`Remove ${folder || "loose photos"}`}>
           <IconClose size={15} />
         </button>
       </div>
@@ -395,7 +407,7 @@ function FolderGroup({
           </ul>
           {items.length > PREVIEW_LIMIT && (
             <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-2 text-sm font-semibold underline">
-              {showAll ? "Thu gọn" : `Xem thêm ${items.length - PREVIEW_LIMIT} ảnh`}
+              {showAll ? "Show less" : `Show ${items.length - PREVIEW_LIMIT} more`}
             </button>
           )}
         </div>
@@ -425,7 +437,7 @@ function PreviewTile({ item, onRemove }: { item: Picked; onRemove: () => void })
         type="button"
         onClick={onRemove}
         className="absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-line bg-surface opacity-100 shadow-hard-sm sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-        aria-label={`Bỏ ${name}`}
+        aria-label={`Remove ${name}`}
       >
         <IconClose size={11} />
       </button>
