@@ -33,6 +33,7 @@ export function AlbumCard({ album, preload = false }: Props) {
           <span className="font-medium text-ink">{album.location}</span>
           <span className="ml-auto tabular-nums">{formatDateRange(album.tripDate, album.endDate)}</span>
         </p>
+        {album.description && <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-ink-soft">{album.description}</p>}
       </div>
     </Link>
   );

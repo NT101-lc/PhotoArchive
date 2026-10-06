@@ -54,6 +54,8 @@ export const albums = pgTable(
     tripDate: date({ mode: "string" }).notNull(),
     // Ngày về (chuyến nhiều ngày); null → đi trong một ngày
     endDate: date({ mode: "string" }),
+    // Vài dòng kể về chuyến đi (không bắt buộc); null → không có
+    description: text(),
     // Ảnh bìa; null → lấy ảnh chụp sớm nhất của album
     coverPhotoId: uuid().references((): AnyPgColumn => photos.id, { onDelete: "set null" }),
     createdById: uuid().references(() => members.id, { onDelete: "set null" }),

@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { dayKey, formatBytes, formatDate, formatDateRange, normalizeText, plural, slugify, tripDays, yearOf } from "./format";
+import { cleanDescription, dayKey, formatBytes, formatDate, formatDateRange, normalizeText, plural, slugify, tripDays, yearOf } from "./format";
 
 describe("format", () => {
+  it("cleanDescription trims lines, collapses blank runs, and turns empty into null", () => {
+    assert.equal(cleanDescription("  Ba ngày sương mù.  \r\n  Tối ra chợ đêm. "), "Ba ngày sương mù.\nTối ra chợ đêm.");
+    assert.equal(cleanDescription("Ngày 1\n\n\n\nNgày 2"), "Ngày 1\n\nNgày 2");
+    assert.equal(cleanDescription("   \n  "), null);
+    assert.equal(cleanDescription(""), null);
+    assert.equal(cleanDescription(null), null);
+  });
+
   it("normalizeText strips Vietnamese accents for search", () => {
     assert.equal(normalizeText("Đà Lạt mùa sương"), "da lat mua suong");
     assert.equal(normalizeText("  PHÚ QUỐC "), "phu quoc");

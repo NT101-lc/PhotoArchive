@@ -3,12 +3,13 @@ import { and, eq, ilike, isNotNull, like, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import { albums, db, members, photos } from "@/db";
 import { ForbiddenError } from "./auth";
-import { slugify } from "./format";
+import { cleanDescription, MAX_DESCRIPTION_LENGTH, slugify } from "./format";
 import {
   canDeleteAlbum,
   canDeletePhoto,
   canEditAlbum,
   canEditAlbumDate,
+  canEditAlbumDescription,
   canRenameSelf,
   canSetCover,
   type Actor,
@@ -71,11 +72,19 @@ export function normalizeEndDate(tripDate: string, endDate: string | null | unde
   return endDate;
 }
 
+// Mô tả: chuỗi rỗng hoặc toàn khoảng trắng → null
+const descriptionInput = z
+  .string()
+  .max(MAX_DESCRIPTION_LENGTH, `Keep the description to ${MAX_DESCRIPTION_LENGTH} characters or fewer.`)
+  .nullable()
+  .transform(cleanDescription);
+
 export const createAlbumInput = z.object({
   title: z.string().trim().min(1).max(120),
   location: z.string().trim().min(1).max(120),
   tripDate: z.iso.date(),
   endDate: endDateInput.optional(),
+  description: descriptionInput.optional(),
 });
 
 /** Tạo album mới (mọi thành viên). Slug không trùng: `sapa-2026`, `sapa-2026-2`, ... */
@@ -95,12 +104,13 @@ export const updateAlbumInput = z
     location: z.string().trim().min(1).max(120),
     tripDate: z.iso.date(),
     endDate: endDateInput,
+    description: descriptionInput,
     // null = bỏ ảnh bìa đã chọn, quay về ảnh đầu tiên
     coverPhotoId: z.uuid().nullable(),
   })
   .partial();
 
-/** Sửa album. Tên / nơi: chỉ admin. Ngày đi / về: mọi thành viên. Ảnh bìa: admin hoặc người tạo album. */
+/** Sửa album. Tên / nơi: chỉ admin. Ngày đi / về, mô tả: mọi thành viên. Ảnh bìa: admin hoặc người tạo album. */
 export async function updateAlbum(actor: Actor, slug: string, input: z.infer<typeof updateAlbumInput>) {
   const album = await findAlbum(slug);
   const { coverPhotoId, ...info } = input;
@@ -109,6 +119,9 @@ export async function updateAlbum(actor: Actor, slug: string, input: z.infer<typ
     throw new ForbiddenError("Only the admin can rename an album or change its place.");
   }
   if ((info.tripDate !== undefined || info.endDate !== undefined) && !canEditAlbumDate(actor)) {
+    throw new ForbiddenError("Choose who you are first.");
+  }
+  if (info.description !== undefined && !canEditAlbumDescription(actor)) {
     throw new ForbiddenError("Choose who you are first.");
   }
   if (coverPhotoId !== undefined && !canSetCover(actor, album)) {

@@ -1,7 +1,10 @@
 import type { Album, Photo } from "../lib/types";
 
 // Kiểu dữ liệu mẫu: chỉ các trường cần để seed (không có các id sinh ra trong DB)
-type SeedAlbum = Omit<Album, "coverPhotoId" | "createdById" | "endDate"> & { endDate?: string | null };
+type SeedAlbum = Omit<Album, "coverPhotoId" | "createdById" | "endDate" | "description"> & {
+  endDate?: string | null;
+  description?: string | null;
+};
 type SeedPhoto = Omit<Photo, "uploadedById">;
 
 // Dữ liệu mẫu để seed DB (npm run db:seed).
@@ -23,10 +26,13 @@ const THUMB_WIDTH = 600;
 type AlbumSeed = Omit<SeedAlbum, "coverUrl" | "photoCount"> & { count: number };
 
 const ALBUM_SEEDS: AlbumSeed[] = [
-  { id: "da-lat-2025", title: "Đà Lạt mùa sương", location: "Đà Lạt", tripDate: "2025-12-20", endDate: "2025-12-22", count: 14 },
+  { id: "da-lat-2025", title: "Đà Lạt mùa sương", location: "Đà Lạt", tripDate: "2025-12-20", endDate: "2025-12-22", count: 14,
+    description: "Ba ngày sương mù dày đặc, sáng nào cũng dậy từ 5 giờ để săn mây ở đồi chè Cầu Đất. Tối ra chợ đêm ăn bánh tráng nướng, về homestay đốt lửa đến khuya." },
   { id: "phu-quoc-2025", title: "Phú Quốc biển xanh", location: "Phú Quốc", tripDate: "2025-07-11", count: 12 },
-  { id: "ha-giang-2024", title: "Cung đường Hà Giang", location: "Hà Giang", tripDate: "2024-10-02", endDate: "2024-10-05", count: 15 },
-  { id: "hoi-an-2024", title: "Hội An đêm đèn lồng", location: "Hội An", tripDate: "2024-04-27", count: 10 },
+  { id: "ha-giang-2024", title: "Cung đường Hà Giang", location: "Hà Giang", tripDate: "2024-10-02", endDate: "2024-10-05", count: 15,
+    description: "Bốn ngày chạy xe máy qua đèo Mã Pí Lèng, ngủ một đêm ở Đồng Văn. Ngày thứ hai mưa cả buổi chiều, mà ảnh đẹp nhất chuyến lại chụp đúng hôm đó." },
+  { id: "hoi-an-2024", title: "Hội An đêm đèn lồng", location: "Hội An", tripDate: "2024-04-27", count: 10,
+    description: "Thả đèn hoa đăng trên sông Hoài, ăn cao lầu ba bữa liền." },
   { id: "da-lat-2023", title: "Đà Lạt lần đầu", location: "Đà Lạt", tripDate: "2023-12-23", count: 9 },
   { id: "vung-tau-2023", title: "Vũng Tàu cuối tuần", location: "Vũng Tàu", tripDate: "2023-06-17", count: 8 },
 ];

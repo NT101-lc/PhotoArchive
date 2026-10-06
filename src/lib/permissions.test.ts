@@ -5,6 +5,7 @@ import {
   canDeletePhoto,
   canEditAlbum,
   canEditAlbumDate,
+  canEditAlbumDescription,
   canRenameSelf,
   canSetCover,
   canUpload,
@@ -16,13 +17,15 @@ const thao: Actor = { id: "t", name: "Thảo", role: 1 };
 const hung: Actor = { id: "h", name: "Hưng", role: 1 };
 
 describe("permissions", () => {
-  it("anyone with a name can upload and edit dates; anonymous cannot", () => {
+  it("anyone with a name can upload and edit dates or the description; anonymous cannot", () => {
     for (const a of [admin, thao]) {
       assert.equal(canUpload(a), true);
       assert.equal(canEditAlbumDate(a), true);
+      assert.equal(canEditAlbumDescription(a), true);
     }
     assert.equal(canUpload(null), false);
     assert.equal(canEditAlbumDate(null), false);
+    assert.equal(canEditAlbumDescription(null), false);
   });
 
   it("only admin renames or deletes albums", () => {

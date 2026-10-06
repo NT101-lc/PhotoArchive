@@ -6,7 +6,7 @@ import { createAlbum, createAlbumInput } from "@/lib/mutations";
 /** GET /api/albums — danh sách album, mới nhất trước. */
 export const GET = handle(async () => json({ albums: await getAlbums() }));
 
-/** POST /api/albums — tạo album { title, location, tripDate } → { id, slug }. Cần đã chọn tên. */
+/** POST /api/albums — tạo album { title, location, tripDate, endDate?, description? } → { id, slug }. Cần đã chọn tên. */
 export const POST = handle(async (req: Request) => {
   const actor = await requireMember();
   const input = await readJson(req, createAlbumInput);

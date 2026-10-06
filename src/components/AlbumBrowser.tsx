@@ -41,7 +41,7 @@ export function AlbumBrowser({ albums, initial }: Props) {
       (a) =>
         (year.length === 0 || year.includes(yearOf(a.tripDate))) &&
         (place.length === 0 || place.includes(a.location)) &&
-        (!q || normalizeText(`${a.title} ${a.location}`).includes(q)),
+        (!q || normalizeText(`${a.title} ${a.location} ${a.description ?? ""}`).includes(q)),
     );
     return list.sort((a, b) =>
       sort === "oldest"

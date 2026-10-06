@@ -45,6 +45,7 @@ function toAlbum(row: AlbumRow & { photoCount: number }, coverUrl: string): Albu
     location: row.location,
     tripDate: row.tripDate,
     endDate: row.endDate,
+    description: row.description,
     coverUrl,
     photoCount: row.photoCount,
     coverPhotoId: row.coverPhotoId,

@@ -30,17 +30,22 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
         eyebrow="All albums"
         title={album.title}
         description={
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="flex items-center gap-1.5">
-              <IconPin size={15} />
-              <b className="font-semibold text-ink">{album.location}</b>
+          <>
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="flex items-center gap-1.5">
+                <IconPin size={15} />
+                <b className="font-semibold text-ink">{album.location}</b>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <IconCalendar size={15} />
+                {formatDateRange(album.tripDate, album.endDate)}
+                {album.endDate && <span>({plural(tripDays(album.tripDate, album.endDate), "day")})</span>}
+              </span>
             </span>
-            <span className="flex items-center gap-1.5">
-              <IconCalendar size={15} />
-              {formatDateRange(album.tripDate, album.endDate)}
-              {album.endDate && <span>({plural(tripDays(album.tripDate, album.endDate), "day")})</span>}
-            </span>
-          </span>
+            {album.description && (
+              <p className="mt-4 max-w-[62ch] text-[1.05rem] leading-relaxed whitespace-pre-line text-ink">{album.description}</p>
+            )}
+          </>
         }
         stats={[
           { value: photos.length, label: "photos" },

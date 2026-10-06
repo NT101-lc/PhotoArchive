@@ -10,7 +10,13 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function createAlbum(input: { title: string; location: string; tripDate: string; endDate?: string | null }) {
+export function createAlbum(input: {
+  title: string;
+  location: string;
+  tripDate: string;
+  endDate?: string | null;
+  description?: string | null;
+}) {
   return api<{ id: string; slug: string }>("/api/albums", { method: "POST", body: JSON.stringify(input) });
 }
 
@@ -21,6 +27,7 @@ export function updateAlbum(
     location?: string;
     tripDate?: string;
     endDate?: string | null;
+    description?: string | null;
     coverPhotoId?: string | null;
   },
 ) {

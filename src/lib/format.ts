@@ -64,6 +64,23 @@ export function slugify(s: string) {
     .slice(0, 60);
 }
 
+export const MAX_DESCRIPTION_LENGTH = 600;
+
+/**
+ * Chuẩn hoá mô tả chuyến đi: bỏ khoảng trắng thừa ở đầu/cuối từng dòng, gộp nhiều dòng trống thành một.
+ * Rỗng → null (album không có mô tả).
+ */
+export function cleanDescription(s: string | null | undefined) {
+  const text = (s ?? "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return text || null;
+}
+
 export function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;

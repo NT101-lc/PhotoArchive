@@ -54,6 +54,11 @@ export default async function HomePage() {
           >
             {latest.title}
           </h1>
+          {latest.description && (
+            <p className="mt-5 line-clamp-4 max-w-[60ch] text-lg leading-relaxed whitespace-pre-line text-ink">
+              {latest.description}
+            </p>
+          )}
           <div className="mt-6 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <p className="max-w-[46ch] text-lg leading-relaxed text-ink-soft">
               <span className="mr-2 inline-flex items-center gap-1 align-[-2px] font-semibold text-ink">
@@ -267,6 +272,9 @@ function TripRow({ album }: { album: Album }) {
             <span className="sm:hidden">, {plural(album.photoCount, "photo")}</span>
           </span>
         </span>
+        {album.description && (
+          <span className="mt-0.5 hidden truncate text-sm text-ink-soft sm:block">{album.description}</span>
+        )}
       </span>
       <span className="hidden w-20 shrink-0 text-right text-sm text-ink-soft tabular-nums sm:block">
         {plural(album.photoCount, "photo")}

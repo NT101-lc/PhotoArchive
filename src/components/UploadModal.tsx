@@ -13,6 +13,7 @@ import { IdentityForm } from "./IdentityForm";
 import { Modal } from "./Modal";
 import { useToast } from "./Toast";
 import { DateRangeFields } from "./DateRangeFields";
+import { DescriptionInput } from "./DescriptionInput";
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const PREVIEW_LIMIT = 24; // số ảnh preview mỗi thư mục trước khi bấm "xem thêm"
@@ -36,7 +37,7 @@ type Picked = {
 
 type Target =
   | { mode: "existing"; albumId: string }
-  | { mode: "new"; title: string; location: string; tripDate: string; endDate: string };
+  | { mode: "new"; title: string; location: string; tripDate: string; endDate: string; description: string };
 
 type Props = {
   albums: Pick<Album, "id" | "title" | "createdById">[];
@@ -76,7 +77,7 @@ function isImage(file: File) {
 }
 
 function newTarget(title = "", tripDate = localDate(Date.now()), endDate = ""): Target {
-  return { mode: "new", title, location: "", tripDate, endDate };
+  return { mode: "new", title, location: "", tripDate, endDate, description: "" };
 }
 
 function dirname(path: string) {
@@ -281,6 +282,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
                 location: target.location.trim(),
                 tripDate: target.tripDate,
                 endDate: target.endDate || null,
+                description: target.description,
               })
             ).slug;
 
@@ -427,6 +429,19 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
                   setTarget({ ...target, tripDate: start, endDate: end });
                 }}
               />
+              <div className="flex flex-col gap-1 sm:col-span-2">
+                <DescriptionInput
+                  value={target.description}
+                  onChange={(description) => {
+                    setTargetTouched(true);
+                    setTarget({ ...target, description });
+                  }}
+                  aria-label="Trip description (optional)"
+                  placeholder="Description (optional): who came, where you stayed, the moment you’ll remember."
+                  rows={2}
+                  className="min-h-[72px]"
+                />
+              </div>
             </div>
           )}
         </fieldset>

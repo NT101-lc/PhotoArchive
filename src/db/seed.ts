@@ -43,6 +43,7 @@ async function main() {
         location: a.location,
         tripDate: a.tripDate,
         endDate: a.endDate ?? null,
+        description: a.description ?? null,
         createdById: memberId.get(MEMBERS[0]),
       })),
     )

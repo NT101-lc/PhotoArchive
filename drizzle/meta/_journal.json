@@ -36,6 +36,13 @@
       "when": 1791271943493,
       "tag": "0004_album_end_date",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791274182642,
+      "tag": "0005_album_description",
+      "breakpoints": true
     }
   ]
 }

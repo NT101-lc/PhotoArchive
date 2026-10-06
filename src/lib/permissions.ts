@@ -15,6 +15,9 @@ export const canDeleteAlbum = (a: Actor | null | undefined) => isAdmin(a);
 /** Sửa ngày đi của album: mọi thành viên đã chọn tên. */
 export const canEditAlbumDate = (a: Actor | null | undefined) => !!a;
 
+/** Viết / sửa mô tả chuyến đi: mọi thành viên đã chọn tên (như ngày đi). */
+export const canEditAlbumDescription = (a: Actor | null | undefined) => !!a;
+
 /** Đổi ảnh bìa: admin, hoặc người đã tạo album đó. */
 export const canSetCover = (a: Actor | null | undefined, album: { createdById: string | null }) =>
   isAdmin(a) || (!!a && album.createdById === a.id);

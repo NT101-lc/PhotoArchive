@@ -6,6 +6,8 @@ export type Album = {
   tripDate: string;
   /** Ngày về (chuyến nhiều ngày), null nếu đi trong ngày */
   endDate: string | null;
+  /** Vài dòng kể về chuyến đi; null nếu chưa ai viết */
+  description: string | null;
   coverUrl: string;
   photoCount: number;
   /** Ảnh bìa đã chọn; null → bìa là ảnh đầu tiên */
