@@ -21,8 +21,8 @@
     "aws4fetch": "^1.0.20",
     "drizzle-orm": "^0.45.3",
     "next": "16.3.8",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "react-icons": "^5.7.0",
     "server-only": "^0.0.1",
     "zod": "^4.6.5"
