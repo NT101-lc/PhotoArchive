@@ -83,3 +83,7 @@ async function squareResize(file: File, size: number): Promise<Blob> {
   if (!blob) throw new Error("Couldn’t process the image.");
   return blob;
 }
+
+export function updateAbout(paragraphs: string[]) {
+  return api<{ paragraphs: string[] }>("/api/about", { method: "PUT", body: JSON.stringify({ paragraphs }) });
+}

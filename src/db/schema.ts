@@ -4,6 +4,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   smallint,
   text,
@@ -118,6 +119,17 @@ export const photos = pgTable(
     check("photos_status_valid", sql`${t.status} in ('queued', 'processing', 'ready', 'failed')`),
   ],
 );
+
+/**
+ * Nội dung tự viết của các trang tĩnh, mỗi trang một dòng theo `key` (vd "about").
+ * `value` là JSON tuỳ trang; trang About: { paragraphs: string[] }.
+ */
+export const siteContent = pgTable("site_content", {
+  key: text().primaryKey(),
+  value: jsonb().notNull(),
+  updatedById: uuid().references(() => members.id, { onDelete: "set null" }),
+  ...timestamps,
+});
 
 export type MemberRow = typeof members.$inferSelect;
 export type AlbumRow = typeof albums.$inferSelect;
