@@ -21,6 +21,13 @@ export const canEditAlbumDescription = (a: Actor | null | undefined) => !!a;
 /** Sửa chữ trang About: mọi thành viên đã chọn tên. */
 export const canEditAbout = (a: Actor | null | undefined) => !!a;
 
+/** Tạo / sửa kế hoạch chuyến đi: mọi thành viên đã chọn tên. */
+export const canEditPlan = (a: Actor | null | undefined) => !!a;
+
+/** Xoá kế hoạch: admin, hoặc người đã tạo kế hoạch đó. */
+export const canDeletePlan = (a: Actor | null | undefined, plan: { createdById: string | null }) =>
+  isAdmin(a) || (!!a && plan.createdById === a.id);
+
 /** Đổi ảnh bìa: admin, hoặc người đã tạo album đó. */
 export const canSetCover = (a: Actor | null | undefined, album: { createdById: string | null }) =>
   isAdmin(a) || (!!a && album.createdById === a.id);

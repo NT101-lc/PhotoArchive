@@ -87,3 +87,21 @@ async function squareResize(file: File, size: number): Promise<Blob> {
 export function updateAbout(paragraphs: string[]) {
   return api<{ paragraphs: string[] }>("/api/about", { method: "PUT", body: JSON.stringify({ paragraphs }) });
 }
+
+// ---------- Planner ----------
+
+export function createPlan(input: { title: string; location: string; startDate: string; endDate: string }) {
+  return api<{ slug: string }>("/api/plans", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function getPlan<T>(slug: string) {
+  return api<T>(`/api/plans/${encodeURIComponent(slug)}`, { cache: "no-store" });
+}
+
+export function patchPlan<T>(slug: string, op: Record<string, unknown>) {
+  return api<T>(`/api/plans/${encodeURIComponent(slug)}`, { method: "PATCH", body: JSON.stringify(op) });
+}
+
+export function deletePlan(slug: string) {
+  return api<{ ok: true }>(`/api/plans/${encodeURIComponent(slug)}`, { method: "DELETE" });
+}

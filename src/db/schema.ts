@@ -131,6 +131,38 @@ export const siteContent = pgTable("site_content", {
   ...timestamps,
 });
 
+/** Một buổi trong lịch trình (dòng của bảng): `id` cố định để ô không lệch khi đổi tên / xoá buổi. */
+export type PlanSlot = { id: string; label: string; time: string };
+/** Một dòng của bảng việc cần làm & chi phí. `cost` tính bằng VND. */
+export type PlanItem = { id: string; done: boolean; text: string; who: string | null; cost: number | null; note: string };
+
+/**
+ * Kế hoạch chuyến đi (planner kiểu bảng tính), không gắn với album.
+ * `cells`: chữ trong bảng lịch trình, key `<YYYY-MM-DD>|<slotId>`. `going`: id các thành viên tham gia.
+ */
+export const plans = pgTable(
+  "plans",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    slug: text().notNull().unique(),
+    title: text().notNull(),
+    location: text().notNull(),
+    startDate: date({ mode: "string" }).notNull(),
+    endDate: date({ mode: "string" }).notNull(),
+    slots: jsonb().$type<PlanSlot[]>().notNull(),
+    cells: jsonb().$type<Record<string, string>>().notNull().default({}),
+    going: jsonb().$type<string[]>().notNull().default([]),
+    items: jsonb().$type<PlanItem[]>().notNull().default([]),
+    createdById: uuid().references(() => members.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [
+    index("plans_start_date_idx").on(t.startDate),
+    check("plans_end_after_start", sql`${t.endDate} >= ${t.startDate}`),
+  ],
+);
+
 export type MemberRow = typeof members.$inferSelect;
 export type AlbumRow = typeof albums.$inferSelect;
 export type PhotoRow = typeof photos.$inferSelect;
+export type PlanRow = typeof plans.$inferSelect;

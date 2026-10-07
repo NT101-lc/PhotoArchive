@@ -381,6 +381,21 @@
     transform: rotate(0deg) translateY(-2%);
   }
 
+  /* Bảng tính của planner: kẻ ô mảnh, viền ngoài do khung bọc lo */
+  .sheet :is(th, td) {
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .sheet thead :is(th, td) {
+    border-color: rgb(255 255 255 / 0.12);
+  }
+  .sheet :is(th, td):last-child {
+    border-right: 0;
+  }
+  .sheet > :last-child > tr:last-child > * {
+    border-bottom: 0;
+  }
+
   /* Lỗ răng cưa cuộn phim — đặt trên nền màu film */
   .sprockets {
     background-image: radial-gradient(circle at center, var(--bg) 0 2.2px, transparent 2.7px);
