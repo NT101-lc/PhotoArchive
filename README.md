@@ -161,7 +161,7 @@ tone-map HDR (video iPhone) về SDR. Khi xem, trình duyệt tự chọn 720p /
 người xem đổi tay được.
 
 Worker là `scripts/transcode-worker.ts`, chạy trên GitHub Actions (`.github/workflows/transcode.yml`):
-được gọi ngay khi có video mới, và chạy lại mỗi 15 phút để nhặt video bị sót. Hàng đợi nằm ngay trong
+được gọi ngay khi có video mới, và chạy lại mỗi 3 giờ để nhặt video bị sót. Hàng đợi nằm ngay trong
 bảng `photos` (`status`: queued → processing → ready / failed, thử tối đa 3 lần).
 
 Cài đặt một lần:
@@ -169,7 +169,7 @@ Cài đặt một lần:
 1. **GitHub → repo → Settings → Secrets and variables → Actions**, thêm các secret giống `.env`:
    `DATABASE_URL`, `R2_ACCOUNT_ID` (hoặc `R2_ENDPOINT`), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
    Thiếu secret thì workflow tự bỏ qua.
-2. (Không bắt buộc, để video xử lý ngay thay vì chờ tới 15 phút) Tạo fine-grained token cho repo với quyền
+2. (Không bắt buộc, để video xử lý ngay thay vì chờ lượt chạy định kỳ 3 giờ một lần) Tạo fine-grained token cho repo với quyền
    **Contents: Read and write**, rồi đặt trên Vercel: `GITHUB_DISPATCH_TOKEN` và `GITHUB_REPOSITORY=NT101-lc/PhotoArchive`.
 
 Chạy worker trên máy (cần `ffmpeg` trong PATH): `npx tsx scripts/transcode-worker.ts`.

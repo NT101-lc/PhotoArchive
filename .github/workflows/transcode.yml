@@ -8,7 +8,8 @@ on:
   repository_dispatch:
     types: [transcode]
   schedule:
-    - cron: "*/15 * * * *"
+    # Mỗi 3 giờ (phút 17 để tránh giờ chẵn, lúc GitHub hay trễ lịch)
+    - cron: "17 */3 * * *"
   workflow_dispatch:
 
 # Một worker tại một thời điểm; lượt mới chờ lượt cũ xong (worker chạy tới khi hết việc)
