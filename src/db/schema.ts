@@ -1,4 +1,5 @@
 import {
+  bigint,
   check,
   date,
   index,
@@ -21,6 +22,11 @@ const timestamps = {
     .defaultNow()
     .$onUpdate(() => new Date()),
 };
+
+export const MEDIA_KINDS = ["photo", "video"] as const;
+/** queued → processing → ready (hoặc failed sau MAX_TRANSCODE_ATTEMPTS lần). Ảnh luôn "ready". */
+export const MEDIA_STATUSES = ["queued", "processing", "ready", "failed"] as const;
+export const MAX_TRANSCODE_ATTEMPTS = 3;
 
 /** Vai trò: 0 = admin (toàn quyền, đăng nhập bằng mật khẩu), 1 = user (chỉ chọn tên, không mật khẩu). */
 export const ROLE_ADMIN = 0;
@@ -82,16 +88,34 @@ export const photos = pgTable(
     sourceUrl: text(),
     width: integer().notNull(),
     height: integer().notNull(),
-    sizeBytes: integer(),
+    // bigint: video có thể lớn hơn 2 GB
+    sizeBytes: bigint({ mode: "number" }),
     mimeType: text(),
     uploadedById: uuid().references(() => members.id, { onDelete: "set null" }),
     takenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+
+    // ---- Video ----
+    // `storageKey` luôn là file gốc. Video được worker (scripts/transcode-worker.ts) chuyển mã
+    // thành MP4 H.264 720p / 1080p + ảnh poster; trong lúc đó `status` khác "ready".
+    kind: text({ enum: MEDIA_KINDS }).notNull().default("photo"),
+    status: text({ enum: MEDIA_STATUSES }).notNull().default("ready"),
+    durationMs: integer(),
+    posterKey: text(),
+    video720Key: text(),
+    video1080Key: text(),
+    // Hàng đợi chuyển mã: số lần đã thử, lúc worker nhận việc, lỗi gần nhất
+    attempts: smallint().notNull().default(0),
+    lockedAt: timestamp({ withTimezone: true }),
+    processingError: text(),
     ...timestamps,
   },
   (t) => [
     index("photos_album_taken_idx").on(t.albumId, t.takenAt),
+    index("photos_status_idx").on(t.status),
     check("photos_has_source", sql`${t.storageKey} is not null or ${t.sourceUrl} is not null`),
     check("photos_positive_size", sql`${t.width} > 0 and ${t.height} > 0`),
+    check("photos_kind_valid", sql`${t.kind} in ('photo', 'video')`),
+    check("photos_status_valid", sql`${t.status} in ('queued', 'processing', 'ready', 'failed')`),
   ],
 );
 

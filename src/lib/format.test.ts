@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { cleanDescription, dayKey, formatBytes, formatDate, formatDateRange, normalizeText, plural, slugify, tripDays, yearOf } from "./format";
+import { cleanDescription, dayKey, formatDuration, formatBytes, formatDate, formatDateRange, normalizeText, plural, slugify, tripDays, yearOf } from "./format";
 
 describe("format", () => {
+  it("formatDuration shows m:ss, or h:mm:ss for long videos", () => {
+    assert.equal(formatDuration(7_400), "0:07");
+    assert.equal(formatDuration(185_000), "3:05");
+    assert.equal(formatDuration(3_729_000), "1:02:09");
+  });
+
   it("cleanDescription trims lines, collapses blank runs, and turns empty into null", () => {
     assert.equal(cleanDescription("  Ba ngày sương mù.  \r\n  Tối ra chợ đêm. "), "Ba ngày sương mù.\nTối ra chợ đêm.");
     assert.equal(cleanDescription("Ngày 1\n\n\n\nNgày 2"), "Ngày 1\n\nNgày 2");

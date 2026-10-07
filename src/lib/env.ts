@@ -13,6 +13,10 @@ const schema = z.object({
   R2_ENDPOINT: z.url().optional(),
   R2_BUCKET: z.string().optional(),
   R2_PUBLIC_URL: z.url().optional(),
+  // Gọi worker chuyển mã video ngay sau upload (GitHub repository_dispatch).
+  // Để trống thì video vẫn được xử lý, chỉ chờ lượt chạy định kỳ của workflow (tối đa ~15 phút).
+  GITHUB_DISPATCH_TOKEN: z.string().optional(),
+  GITHUB_REPOSITORY: z.string().regex(/^[\w.-]+\/[\w.-]+$/).optional(),
 });
 
 type ServerEnv = z.infer<typeof schema>;

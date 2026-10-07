@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { deletePhoto, updateAlbum } from "@/lib/api-client";
+import { deletePhoto, retryVideo, updateAlbum } from "@/lib/api-client";
 import { useFavorites } from "@/lib/favorites";
 import { dayKey, formatDayHeading, plural } from "@/lib/format";
 import { canDeletePhoto, canSetCover } from "@/lib/permissions";
@@ -64,7 +64,18 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
     return [...groups.entries()];
   }, [visible]);
 
-  const openIndex = openId ? lightboxList.findIndex((p) => p.id === openId) : -1;
+  // Lightbox giữ danh sách lúc mở, nhưng luôn lấy bản mới nhất của từng ảnh (vd video vừa xử lý xong)
+  const byId = useMemo(() => new Map(photos.map((p) => [p.id, p])), [photos]);
+  const liveList = useMemo(() => lightboxList.map((p) => byId.get(p.id) ?? p), [lightboxList, byId]);
+  const openIndex = openId ? liveList.findIndex((p) => p.id === openId) : -1;
+
+  // Còn video đang chờ / đang chuyển mã → hỏi lại server mỗi 10 giây
+  const processing = photos.some((p) => p.kind === "video" && (p.status === "queued" || p.status === "processing"));
+  useEffect(() => {
+    if (!processing) return;
+    const t = setInterval(() => router.refresh(), 10_000);
+    return () => clearInterval(t);
+  }, [processing, router]);
 
   // Đồng bộ ?photo=… để copy link là mở đúng tấm ảnh
   useEffect(() => {
@@ -81,7 +92,18 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
     },
     isFavorite: favorites.has,
     onToggleFavorite: favorites.toggle,
+    onRetry: me ? retry : undefined,
   };
+
+  async function retry(photo: Photo) {
+    try {
+      await retryVideo(photo.id);
+      toast.show({ tone: "success", title: "Video queued again", message: "It’ll be ready in a few minutes." });
+      router.refresh();
+    } catch (err) {
+      toast.show({ tone: "warn", title: "Couldn’t retry", message: (err as Error).message });
+    }
+  }
 
   async function setCover(photo: Photo) {
     if (photo.id === coverId) return;
@@ -201,9 +223,9 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
 
       {openIndex >= 0 && (
         <Lightbox
-          photos={lightboxList}
+          photos={liveList}
           index={openIndex}
-          onIndexChange={(i) => setOpenId(lightboxList[i].id)}
+          onIndexChange={(i) => setOpenId(liveList[i].id)}
           onClose={() => setOpenId(null)}
           isFavorite={favorites.has}
           onToggleFavorite={favorites.toggle}

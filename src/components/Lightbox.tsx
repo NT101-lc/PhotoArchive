@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode, type TouchEvent } from "react";
-import { formatDateTime, pad2 } from "@/lib/format";
+import { formatDateTime, formatDuration, pad2 } from "@/lib/format";
 import type { Photo } from "@/lib/types";
+import { useVideoQuality, type Quality } from "@/lib/video-quality";
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -43,7 +44,7 @@ const SLIDESHOW_MS = 3500;
 const DOUBLE_TAP_MS = 280;
 
 /**
- * Xem ảnh gốc. Phím: ← → chuyển ảnh · Space slideshow · Z phóng to · F yêu thích · I thông tin · Esc đóng.
+ * Xem ảnh gốc / phát video. Phím: ← → chuyển ảnh · Space slideshow (video: phát / dừng) · Z phóng to · F yêu thích · I thông tin · Esc đóng.
  * Mobile: vuốt trái/phải để chuyển, vuốt xuống để đóng, chạm 2 lần để phóng to.
  * Luôn dùng tông tối (phòng tối) bất kể theme.
  */
@@ -65,9 +66,13 @@ export function Lightbox({
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const lastTap = useRef(0);
   const stripRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const photo = photos[index];
   const total = photos.length;
   const fav = photo ? isFavorite(photo.id) : false;
+  const isVideo = photo?.kind === "video";
+  const playable = isVideo && photo.status === "ready" && !!photo.sources;
+  const quality = useVideoQuality();
 
   useBodyScrollLock(true);
 
@@ -81,10 +86,10 @@ export function Lightbox({
 
   // Slideshow: tự chuyển ảnh; dừng khi đang phóng to
   useEffect(() => {
-    if (!playing || zoomed || paused || total < 2) return;
+    if (!playing || zoomed || paused || total < 2 || playable) return;
     const t = setTimeout(() => go(1), SLIDESHOW_MS);
     return () => clearTimeout(t);
-  }, [playing, zoomed, paused, go, total, index]);
+  }, [playing, zoomed, paused, go, total, index, playable]);
 
   useEffect(() => {
     if (paused) return;
@@ -96,20 +101,25 @@ export function Lightbox({
       else if (e.key === "ArrowRight") go(1);
       else if (e.key === " ") {
         e.preventDefault();
-        setPlaying((v) => !v);
+        const v = videoRef.current;
+        if (v) {
+          if (v.paused) void v.play();
+          else v.pause();
+        } else setPlaying((p) => !p);
       } else if (e.key === "i" || e.key === "I") setShowInfo((v) => !v);
-      else if (e.key === "z" || e.key === "Z") setZoomed((v) => !v);
+      else if ((e.key === "z" || e.key === "Z") && !isVideo) setZoomed((v) => !v);
       else if ((e.key === "f" || e.key === "F") && photo) onToggleFavorite(photo.id);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, onClose, zoomed, photo, onToggleFavorite, paused]);
+  }, [go, onClose, zoomed, photo, onToggleFavorite, paused, isVideo]);
 
   // Tải trước ảnh kế bên để chuyển ảnh mượt hơn
   useEffect(() => {
     for (const d of [1, -1]) {
       const p = photos[(index + d + total) % total];
-      if (p) new window.Image().src = p.url;
+      const src = p?.kind === "video" ? p.thumbUrl : p?.url;
+      if (src) new window.Image().src = src;
     }
   }, [index, photos, total]);
 
@@ -136,7 +146,7 @@ export function Lightbox({
     if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
       // Chạm 2 lần liên tiếp → phóng to / thu nhỏ
       const now = Date.now();
-      if (now - lastTap.current < DOUBLE_TAP_MS) {
+      if (now - lastTap.current < DOUBLE_TAP_MS && !isVideo) {
         e.preventDefault(); // chặn dblclick giả lập để không bị bật/tắt 2 lần
         setZoomed((v) => !v);
         lastTap.current = 0;
@@ -150,6 +160,13 @@ export function Lightbox({
 
   async function download() {
     if (!photo) return;
+    // Video có thể rất lớn: để trình duyệt tự tải qua link ký sẵn thay vì nạp vào bộ nhớ
+    if (isVideo) {
+      const a = document.createElement("a");
+      a.href = `/api/photos/${encodeURIComponent(photo.id)}/raw?download=1`;
+      a.click();
+      return;
+    }
     try {
       const res = await fetch(photo.url);
       if (!res.ok) throw new Error(String(res.status));
@@ -182,7 +199,7 @@ export function Lightbox({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`Photo ${index + 1} of ${total}`}
+      aria-label={`${isVideo ? "Video" : "Photo"} ${index + 1} of ${total}`}
       className="animate-fade fixed inset-0 z-[1100] flex flex-col bg-[#0b0e0d] text-[#e4e9e5]"
     >
       {/* Thanh tiến trình slideshow */}
@@ -204,16 +221,31 @@ export function Lightbox({
           <LbButton onClick={() => setPlaying((v) => !v)} label={playing ? "Pause slideshow (Space)" : "Slideshow (Space)"} active={playing}>
             {playing ? <IconPause size={18} /> : <IconPlay size={16} />}
           </LbButton>
-          <LbButton onClick={() => setZoomed((v) => !v)} label={zoomed ? "Zoom out (Z)" : "Zoom in (Z)"} active={zoomed} className="max-sm:hidden">
-            {zoomed ? <IconZoomOut size={18} /> : <IconZoomIn size={18} />}
-          </LbButton>
+          {isVideo ? (
+            playable &&
+            photo.sources?.["720"] &&
+            photo.sources["1080"] && (
+              <button
+                type="button"
+                onClick={() => quality.set(quality.value === "1080" ? "720" : "1080")}
+                title="Switch video quality"
+                className="h-9 rounded-full border border-white/20 px-3 text-xs font-semibold tabular-nums hover:bg-white/10 sm:h-10"
+              >
+                {quality.value}p
+              </button>
+            )
+          ) : (
+            <LbButton onClick={() => setZoomed((v) => !v)} label={zoomed ? "Zoom out (Z)" : "Zoom in (Z)"} active={zoomed} className="max-sm:hidden">
+              {zoomed ? <IconZoomOut size={18} /> : <IconZoomIn size={18} />}
+            </LbButton>
+          )}
           <LbButton onClick={download} label="Download original" className="max-sm:hidden">
             <IconDownload size={18} />
           </LbButton>
           <LbButton onClick={copyLink} label="Copy photo link" className="max-sm:hidden">
             <IconLink size={18} />
           </LbButton>
-          {cover && (
+          {cover && (!isVideo || playable) && (
             <LbButton
               onClick={() => cover.onSet(photo)}
               label={cover.isCover(photo.id) ? "This is the album cover" : "Set as album cover"}
@@ -223,7 +255,7 @@ export function Lightbox({
             </LbButton>
           )}
           {remove?.canDelete(photo) && (
-            <LbButton onClick={() => remove.onDelete(photo)} label="Delete photo">
+            <LbButton onClick={() => remove.onDelete(photo)} label={isVideo ? "Delete video" : "Delete photo"}>
               <IconTrash size={18} />
             </LbButton>
           )}
@@ -246,7 +278,17 @@ export function Lightbox({
           if (e.target === e.currentTarget) onClose();
         }}
       >
-        {zoomed ? (
+        {isVideo ? (
+          <VideoStage
+            key={photo.id}
+            photo={photo}
+            quality={quality.value}
+            videoRef={videoRef}
+            onEnded={() => {
+              if (playing && total > 1) go(1);
+            }}
+          />
+        ) : zoomed ? (
           <ZoomedImage key={photo.id} photo={photo} onExit={() => setZoomed(false)} />
         ) : (
           <FittedImage key={photo.id} photo={photo} onDoubleClick={() => setZoomed(true)} />
@@ -281,14 +323,23 @@ export function Lightbox({
                 setZoomed(false);
                 onIndexChange(i);
               }}
-              aria-label={`Photo ${i + 1}`}
+              aria-label={`${p.kind === "video" ? "Video" : "Photo"} ${i + 1}`}
               aria-current={i === index}
               className={`relative h-12 shrink-0 overflow-hidden rounded-md border transition-all sm:h-14 ${
                 i === index ? "border-[#6cc79c] opacity-100" : "border-transparent opacity-45 hover:opacity-80"
               }`}
               style={{ aspectRatio: `${p.width} / ${p.height}` }}
             >
-              <Image src={p.thumbUrl} alt="" fill sizes="96px" className="object-cover" />
+              {p.thumbUrl ? (
+                <Image src={p.thumbUrl} alt="" fill sizes="96px" className="object-cover" />
+              ) : (
+                <span className="absolute inset-0 bg-white/10" />
+              )}
+              {p.kind === "video" && (
+                <span className="absolute inset-0 flex items-center justify-center text-white drop-shadow" aria-hidden="true">
+                  <IconPlay size={16} />
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -303,6 +354,72 @@ function Spinner() {
   return (
     <div className="absolute inset-0 flex items-center justify-center">
       <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-white/15 border-t-[#6cc79c]" />
+    </div>
+  );
+}
+
+/**
+ * Video: phát bản đã chuyển mã theo chất lượng đang chọn (giữ nguyên vị trí khi đổi 720p ↔ 1080p).
+ * Chưa chuyển mã xong thì hiện trạng thái.
+ */
+function VideoStage({
+  photo,
+  quality,
+  videoRef,
+  onEnded,
+}: {
+  photo: Photo;
+  quality: Quality;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  onEnded: () => void;
+}) {
+  const resumeAt = useRef(0);
+  const sources = photo.status === "ready" ? photo.sources : null;
+  const src = sources ? (sources[quality] ?? sources["720"] ?? sources["1080"]) : undefined;
+
+  if (!src) {
+    const failed = photo.status === "failed";
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+        {failed ? (
+          <>
+            <p className="font-display text-xl font-bold">This video couldn’t be processed</p>
+            <p className="max-w-sm text-sm text-white/60">
+              {photo.processingError ?? "Something went wrong while converting it."} Use “Try again” on the album page, or download
+              the original.
+            </p>
+          </>
+        ) : (
+          <>
+            <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-white/15 border-t-[#6cc79c]" aria-hidden="true" />
+            <p className="font-display text-xl font-bold">{photo.status === "processing" ? "Processing video…" : "Waiting to process…"}</p>
+            <p className="max-w-sm text-sm text-white/60">It’s being converted so it plays on every device. This page updates by itself.</p>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="absolute inset-2 sm:inset-x-20 sm:inset-y-2">
+      <video
+        ref={videoRef}
+        src={src}
+        poster={photo.thumbUrl || undefined}
+        controls
+        autoPlay
+        playsInline
+        preload="metadata"
+        // Lúc đổi nguồn, trình duyệt báo currentTime = 0 trước khi có dữ liệu → bỏ qua để còn nhảy về chỗ cũ
+        onTimeUpdate={(e) => {
+          if (e.currentTarget.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) resumeAt.current = e.currentTarget.currentTime;
+        }}
+        onLoadedMetadata={(e) => {
+          if (resumeAt.current > 0) e.currentTarget.currentTime = resumeAt.current;
+        }}
+        onEnded={onEnded}
+        className="h-full w-full object-contain"
+      />
     </div>
   );
 }
@@ -425,13 +542,15 @@ function InfoPanel({
     ["Taken by", photo.uploadedBy],
     ["Taken at", formatDateTime(photo.takenAt)],
     ["Size", `${photo.width} × ${photo.height}`],
-    ["Orientation", photo.width >= photo.height ? "Landscape" : "Portrait"],
+    photo.kind === "video" && photo.durationMs
+      ? ["Length", formatDuration(photo.durationMs)]
+      : ["Orientation", photo.width >= photo.height ? "Landscape" : "Portrait"],
   ];
 
   return (
     <aside className="animate-rise absolute inset-x-2 bottom-2 z-10 rounded-2xl border border-white/15 bg-[#171c1b]/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-auto sm:top-2 sm:right-4 sm:bottom-auto sm:w-[300px]">
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-[#97a29e]">Photo details</span>
+        <span className="text-xs font-medium text-[#97a29e]">{photo.kind === "video" ? "Video details" : "Photo details"}</span>
         <button type="button" onClick={onClose} className="rounded-full p-1 hover:bg-white/10" aria-label="Close details">
           <IconClose size={14} />
         </button>
@@ -444,7 +563,7 @@ function InfoPanel({
           </div>
         ))}
         <div className="col-span-2">
-          <dt className="text-[0.7rem] text-[#97a29e]">Photo ID</dt>
+          <dt className="text-[0.7rem] text-[#97a29e]">ID</dt>
           <dd className="truncate font-mono text-xs">{photo.id}</dd>
         </div>
       </dl>

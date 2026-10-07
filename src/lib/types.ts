@@ -28,7 +28,18 @@ export type Photo = {
   uploadedById: string | null;
   /** Thời điểm chụp, ISO datetime */
   takenAt: string;
+  kind: "photo" | "video";
+  /** Ảnh luôn "ready". Video: chờ / đang chuyển mã / xong / lỗi */
+  status: "queued" | "processing" | "ready" | "failed";
+  /** Video: thời lượng (ms) */
+  durationMs: number | null;
+  /** Video đã chuyển mã: URL MP4 theo độ phân giải (cạnh ngắn); thiếu bản nào thì không có key đó */
+  sources: VideoSources | null;
+  /** Video: lỗi chuyển mã gần nhất */
+  processingError: string | null;
 };
+
+export type VideoSources = { "720"?: string; "1080"?: string };
 
 export type Member = {
   id: string;

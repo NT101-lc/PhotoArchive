@@ -3,6 +3,7 @@ import { Archivo, Be_Vietnam_Pro } from "next/font/google";
 import { AppBar } from "@/components/AppBar";
 import { IdentityProvider } from "@/components/Identity";
 import { ToastProvider } from "@/components/Toast";
+import { UploadManagerProvider } from "@/components/UploadManager";
 import { getCurrentMember } from "@/lib/auth";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -52,8 +53,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body>
         <IdentityProvider member={member}>
           <ToastProvider>
-            <AppBar />
-            {children}
+            <UploadManagerProvider>
+              <AppBar />
+              {children}
+            </UploadManagerProvider>
           </ToastProvider>
         </IdentityProvider>
       </body>

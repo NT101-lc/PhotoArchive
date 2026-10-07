@@ -41,6 +41,10 @@ export function deleteAlbum(slug: string) {
   return api<{ deletedPhotos: number }>(`/api/albums/${encodeURIComponent(slug)}`, { method: "DELETE" });
 }
 
+export function retryVideo(id: string) {
+  return api<{ ok: boolean }>(`/api/photos/${encodeURIComponent(id)}/retry`, { method: "POST" });
+}
+
 export function deletePhoto(id: string) {
   return api<{ deleted: number }>(`/api/photos/${encodeURIComponent(id)}`, { method: "DELETE" });
 }

@@ -1,8 +1,8 @@
 import "server-only";
-import { asc, desc, eq, getTableColumns, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, isNotNull, or } from "drizzle-orm";
 import { connection } from "next/server";
 import { cache } from "react";
-import { albums, db, members, photos, ROLE_USER, type AlbumRow } from "@/db";
+import { albums, db, members, photos, ROLE_USER, type AlbumRow, type PhotoRow } from "@/db";
 import { resolveObjectUrl, resolvePhotoUrl } from "./storage";
 import type { Album, Member, Photo } from "./types";
 
@@ -12,7 +12,13 @@ import type { Album, Member, Photo } from "./types";
 // Hàm (không phải hằng) để không đụng tới DB lúc import module
 const photoCount = () => db.$count(photos, eq(photos.albumId, albums.id));
 
-/** URL ảnh bìa cho từng album: ảnh bìa đã chọn, nếu không có thì ảnh chụp sớm nhất. */
+/** URL để hiện như ảnh: ảnh → file ảnh; video → poster (rỗng nếu chưa chuyển mã xong). */
+async function displayUrl(p: Pick<PhotoRow, "kind" | "storageKey" | "sourceUrl" | "posterKey">) {
+  if (p.kind === "video") return (await resolveObjectUrl(p.posterKey)) ?? "";
+  return resolvePhotoUrl(p);
+}
+
+/** URL ảnh bìa cho từng album: ảnh bìa đã chọn, nếu không có thì ảnh chụp sớm nhất (bỏ qua video chưa có poster). */
 async function coverUrls(rows: AlbumRow[]): Promise<Map<string, string>> {
   if (rows.length === 0) return new Map();
   const chosenIds = rows.map((r) => r.coverPhotoId).filter((id): id is string => !!id);
@@ -23,7 +29,12 @@ async function coverUrls(rows: AlbumRow[]): Promise<Map<string, string>> {
     db
       .selectDistinctOn([photos.albumId])
       .from(photos)
-      .where(inArray(photos.albumId, rows.map((r) => r.id)))
+      .where(
+        and(
+          inArray(photos.albumId, rows.map((r) => r.id)),
+          or(eq(photos.kind, "photo"), isNotNull(photos.posterKey)),
+        ),
+      )
       .orderBy(photos.albumId, asc(photos.takenAt)),
   ]);
   const byId = new Map(chosen.map((p) => [p.id, p]));
@@ -32,7 +43,7 @@ async function coverUrls(rows: AlbumRow[]): Promise<Map<string, string>> {
     await Promise.all(
       rows.map(async (r) => {
         const p = (r.coverPhotoId && byId.get(r.coverPhotoId)) || firstByAlbum.get(r.id);
-        return [r.id, p ? await resolvePhotoUrl(p) : ""] as const;
+        return [r.id, p ? await displayUrl(p) : ""] as const;
       }),
     ),
   );
@@ -90,18 +101,30 @@ export const getPhotos = cache(async (slug: string): Promise<Photo[]> => {
 
   return Promise.all(
     rows.map(async ({ photo, uploader }) => {
-      const url = await resolvePhotoUrl(photo);
+      const video = photo.kind === "video";
+      const [url, thumbUrl, v720, v1080] = await Promise.all([
+        // Video: `url` là file gốc (để tải về), không phát trực tiếp
+        resolvePhotoUrl(photo),
+        displayUrl(photo),
+        video ? resolveObjectUrl(photo.video720Key) : null,
+        video ? resolveObjectUrl(photo.video1080Key) : null,
+      ]);
       return {
         id: photo.id,
         albumId: slug,
         url,
-        // next/image tự resize khi hiển thị lưới, nên thumb dùng chung file gốc
-        thumbUrl: url,
+        // next/image tự resize khi hiển thị lưới, nên thumb của ảnh dùng chung file gốc
+        thumbUrl,
         width: photo.width,
         height: photo.height,
         uploadedBy: uploader ?? "Unknown",
         uploadedById: photo.uploadedById,
         takenAt: photo.takenAt.toISOString(),
+        kind: photo.kind,
+        status: photo.status,
+        durationMs: photo.durationMs,
+        sources: v720 || v1080 ? { ...(v720 && { "720": v720 }), ...(v1080 && { "1080": v1080 }) } : null,
+        processingError: photo.processingError,
       };
     }),
   );

@@ -10,7 +10,8 @@ export const GET = handle(async () =>
 
 /**
  * POST /api/uploads — cấp URL đã ký để upload thẳng lên R2.
- * Body: { albumSlug, files: [{ name, type, size }] } → { uploads: [{ name, key, contentType, uploadUrl }] }
+ * Body: { albumSlug, files: [{ name, type, size }] }
+ * → { uploads: [{ name, key, contentType, uploadUrl } (ảnh) hoặc { ..., multipart: { uploadId, partSize, partCount } } (video)] }
  */
 export const POST = handle(async (req: Request) => {
   const actor = await requireMember();

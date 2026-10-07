@@ -12,9 +12,19 @@ import {
   canEditAlbumDescription,
   canRenameSelf,
   canSetCover,
+  canUpload,
   type Actor,
 } from "./permissions";
-import { deleteObjects, presignUpload } from "./storage";
+import { IMAGE_TYPES, isVideoType, MEDIA_TYPES, type ImageType, type MediaType } from "./media";
+import {
+  abortMultipartUpload,
+  completeMultipartUpload,
+  createMultipartUpload,
+  deleteObjects,
+  multipartPartSize,
+  presignUpload,
+  presignUploadPart,
+} from "./storage";
 
 // Các thao tác ghi. Mọi input từ client đi qua schema zod, mọi thao tác nhận `actor`
 // (người đang dùng, lấy từ cookie đã ký) và kiểm tra quyền theo lib/permissions.ts.
@@ -22,17 +32,8 @@ import { deleteObjects, presignUpload } from "./storage";
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 export const MAX_FILES_PER_REQUEST = 100;
 
-const IMAGE_TYPES = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/avif": "avif",
-  "image/gif": "gif",
-  "image/heic": "heic",
-  "image/heif": "heif",
-} as const;
-type ImageType = keyof typeof IMAGE_TYPES;
 const imageType = z.enum(Object.keys(IMAGE_TYPES) as [ImageType, ...ImageType[]]);
+const mediaType = z.enum(Object.keys(MEDIA_TYPES) as [MediaType, ...MediaType[]]);
 
 export class NotFoundError extends Error {}
 export class BadRequestError extends Error {}
@@ -161,11 +162,16 @@ export async function deleteAlbum(actor: Actor, slug: string) {
   if (!canDeleteAlbum(actor)) throw new ForbiddenError("Only the admin can delete albums.");
   const album = await findAlbum(slug);
   const files = await db
-    .select({ key: photos.storageKey })
+    .select({
+      storageKey: photos.storageKey,
+      posterKey: photos.posterKey,
+      video720Key: photos.video720Key,
+      video1080Key: photos.video1080Key,
+    })
     .from(photos)
     .where(and(eq(photos.albumId, album.id), isNotNull(photos.storageKey)));
   await db.delete(albums).where(eq(albums.id, album.id)); // ảnh xoá theo (cascade)
-  const failed = await deleteObjects(files.map((f) => f.key!));
+  const failed = await deleteObjects(files.flatMap(mediaKeys));
   if (failed.length) console.error(`R2: could not delete ${failed.length} file(s) of album ${slug}`, failed);
   return { deletedPhotos: files.length };
 }
@@ -176,7 +182,14 @@ export async function deleteAlbum(actor: Actor, slug: string) {
 export async function deletePhoto(actor: Actor, photoId: string) {
   if (!z.uuid().safeParse(photoId).success) throw new NotFoundError("Photo not found");
   const [p] = await db
-    .select({ id: photos.id, uploadedById: photos.uploadedById, storageKey: photos.storageKey })
+    .select({
+      id: photos.id,
+      uploadedById: photos.uploadedById,
+      storageKey: photos.storageKey,
+      posterKey: photos.posterKey,
+      video720Key: photos.video720Key,
+      video1080Key: photos.video1080Key,
+    })
     .from(photos)
     .where(eq(photos.id, photoId))
     .limit(1);
@@ -184,8 +197,9 @@ export async function deletePhoto(actor: Actor, photoId: string) {
   if (!canDeletePhoto(actor, p)) throw new ForbiddenError("You can only delete photos you uploaded.");
 
   await db.delete(photos).where(eq(photos.id, p.id)); // cover_photo_id tự về null (on delete set null)
-  if (p.storageKey) {
-    const failed = await deleteObjects([p.storageKey]);
+  const keys = mediaKeys(p);
+  if (keys.length) {
+    const failed = await deleteObjects(keys);
     if (failed.length) console.error("R2: could not delete", failed);
   }
   return { deleted: 1 };
@@ -193,29 +207,82 @@ export async function deletePhoto(actor: Actor, photoId: string) {
 
 // ---------- Upload ----------
 
+const MEDIA_KEY = /^albums\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.[a-z0-9]{2,5}$/;
+
+const fileInput = z
+  .object({
+    name: z.string().max(255),
+    type: mediaType,
+    // Ảnh: tối đa MAX_UPLOAD_BYTES. Video: không giới hạn (upload multipart)
+    size: z.number().int().positive(),
+  })
+  .refine((f) => isVideoType(f.type) || f.size <= MAX_UPLOAD_BYTES, {
+    message: `Photos must be ${MAX_UPLOAD_BYTES / 1024 / 1024} MB or smaller.`,
+  });
+
 export const presignInput = z.object({
   albumSlug: z.string().min(1),
-  files: z
-    .array(
-      z.object({
-        name: z.string().max(255),
-        type: imageType,
-        size: z.number().int().positive().max(MAX_UPLOAD_BYTES),
-      }),
-    )
-    .min(1)
-    .max(MAX_FILES_PER_REQUEST),
+  files: z.array(fileInput).min(1).max(MAX_FILES_PER_REQUEST),
 });
 
-/** Bước 1: cấp URL đã ký để trình duyệt PUT từng file thẳng lên R2. */
+/**
+ * Bước 1: cấp chỗ upload cho từng file.
+ * Ảnh → một URL PUT đã ký. Video → mở upload multipart; URL từng phần lấy qua `presignParts`.
+ */
 export async function presignPhotoUploads(_actor: Actor, input: z.infer<typeof presignInput>) {
   const album = await findAlbum(input.albumSlug);
   return Promise.all(
     input.files.map(async (f) => {
-      const key = `albums/${album.id}/${crypto.randomUUID()}.${IMAGE_TYPES[f.type]}`;
-      return { name: f.name, key, contentType: f.type, uploadUrl: await presignUpload(key, f.type) };
+      const key = `albums/${album.id}/${crypto.randomUUID()}.${MEDIA_TYPES[f.type]}`;
+      if (!isVideoType(f.type)) {
+        return { name: f.name, key, contentType: f.type, uploadUrl: await presignUpload(key, f.type) };
+      }
+      const partSize = multipartPartSize(f.size);
+      return {
+        name: f.name,
+        key,
+        contentType: f.type,
+        multipart: {
+          uploadId: await createMultipartUpload(key, f.type),
+          partSize,
+          partCount: Math.max(1, Math.ceil(f.size / partSize)),
+        },
+      };
     }),
   );
+}
+
+const multipartRef = z.object({
+  key: z.string().regex(MEDIA_KEY, "Invalid upload key"),
+  uploadId: z.string().min(1).max(1024),
+});
+
+export const presignPartsInput = multipartRef.extend({
+  partNumbers: z.array(z.number().int().min(1).max(10_000)).min(1).max(100),
+});
+
+/** URL đã ký cho một loạt phần của upload multipart (xin dần theo tiến độ). */
+export async function presignParts(_actor: Actor, input: z.infer<typeof presignPartsInput>) {
+  return Promise.all(
+    input.partNumbers.map(async (partNumber) => ({
+      partNumber,
+      url: await presignUploadPart(input.key, input.uploadId, partNumber),
+    })),
+  );
+}
+
+export const completeMultipartInput = multipartRef.extend({ partCount: z.number().int().min(1).max(10_000) });
+
+export async function completeMultipart(_actor: Actor, input: z.infer<typeof completeMultipartInput>) {
+  await completeMultipartUpload(input.key, input.uploadId, input.partCount);
+  return { ok: true };
+}
+
+export const abortMultipartInput = multipartRef;
+
+export async function abortMultipart(_actor: Actor, input: z.infer<typeof abortMultipartInput>) {
+  await abortMultipartUpload(input.key, input.uploadId);
+  return { ok: true };
 }
 
 export const addPhotosInput = z.object({
@@ -225,9 +292,11 @@ export const addPhotosInput = z.object({
         key: z.string().min(1).max(300),
         width: z.number().int().positive().max(100_000),
         height: z.number().int().positive().max(100_000),
-        sizeBytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
-        mimeType: imageType,
+        sizeBytes: z.number().int().positive(),
+        mimeType: mediaType,
         takenAt: z.iso.datetime({ offset: true }).optional(),
+        // Video: thời lượng đọc được trên trình duyệt (worker sẽ ghi lại số chính xác)
+        durationMs: z.number().int().nonnegative().optional(),
       }),
     )
     .min(1)
@@ -236,7 +305,10 @@ export const addPhotosInput = z.object({
   coverKey: z.string().optional(),
 });
 
-/** Bước 2: sau khi upload xong, ghi ảnh vào DB (người upload = actor) và đặt ảnh bìa nếu có chọn. */
+/**
+ * Bước 2: sau khi upload xong, ghi vào DB (người upload = actor) và đặt ảnh bìa nếu có chọn.
+ * Video vào hàng đợi chuyển mã (status "queued"); trả về `queuedVideos` để route gọi worker.
+ */
 export async function addPhotos(actor: Actor, albumSlug: string, input: z.infer<typeof addPhotosInput>) {
   const album = await findAlbum(albumSlug);
 
@@ -244,6 +316,8 @@ export async function addPhotos(actor: Actor, albumSlug: string, input: z.infer<
   const prefix = `albums/${album.id}/`;
   const bad = input.photos.find((p) => !p.key.startsWith(prefix) || p.key.includes(".."));
   if (bad) throw new BadRequestError(`Key does not belong to this album: ${bad.key}`);
+  const tooBig = input.photos.find((p) => !isVideoType(p.mimeType) && p.sizeBytes > MAX_UPLOAD_BYTES);
+  if (tooBig) throw new BadRequestError(`Photo is larger than ${MAX_UPLOAD_BYTES / 1024 / 1024} MB: ${tooBig.key}`);
   if (input.coverKey && !input.photos.some((p) => p.key === input.coverKey)) {
     throw new BadRequestError("coverKey must be one of the uploaded photos.");
   }
@@ -254,24 +328,49 @@ export async function addPhotos(actor: Actor, albumSlug: string, input: z.infer<
   const rows = await db
     .insert(photos)
     .values(
-      input.photos.map((p) => ({
-        albumId: album.id,
-        storageKey: p.key,
-        width: p.width,
-        height: p.height,
-        sizeBytes: p.sizeBytes,
-        mimeType: p.mimeType,
-        uploadedById: actor.id,
-        takenAt: p.takenAt ? new Date(p.takenAt) : undefined,
-      })),
+      input.photos.map((p) => {
+        const video = isVideoType(p.mimeType);
+        return {
+          albumId: album.id,
+          storageKey: p.key,
+          width: p.width,
+          height: p.height,
+          sizeBytes: p.sizeBytes,
+          mimeType: p.mimeType,
+          uploadedById: actor.id,
+          takenAt: p.takenAt ? new Date(p.takenAt) : undefined,
+          kind: video ? ("video" as const) : ("photo" as const),
+          status: video ? ("queued" as const) : ("ready" as const),
+          durationMs: video ? p.durationMs : undefined,
+        };
+      }),
     )
     .onConflictDoNothing({ target: photos.storageKey })
-    .returning({ id: photos.id, storageKey: photos.storageKey });
+    .returning({ id: photos.id, storageKey: photos.storageKey, kind: photos.kind });
 
-  const cover = input.coverKey && rows.find((r) => r.storageKey === input.coverKey);
+  // Video chưa có poster nên chưa làm bìa được; bìa sẽ đổi khi chọn lại sau khi xử lý xong
+  const cover = input.coverKey && rows.find((r) => r.storageKey === input.coverKey && r.kind === "photo");
   if (cover) await db.update(albums).set({ coverPhotoId: cover.id }).where(eq(albums.id, album.id));
 
-  return { added: rows.length, coverSet: !!cover };
+  return { added: rows.length, coverSet: !!cover, queuedVideos: rows.filter((r) => r.kind === "video").length };
+}
+
+/** Cho video bị lỗi chuyển mã vào hàng đợi lại (mọi thành viên đã chọn tên). */
+export async function retryVideo(actor: Actor, photoId: string) {
+  if (!canUpload(actor)) throw new ForbiddenError("Choose who you are first.");
+  if (!z.uuid().safeParse(photoId).success) throw new NotFoundError("Video not found");
+  const [row] = await db
+    .update(photos)
+    .set({ status: "queued", attempts: 0, lockedAt: null, processingError: null })
+    .where(and(eq(photos.id, photoId), eq(photos.kind, "video"), eq(photos.status, "failed")))
+    .returning({ id: photos.id });
+  if (!row) throw new BadRequestError("Only videos that failed to process can be retried.");
+  return { ok: true };
+}
+
+/** Mọi file trên R2 của một ảnh / video: gốc, poster, các bản chuyển mã. */
+function mediaKeys(p: { storageKey: string | null; posterKey: string | null; video720Key: string | null; video1080Key: string | null }) {
+  return [p.storageKey, p.posterKey, p.video720Key, p.video1080Key].filter((k): k is string => !!k);
 }
 
 // ---------- Profile ----------
@@ -337,4 +436,11 @@ export async function getPhotoStorageKey(photoId: string) {
     .where(eq(photos.id, photoId))
     .limit(1);
   return row?.storageKey ?? null;
+}
+
+/** File gốc để tải về, kèm tên file gợi ý: id + đuôi gốc. */
+export async function getOriginalDownload(photoId: string) {
+  const key = await getPhotoStorageKey(photoId);
+  if (!key) return null;
+  return { key, filename: `${photoId}.${key.split(".").pop()}` };
 }

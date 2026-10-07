@@ -153,11 +153,33 @@ Lỗi trả về `{ error }` với mã 400 (input sai), 401 (chưa chọn tên /
 
 4. Khởi động lại `npm run dev` sau khi sửa `.env`.
 
+## Video
+
+Video upload thẳng lên R2 theo từng phần (multipart, không giới hạn dung lượng; ảnh vẫn tối đa 50 MB).
+File gốc được giữ nguyên; worker chuyển mã ra MP4 H.264 720p và 1080p (nếu nguồn đủ nét) + ảnh poster,
+tone-map HDR (video iPhone) về SDR. Khi xem, trình duyệt tự chọn 720p / 1080p theo mạng và màn hình,
+người xem đổi tay được.
+
+Worker là `scripts/transcode-worker.ts`, chạy trên GitHub Actions (`.github/workflows/transcode.yml`):
+được gọi ngay khi có video mới, và chạy lại mỗi 15 phút để nhặt video bị sót. Hàng đợi nằm ngay trong
+bảng `photos` (`status`: queued → processing → ready / failed, thử tối đa 3 lần).
+
+Cài đặt một lần:
+
+1. **GitHub → repo → Settings → Secrets and variables → Actions**, thêm các secret giống `.env`:
+   `DATABASE_URL`, `R2_ACCOUNT_ID` (hoặc `R2_ENDPOINT`), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
+   Thiếu secret thì workflow tự bỏ qua.
+2. (Không bắt buộc, để video xử lý ngay thay vì chờ tới 15 phút) Tạo fine-grained token cho repo với quyền
+   **Contents: Read and write**, rồi đặt trên Vercel: `GITHUB_DISPATCH_TOKEN` và `GITHUB_REPOSITORY=NT101-lc/PhotoArchive`.
+
+Chạy worker trên máy (cần `ffmpeg` trong PATH): `npx tsx scripts/transcode-worker.ts`.
+
 ## Cấu trúc thư mục
 
 ```
 drizzle/                        # Migration SQL do drizzle-kit sinh ra (commit vào git)
 drizzle.config.ts
+scripts/transcode-worker.ts     # Worker ffmpeg (chạy trên GitHub Actions)
 src/
 ├── app/
 │   ├── layout.tsx              # Font, theme script chống nháy, AppBar, ToastProvider
@@ -179,7 +201,10 @@ src/
     ├── storage.ts              # R2: ký URL upload / download, URL hiển thị ảnh
     ├── env.ts                  # Đọc + kiểm tra biến môi trường (nơi duy nhất đọc secret)
     ├── api.ts                  # Helper route handler: đọc JSON, map lỗi → HTTP
-    ├── upload-client.ts        # Luồng upload phía trình duyệt
+    ├── upload-client.ts        # Upload phía trình duyệt (ảnh: PUT, video: multipart)
+    ├── media.ts                # Định dạng ảnh / video được nhận (dùng chung client + server)
+    ├── transcode-plan.ts       # Kế hoạch chuyển mã: độ phân giải, filter ffmpeg, tên file
+    ├── transcode.ts            # Gọi worker chuyển mã (GitHub repository_dispatch)
     ├── types.ts, format.ts, favorites.ts, theme.ts
 ```
 

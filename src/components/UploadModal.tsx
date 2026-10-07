@@ -6,16 +6,17 @@ import { formatBytes, plural } from "@/lib/format";
 import { api, createAlbum } from "@/lib/api-client";
 import { canSetCover } from "@/lib/permissions";
 import type { Album, Member } from "@/lib/types";
-import { ACCEPTED_EXT, getUploadStatus, mimeOf, uploadPhotos, type UploadProgress } from "@/lib/upload-client";
-import { IconChevronDown, IconClose, IconFolder, IconImage, IconPlus, IconStar, IconUpload, IconUser } from "./Icons";
+import { mediaTypeOf } from "@/lib/media";
+import { ACCEPT, getUploadStatus, isVideoFile, MAX_PHOTO_BYTES } from "@/lib/upload-client";
+import { IconChevronDown, IconClose, IconFolder, IconImage, IconPlay, IconPlus, IconStar, IconUpload, IconUser } from "./Icons";
 import { useIdentity } from "./Identity";
 import { IdentityForm } from "./IdentityForm";
 import { Modal } from "./Modal";
 import { useToast } from "./Toast";
 import { DateRangeFields } from "./DateRangeFields";
 import { DescriptionInput } from "./DescriptionInput";
+import { useUploads } from "./UploadManager";
 
-const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const PREVIEW_LIMIT = 24; // số ảnh preview mỗi thư mục trước khi bấm "xem thêm"
 const LOOSE = ""; // nhóm ảnh lẻ (không nằm trong thư mục)
 
@@ -33,6 +34,7 @@ type Picked = {
   /** Thư mục chứa, `""` nếu là ảnh lẻ */
   folder: string;
   previewUrl: string;
+  video: boolean;
 };
 
 type Target =
@@ -46,7 +48,8 @@ type Props = {
 };
 
 /**
- * Nút "Upload ảnh" + modal. File được upload thẳng lên R2 qua URL đã ký (xem lib/upload-client.ts).
+ * Nút "Upload" + modal chọn ảnh / video / thư mục. Bấm lưu thì giao file cho UploadManager chạy nền
+ * (upload thẳng lên R2 qua URL đã ký, xem lib/upload-client.ts) và đóng modal ngay.
  * Truyền `children` + `className` để đổi giao diện nút (vd thẻ lối tắt ở trang chủ).
  */
 export function UploadButton({
@@ -72,8 +75,8 @@ export function UploadButton({
   );
 }
 
-function isImage(file: File) {
-  return ACCEPTED_EXT.test(file.name) || mimeOf(file).startsWith("image/");
+function isAccepted(file: File) {
+  return mediaTypeOf(file) !== null;
 }
 
 function newTarget(title = "", tripDate = localDate(Date.now()), endDate = ""): Target {
@@ -136,8 +139,8 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
   const switching = pickedName !== null && me?.name !== pickedName;
   // Ảnh được chọn làm bìa; null = mặc định (ảnh đầu tiên của album)
   const [coverKey, setCoverKey] = useState<string | null>(null);
-  const [progress, setProgress] = useState<UploadProgress | null>(null);
-  const uploading = progress !== null;
+  const [saving, setSaving] = useState(false);
+  const uploads = useUploads();
 
   // Kiểm tra R2 đã cấu hình chưa
   useEffect(() => {
@@ -171,11 +174,12 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
     let skippedSize = 0;
     const accepted = list.filter(({ file }) => {
       if (file.name.startsWith(".")) return false; // .DS_Store, file ẩn
-      if (!isImage(file)) {
+      if (!isAccepted(file)) {
         skippedType++;
         return false;
       }
-      if (file.size > MAX_FILE_BYTES) {
+      // Video không giới hạn dung lượng; ảnh tối đa 50 MB
+      if (!isVideoFile(file) && file.size > MAX_PHOTO_BYTES) {
         skippedSize++;
         return false;
       }
@@ -187,8 +191,8 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
         tone: "warn",
         title: `Skipped ${plural(skippedType + skippedSize, "file")}`,
         message: [
-          skippedType && `${plural(skippedType, "file")} not an image`,
-          skippedSize && `${plural(skippedSize, "photo")} over ${formatBytes(MAX_FILE_BYTES)}`,
+          skippedType && `${plural(skippedType, "file")} not a photo or video`,
+          skippedSize && `${plural(skippedSize, "photo")} over ${formatBytes(MAX_PHOTO_BYTES)}`,
         ]
           .filter(Boolean)
           .join(" · "),
@@ -201,7 +205,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
       const key = `${path}-${file.size}-${file.lastModified}`;
       if (existing.has(key)) continue;
       existing.add(key);
-      added.push({ key, file, path, folder: dirname(path), previewUrl: URL.createObjectURL(file) });
+      added.push({ key, file, path, folder: dirname(path), previewUrl: URL.createObjectURL(file), video: isVideoFile(file) });
     }
     if (added.length === 0) return;
     setItems((prev) => [...prev, ...added]);
@@ -270,40 +274,49 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
   const canPickCover = target.mode === "new" || (!!targetAlbum && canSetCover(me, targetAlbum));
   const coverItem = canPickCover && coverKey ? items.find((i) => i.key === coverKey) : undefined;
 
+  const videoCount = items.filter((i) => i.video).length;
+  const photoCount = items.length - videoCount;
+  const countLabel = [photoCount && plural(photoCount, "photo"), videoCount && plural(videoCount, "video")]
+    .filter(Boolean)
+    .join(" and ");
+
+  /** Tạo album (nếu cần) rồi giao file cho UploadManager chạy nền; modal đóng ngay. */
   async function onSave() {
-    setProgress({ done: 0, failed: 0, total: items.length });
+    setSaving(true);
     try {
-      const slug =
-        target.mode === "existing"
-          ? target.albumId
-          : (
-              await createAlbum({
-                title: target.title.trim(),
-                location: target.location.trim(),
-                tripDate: target.tripDate,
-                endDate: target.endDate || null,
-                description: target.description,
-              })
-            ).slug;
+      let slug: string;
+      let title: string;
+      if (target.mode === "existing") {
+        slug = target.albumId;
+        title = albums.find((a) => a.id === slug)?.title ?? "Album";
+      } else {
+        title = target.title.trim();
+        slug = (
+          await createAlbum({
+            title,
+            location: target.location.trim(),
+            tripDate: target.tripDate,
+            endDate: target.endDate || null,
+            description: target.description,
+          })
+        ).slug;
+      }
 
-      const { added, failed } = await uploadPhotos(
-        slug,
-        items.map((i) => i.file),
-        coverItem ? items.indexOf(coverItem) : undefined,
-        setProgress,
-      );
-
-      toast.show({
-        tone: failed ? "warn" : "success",
-        title: `Uploaded ${plural(added, "photo")}`,
-        message: failed ? `${plural(failed, "file")} failed — try those again.` : undefined,
+      uploads.enqueue({
+        albumSlug: slug,
+        albumTitle: title,
+        files: items.map((i) => i.file),
+        coverIndex: coverItem ? items.indexOf(coverItem) : undefined,
       });
       onClose();
-      router.push(`/albums/${slug}`);
-      router.refresh();
+      // Album mới → mở luôn để thấy ảnh hiện dần; album có sẵn → để người dùng ở yên chỗ đang xem
+      if (target.mode === "new") {
+        router.push(`/albums/${slug}`);
+        router.refresh();
+      }
     } catch (err) {
-      toast.show({ tone: "warn", title: "Upload failed", message: err instanceof Error ? err.message : undefined });
-      setProgress(null);
+      toast.show({ tone: "warn", title: "Couldn’t create the album", message: err instanceof Error ? err.message : undefined });
+      setSaving(false);
     }
   }
 
@@ -311,17 +324,17 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
     <Modal
       open
       onClose={() => {
-        if (!uploading) onClose();
+        if (!saving) onClose();
       }}
       maxWidth="max-w-[720px]"
-      eyebrow="Add photos"
-      title="Upload photos or whole folders"
+      eyebrow="Add to the archive"
+      title="Upload photos, videos or folders"
       footer={
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <p className="font-mono text-xs text-ink-soft sm:flex-1">
             {items.length > 0
-              ? `${plural(items.length, "photo")} · ${formatBytes(totalSize)}${folderCount ? ` · ${plural(folderCount, "folder")}` : ""}`
-              : "No photos selected"}
+              ? `${countLabel} · ${formatBytes(totalSize)}${folderCount ? ` · ${plural(folderCount, "folder")}` : ""}`
+              : "Nothing selected yet"}
             {items.length > 0 && canPickCover && (
               <span className="block">
                 Cover: {coverItem ? coverItem.path.split("/").pop() : "first photo (default)"}
@@ -331,18 +344,18 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
           <button
             type="button"
             className="btn btn-primary h-11 px-6"
-            disabled={items.length === 0 || !targetValid || uploading || storageReady !== true || !me || switching || picking}
+            disabled={items.length === 0 || !targetValid || saving || storageReady !== true || !me || switching || picking}
             onClick={onSave}
           >
-            {uploading ? (
+            {saving ? (
               <>
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-on-accent/25 border-t-on-accent" />
-                Uploading {progress.done + progress.failed}/{progress.total}…
+                Creating album…
               </>
             ) : (
               <>
                 <IconUpload size={16} />
-                Save {items.length > 0 ? plural(items.length, "photo") : ""}
+                Upload {items.length > 0 ? plural(items.length, "file") : ""}
               </>
             )}
           </button>
@@ -480,7 +493,7 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
           <p className="flex items-center gap-2 text-sm text-ink-soft">
             <IconUser size={15} />
             Uploading as <b className="text-ink">{me.name}</b>
-            <button type="button" onClick={openPicker} disabled={uploading} className="ml-auto font-semibold underline hover:text-accent">
+            <button type="button" onClick={openPicker} disabled={saving} className="ml-auto font-semibold underline hover:text-accent">
               Not you?
             </button>
           </p>
@@ -518,14 +531,16 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
           </span>
           <div>
             <p className="font-display text-lg font-bold">
-              {reading ? "Reading folder…" : dragging ? "Drop it here" : "Drag & drop photos or folders here"}
+              {reading ? "Reading folder…" : dragging ? "Drop it here" : "Drag photos, videos or folders here"}
             </p>
-            <p className="text-sm text-ink-soft">Subfolders included · JPG, PNG, HEIC, WEBP · up to 50 MB per photo</p>
+            <p className="text-sm text-ink-soft">
+              Subfolders included. Photos up to 50 MB each; videos any size. You can keep browsing while they upload.
+            </p>
           </div>
           <div className="flex flex-wrap justify-center gap-2">
             <label className="btn cursor-pointer">
-              <IconImage size={16} /> Choose photos
-              <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => {
+              <IconImage size={16} /> Choose files
+              <input type="file" accept={ACCEPT} multiple className="sr-only" onChange={(e) => {
                 onPick(e.target.files);
                 e.target.value = "";
               }} />
@@ -616,7 +631,7 @@ function FolderGroup({
                 item={f}
                 onRemove={() => onRemoveItem(f.key)}
                 isCover={coverKey === f.key}
-                onToggleCover={onToggleCover && (() => onToggleCover(f.key))}
+                onToggleCover={onToggleCover && !f.video ? () => onToggleCover(f.key) : undefined}
               />
             ))}
           </ul>
@@ -654,14 +669,29 @@ function PreviewTile({
       >
         {broken ? (
           <div className="flex h-full flex-col items-center justify-center gap-1 p-1 text-ink-soft">
-            <IconImage size={18} />
+            {item.video ? <IconPlay size={18} /> : <IconImage size={18} />}
             <span className="w-full truncate text-center font-mono text-[0.55rem]">{name}</span>
           </div>
+        ) : item.video ? (
+          // #t=0.1: hiện khung hình đầu làm preview; codec trình duyệt không đọc được (vd HEVC) thì hiện icon
+          <video
+            src={`${item.previewUrl}#t=0.1`}
+            muted
+            playsInline
+            preload="metadata"
+            onError={() => setBroken(true)}
+            className="h-full w-full object-cover"
+          />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element -- blob: URL cục bộ, không qua next/image
           <img src={item.previewUrl} alt={name} loading="lazy" onError={() => setBroken(true)} className="h-full w-full object-cover" />
         )}
       </div>
+      {item.video && !broken && (
+        <span className="pointer-events-none absolute bottom-1 left-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white" aria-hidden="true">
+          <IconPlay size={12} />
+        </span>
+      )}
       <button
         type="button"
         onClick={onRemove}

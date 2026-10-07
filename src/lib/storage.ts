@@ -40,11 +40,12 @@ async function presign(
   method: "GET" | "PUT",
   key: string,
   expires: number,
-  opts: { headers?: Record<string, string>; datetime?: string } = {},
+  opts: { headers?: Record<string, string>; datetime?: string; query?: Record<string, string> } = {},
 ) {
   const c = r2();
   if (!c) throw new StorageNotConfiguredError();
   const url = objectUrl(c.cfg, key);
+  for (const [k, v] of Object.entries(opts.query ?? {})) url.searchParams.set(k, v);
   url.searchParams.set("X-Amz-Expires", String(expires));
   const signed = await c.aws.sign(new Request(url, { method, headers: opts.headers }), {
     aws: { signQuery: true, allHeaders: true, datetime: opts.datetime },
@@ -57,9 +58,95 @@ export function presignUpload(key: string, contentType: string) {
   return presign("PUT", key, PUT_EXPIRES_S, { headers: { "Content-Type": contentType } });
 }
 
-/** URL đọc tạm thời cho bucket private. */
-export function presignDownload(key: string) {
-  return presign("GET", key, GET_EXPIRES_S);
+/** URL đọc tạm thời cho bucket private. Có `filename` → trình duyệt tải về thay vì mở. */
+export function presignDownload(key: string, filename?: string) {
+  const query: Record<string, string> = filename
+    ? { "response-content-disposition": `attachment; filename="${filename.replace(/["\\]/g, "")}"` }
+    : {};
+  return presign("GET", key, GET_EXPIRES_S, { query });
+}
+
+// ---------- Multipart (video, không giới hạn dung lượng) ----------
+// R2: tối đa 10.000 phần, mỗi phần 5 MiB – 5 GiB, mọi phần (trừ phần cuối) cùng kích thước.
+// Trình duyệt PUT từng phần qua URL đã ký; lúc hoàn tất, server tự đọc ETag bằng ListParts
+// nên bucket không cần mở header ETag cho CORS.
+
+const MiB = 1024 * 1024;
+const MIN_PART = 16 * MiB;
+const MAX_PARTS = 10_000;
+const PART_EXPIRES_S = 6 * 60 * 60; // file lớn trên mạng chậm có thể upload rất lâu
+
+/** Kích thước mỗi phần: 16 MiB, tăng dần (bội số MiB) khi file quá lớn để không vượt 10.000 phần. */
+export function multipartPartSize(fileSize: number) {
+  return Math.max(MIN_PART, Math.ceil(fileSize / MAX_PARTS / MiB) * MiB);
+}
+
+function multipartUrl(c: NonNullable<ReturnType<typeof r2>>, key: string, query: Record<string, string>) {
+  const url = objectUrl(c.cfg, key);
+  for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
+  return url;
+}
+
+function xmlValues(xml: string, tag: string) {
+  return [...xml.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "g"))].map((m) => m[1]);
+}
+
+export async function createMultipartUpload(key: string, contentType: string) {
+  const c = r2();
+  if (!c) throw new StorageNotConfiguredError();
+  const res = await c.aws.fetch(multipartUrl(c, key, { uploads: "" }), {
+    method: "POST",
+    headers: { "Content-Type": contentType },
+  });
+  const uploadId = xmlValues(await res.text(), "UploadId")[0];
+  if (!res.ok || !uploadId) throw new Error(`R2 could not start the upload (${res.status})`);
+  return uploadId;
+}
+
+/** URL đã ký để PUT phần thứ `partNumber` (bắt đầu từ 1). */
+export function presignUploadPart(key: string, uploadId: string, partNumber: number) {
+  return presign("PUT", key, PART_EXPIRES_S, { query: { partNumber: String(partNumber), uploadId } });
+}
+
+async function listParts(c: NonNullable<ReturnType<typeof r2>>, key: string, uploadId: string) {
+  const parts: Array<{ partNumber: number; etag: string }> = [];
+  let marker = "";
+  for (;;) {
+    const query: Record<string, string> = { uploadId, "max-parts": "1000" };
+    if (marker) query["part-number-marker"] = marker;
+    const res = await c.aws.fetch(multipartUrl(c, key, query), { method: "GET" });
+    const xml = await res.text();
+    if (!res.ok) throw new Error(`R2 could not list uploaded parts (${res.status})`);
+    for (const block of xmlValues(xml, "Part")) {
+      parts.push({ partNumber: Number(xmlValues(block, "PartNumber")[0]), etag: xmlValues(block, "ETag")[0] });
+    }
+    if (xmlValues(xml, "IsTruncated")[0] !== "true") return parts;
+    marker = xmlValues(xml, "NextPartNumberMarker")[0];
+  }
+}
+
+/** Ghép các phần thành một object. Báo lỗi nếu thiếu phần nào so với `partCount`. */
+export async function completeMultipartUpload(key: string, uploadId: string, partCount: number) {
+  const c = r2();
+  if (!c) throw new StorageNotConfiguredError();
+  const parts = (await listParts(c, key, uploadId)).sort((a, b) => a.partNumber - b.partNumber);
+  if (parts.length !== partCount) {
+    throw new Error(`Upload is missing parts: got ${parts.length} of ${partCount}.`);
+  }
+  const body =
+    "<CompleteMultipartUpload>" +
+    parts.map((p) => `<Part><PartNumber>${p.partNumber}</PartNumber><ETag>${p.etag}</ETag></Part>`).join("") +
+    "</CompleteMultipartUpload>";
+  const res = await c.aws.fetch(multipartUrl(c, key, { uploadId }), { method: "POST", body });
+  const text = await res.text();
+  // S3/R2 có thể trả 200 kèm <Error> trong body
+  if (!res.ok || text.includes("<Error>")) throw new Error(`R2 could not finish the upload (${res.status})`);
+}
+
+export async function abortMultipartUpload(key: string, uploadId: string) {
+  const c = r2();
+  if (!c) return;
+  await c.aws.fetch(multipartUrl(c, key, { uploadId }), { method: "DELETE" }).catch(() => undefined);
 }
 
 /**
