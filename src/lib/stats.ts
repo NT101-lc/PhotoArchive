@@ -154,3 +154,121 @@ export async function getVideoQueue() {
     stuck,
   };
 }
+
+/** Tối đa số khung trên "cuộn phim" ở đầu dashboard (mới nhất trước khi vượt) */
+const ROLL_LIMIT = 600;
+
+/**
+ * "The roll": mọi ảnh / video xem được, gom theo chuyến (chuyến mới nhất trên cùng),
+ * trong chuyến theo thứ tự chụp. Mỗi ảnh một khung nhỏ.
+ */
+export async function getRoll() {
+  await connection();
+  const rows = await db
+    .select({
+      photo: photos,
+      albumId: albums.id,
+      albumSlug: albums.slug,
+      albumTitle: albums.title,
+      tripDate: albums.tripDate,
+    })
+    .from(photos)
+    .innerJoin(albums, eq(albums.id, photos.albumId))
+    .where(eq(photos.status, "ready"))
+    .orderBy(desc(albums.tripDate), desc(albums.createdAt), asc(photos.takenAt), asc(photos.createdAt))
+    .limit(ROLL_LIMIT);
+
+  const groups = new Map<string, { slug: string; title: string; tripDate: string; frames: Array<{ id: string; kind: "photo" | "video"; thumbUrl: string }> }>();
+  const urls = await Promise.all(rows.map((r) => displayUrl(r.photo)));
+  rows.forEach((r, i) => {
+    const g = groups.get(r.albumId) ?? { slug: r.albumSlug, title: r.albumTitle, tripDate: r.tripDate, frames: [] };
+    g.frames.push({ id: r.photo.id, kind: r.photo.kind, thumbUrl: urls[i] });
+    groups.set(r.albumId, g);
+  });
+  return { trips: [...groups.values()], truncated: rows.length === ROLL_LIMIT };
+}
+
+/** Những nơi đã đến: số chuyến, số ảnh, lần gần nhất. */
+export async function getPlaces() {
+  await connection();
+  return db
+    .select({
+      location: albums.location,
+      trips: sql<number>`count(distinct ${albums.id})::int`,
+      photos: sql<number>`count(${photos.id})::int`,
+      lastTrip: sql<string>`max(${albums.tripDate})::text`,
+    })
+    .from(albums)
+    .leftJoin(photos, eq(photos.albumId, albums.id))
+    .groupBy(albums.location)
+    .orderBy(desc(sql`count(distinct ${albums.id})`), desc(sql`max(${albums.tripDate})`))
+    .limit(8);
+}
+
+/** Đợt upload gần đây: gom theo người + album + giờ upload. */
+export async function getRecentUploads(limit = 6) {
+  await connection();
+  const hour = sql`date_trunc('hour', ${photos.createdAt})`;
+  const rows = await db
+    .select({
+      name: members.name,
+      avatarKey: members.avatarKey,
+      albumSlug: albums.slug,
+      albumTitle: albums.title,
+      photos: sql<number>`count(*) filter (where ${photos.kind} = 'photo')::int`,
+      videos: sql<number>`count(*) filter (where ${photos.kind} = 'video')::int`,
+      at: sql<string>`max(${photos.createdAt})::text`,
+    })
+    .from(photos)
+    .innerJoin(albums, eq(albums.id, photos.albumId))
+    .leftJoin(members, eq(members.id, photos.uploadedById))
+    .groupBy(members.id, albums.id, hour)
+    .orderBy(desc(sql`max(${photos.createdAt})`))
+    .limit(limit);
+  return Promise.all(
+    rows.map(async ({ avatarKey, at, ...r }) => ({
+      ...r,
+      at: new Date(at).toISOString(),
+      avatarUrl: await resolveObjectUrl(avatarKey),
+    })),
+  );
+}
+
+/** Thành viên chưa upload gì (để mời). */
+export async function getQuietMembers() {
+  await connection();
+  const rows = await db
+    .select({ id: members.id, name: members.name, avatarKey: members.avatarKey })
+    .from(members)
+    .where(
+      and(
+        eq(members.role, 1),
+        sql`not exists (select 1 from ${photos} where ${photos.uploadedById} = ${members.id})`,
+      ),
+    )
+    .orderBy(asc(members.name));
+  return Promise.all(rows.map(async ({ avatarKey, ...m }) => ({ ...m, avatarUrl: await resolveObjectUrl(avatarKey) })));
+}
+
+/** "From the archive": vài khung ngẫu nhiên, cố định trong ngày (đổi mỗi ngày). */
+export async function getRandomFrames(limit = 8) {
+  await connection();
+  const rows = await db
+    .select({ photo: photos, albumSlug: albums.slug, albumTitle: albums.title, tripDate: albums.tripDate })
+    .from(photos)
+    .innerJoin(albums, eq(albums.id, photos.albumId))
+    .where(eq(photos.status, "ready"))
+    .orderBy(sql`md5(${photos.id}::text || (now() at time zone ${TZ})::date::text)`)
+    .limit(limit);
+  return Promise.all(
+    rows.map(async ({ photo, albumSlug, albumTitle, tripDate }) => ({
+      id: photo.id,
+      kind: photo.kind,
+      thumbUrl: await displayUrl(photo),
+      albumSlug,
+      albumTitle,
+      year: Number(tripDate.slice(0, 4)),
+      takenAt: photo.takenAt.toISOString(),
+    })),
+  );
+}
