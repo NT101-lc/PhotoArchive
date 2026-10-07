@@ -143,6 +143,29 @@ export async function completeMultipartUpload(key: string, uploadId: string, par
   if (!res.ok || text.includes("<Error>")) throw new Error(`R2 could not finish the upload (${res.status})`);
 }
 
+/** Liệt kê mọi object (key + dung lượng) trong bucket, theo từng trang 1000 object. */
+export async function listObjects(prefix = ""): Promise<Array<{ key: string; size: number }>> {
+  const c = r2();
+  if (!c) throw new StorageNotConfiguredError();
+  const out: Array<{ key: string; size: number }> = [];
+  let token = "";
+  for (;;) {
+    const url = new URL(`${c.cfg.endpoint}/${c.cfg.bucket}`);
+    url.searchParams.set("list-type", "2");
+    url.searchParams.set("max-keys", "1000");
+    if (prefix) url.searchParams.set("prefix", prefix);
+    if (token) url.searchParams.set("continuation-token", token);
+    const res = await c.aws.fetch(url);
+    const xml = await res.text();
+    if (!res.ok) throw new Error(`R2 could not list objects (${res.status})`);
+    for (const block of xmlValues(xml, "Contents")) {
+      out.push({ key: xmlValues(block, "Key")[0], size: Number(xmlValues(block, "Size")[0]) });
+    }
+    if (xmlValues(xml, "IsTruncated")[0] !== "true") return out;
+    token = xmlValues(xml, "NextContinuationToken")[0];
+  }
+}
+
 export async function abortMultipartUpload(key: string, uploadId: string) {
   const c = r2();
   if (!c) return;

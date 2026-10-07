@@ -16,16 +16,28 @@ type Props = {
   eagerCount?: number;
 };
 
-/** Lưới ảnh masonry (CSS columns). Video hiện poster + thời lượng; đang chuyển mã thì hiện trạng thái. */
+// Tỉ lệ khung dùng để dàn hàng; ảnh quá dài / quá cao bị kẹp lại để hàng không vỡ
+const clampRatio = (p: Photo) => Math.min(2.4, Math.max(0.6, p.width / p.height));
+
+/**
+ * Lưới "hàng đều" (justified rows): mọi ảnh trong một hàng cao bằng nhau, giữ tỉ lệ, đọc trái → phải
+ * đúng thứ tự thời gian. CSS thuần (xem .justified trong globals.css): flex-grow tỉ lệ với tỉ lệ khung.
+ * Video hiện poster + thời lượng; đang chuyển mã thì hiện trạng thái.
+ */
 export function PhotoGrid({ photos, onOpen, isFavorite, onToggleFavorite, onRetry, eagerCount = 0 }: Props) {
   return (
-    <ul className="columns-2 gap-3 sm:gap-4 md:columns-3 xl:columns-4">
+    <ul className="justified">
       {photos.map((photo, i) => {
         const fav = isFavorite(photo.id);
         const video = photo.kind === "video";
         const pending = video && photo.status !== "ready";
+        const ratio = clampRatio(photo);
         return (
-          <li key={photo.id} className="group relative mb-3 break-inside-avoid sm:mb-4">
+          <li
+            key={photo.id}
+            className="group relative"
+            style={{ flexGrow: ratio, flexBasis: `calc(var(--row-h) * ${ratio})` }}
+          >
             <button
               type="button"
               onClick={() => onOpen(photo)}
@@ -33,7 +45,7 @@ export function PhotoGrid({ photos, onOpen, isFavorite, onToggleFavorite, onRetr
               className={`relative block w-full overflow-hidden rounded-[3px] transition-[filter] duration-150 hover:brightness-[1.06] ${
                 pending ? "bg-film" : "bg-surface-2"
               }`}
-              style={{ aspectRatio: `${photo.width} / ${photo.height}` }}
+              style={{ aspectRatio: ratio }}
             >
               {!pending && (
                 <SmartImage
@@ -41,7 +53,7 @@ export function PhotoGrid({ photos, onOpen, isFavorite, onToggleFavorite, onRetr
                   alt={`${video ? "Video" : "Photo"} by ${photo.uploadedBy}`}
                   fill
                   loading={i < eagerCount ? "eager" : "lazy"}
-                  sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                  sizes="(max-width: 640px) 60vw, 420px"
                   className="object-cover"
                 />
               )}

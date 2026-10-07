@@ -13,7 +13,7 @@ import type { Album, Member, Photo } from "./types";
 const photoCount = () => db.$count(photos, eq(photos.albumId, albums.id));
 
 /** URL để hiện như ảnh: ảnh → file ảnh; video → poster (rỗng nếu chưa chuyển mã xong). */
-async function displayUrl(p: Pick<PhotoRow, "kind" | "storageKey" | "sourceUrl" | "posterKey">) {
+export async function displayUrl(p: Pick<PhotoRow, "kind" | "storageKey" | "sourceUrl" | "posterKey">) {
   if (p.kind === "video") return (await resolveObjectUrl(p.posterKey)) ?? "";
   return resolvePhotoUrl(p);
 }

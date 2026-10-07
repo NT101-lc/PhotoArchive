@@ -22,6 +22,8 @@
   --on-accent: #ffffff;
   --edge: #a8660c;
   --danger: #b23c2a;
+  /* Màu dữ liệu biểu đồ (đã kiểm tra độ đậm + tương phản với nền thẻ) */
+  --chart: #178a5c;
   --on-danger: #ffffff;
   --teal: #2f6f7e;
   --lilac: #6a5f9e;
@@ -46,6 +48,7 @@
   --on-accent: #0b1a14;
   --edge: #e3a042;
   --danger: #f0907c;
+  --chart: #44a378;
   --on-danger: #1f0b07;
   --teal: #7cc4cf;
   --lilac: #b3a8e6;
@@ -68,6 +71,7 @@
   --color-on-accent: var(--on-accent);
   --color-edge: var(--edge);
   --color-danger: var(--danger);
+  --color-chart: var(--chart);
   --color-on-danger: var(--on-danger);
   --color-film: var(--film);
   --color-teal: var(--teal);
@@ -281,6 +285,30 @@
     background-image: linear-gradient(100deg, transparent 20%, var(--skeleton-b) 50%, transparent 80%);
     background-size: 200% 100%;
     animation: shimmer 1.3s linear infinite;
+  }
+
+  /* Lưới ảnh hàng đều (PhotoGrid): mỗi ô đặt flex-grow = tỉ lệ khung, flex-basis = tỉ lệ × --row-h.
+     ::after chiếm phần dư của hàng cuối để ảnh hàng cuối không bị kéo giãn. */
+  .justified {
+    --row-h: 132px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .justified::after {
+    content: "";
+    flex-grow: 1000000;
+  }
+  @media (min-width: 640px) {
+    .justified {
+      --row-h: 200px;
+      gap: 10px;
+    }
+  }
+  @media (min-width: 1280px) {
+    .justified {
+      --row-h: 240px;
+    }
   }
 
   /* Lỗ răng cưa cuộn phim — đặt trên nền màu film */

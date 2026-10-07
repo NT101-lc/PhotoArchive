@@ -50,7 +50,9 @@ Giao diện hiển thị bằng tiếng Anh (tên chuyến đi / địa danh tro
   dòng thời gian dạng trục dọc (mỗi chuyến là một mốc có ngày + thứ, mốc năm nằm trên trục).
 - **Thư viện `/albums`**: tìm kiếm không dấu (phím `/`), lọc theo năm / nơi (**chọn nhiều**: cùng hàng là "hoặc",
   khác hàng là "và"; mỗi hàng có nút reset riêng, "Clear all" xoá hết kể cả sort), sắp xếp, bộ lọc lưu trên URL.
-- **Trang album**: lọc theo người chụp, chỉ xem ảnh yêu thích, xem dạng lưới masonry hoặc theo ngày, modal chi tiết chuyến đi.
+- **Trang album**: lọc theo người chụp, chỉ xem ảnh yêu thích, modal chi tiết chuyến đi. Hai cách xem:
+  **lưới hàng đều** (mỗi hàng cao bằng nhau, đọc trái → phải đúng thứ tự chụp) và **contact sheet**
+  (mỗi ngày là các dải phim 6 khung, số khung đánh liền cả album như một cuộn phim).
 - **Lightbox**: ← → / vuốt để chuyển, dải phim, slideshow (`Space`), phóng to (`Z` / nhấp đúp / chạm 2 lần),
   thả tim (`F`), thông tin ảnh (`I`), tải ảnh gốc, copy link mở thẳng tới ảnh (`?photo=…`), `Esc` để đóng.
 - **Upload**: chọn ảnh, chọn thư mục hoặc kéo thả thư mục (đọc cả thư mục con), gom theo thư mục,
@@ -58,6 +60,9 @@ Giao diện hiển thị bằng tiếng Anh (tên chuyến đi / địa danh tro
   Trình duyệt upload thẳng lên R2 qua URL đã ký, rồi server ghi thông tin ảnh vào DB.
   Người upload = người đang dùng (chọn ở trang "Who are you?").
   **Ảnh bìa**: bấm ★ trên ảnh xem trước để chọn bìa; không chọn gì thì bìa là ảnh đầu tiên (chụp sớm nhất) của album.
+- **Dashboard `/dashboard`** (cần chọn tên): số chuyến / ảnh / video / nơi, số chuyến theo năm, ai upload nhiều nhất,
+  "On this day" (ảnh chụp quanh ngày này những năm trước). Riêng admin thấy thêm dung lượng thật trên R2
+  (đọc thẳng từ bucket, chia theo loại, dự đoán ngày vượt 10 GB miễn phí) và hàng đợi chuyển mã video (thử lại video lỗi).
 - Ảnh yêu thích tạm lưu trong `localStorage` của từng máy.
 
 ## CI

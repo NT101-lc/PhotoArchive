@@ -26,13 +26,17 @@ export function AlbumCardSkeleton() {
 }
 
 // Tỉ lệ cố định để skeleton masonry trông tự nhiên (không random để tránh lệch hydrate)
-const RATIOS = ["3/2", "2/3", "4/3", "3/4", "16/9", "2/3", "3/2", "3/4", "4/3", "16/9", "2/3", "3/2"];
+const RATIOS = [1.5, 0.67, 1.33, 0.75, 1.78, 0.67, 1.5, 0.75, 1.33, 1.78, 0.67, 1.5];
 
 export function PhotoGridSkeleton() {
   return (
-    <div className="columns-2 gap-3 sm:gap-4 md:columns-3 xl:columns-4">
+    <div className="justified">
       {RATIOS.map((r, i) => (
-        <div key={i} className="skeleton mb-3 break-inside-avoid rounded-[3px] sm:mb-4" style={{ aspectRatio: r }} />
+        <div
+          key={i}
+          className="skeleton rounded-[3px]"
+          style={{ aspectRatio: r, flexGrow: r, flexBasis: `calc(var(--row-h) * ${r})` }}
+        />
       ))}
     </div>
   );

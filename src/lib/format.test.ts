@@ -60,5 +60,6 @@ describe("format", () => {
     assert.equal(formatBytes(512), "512 B");
     assert.equal(formatBytes(2048), "2 KB");
     assert.equal(formatBytes(5 * 1024 * 1024), "5.0 MB");
+    assert.equal(formatBytes(3.5 * 1024 ** 3), "3.50 GB");
   });
 });

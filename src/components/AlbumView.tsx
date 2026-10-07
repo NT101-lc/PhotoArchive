@@ -4,14 +4,15 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { deletePhoto, retryVideo, updateAlbum } from "@/lib/api-client";
 import { useFavorites } from "@/lib/favorites";
-import { dayKey, formatDayHeading, plural } from "@/lib/format";
+import { dayKey } from "@/lib/format";
 import { canDeletePhoto, canSetCover } from "@/lib/permissions";
 import type { Album, Photo } from "@/lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { EmptyState } from "./EmptyState";
 import { useIdentity } from "./Identity";
 import { useToast } from "./Toast";
-import { IconGrid, IconHeart, IconImage, IconTimeline } from "./Icons";
+import { ContactSheet } from "./ContactSheet";
+import { IconFilm, IconGrid, IconHeart, IconImage } from "./Icons";
 import { Lightbox } from "./Lightbox";
 import { PhotoGrid } from "./PhotoGrid";
 
@@ -66,6 +67,9 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
 
   // Lightbox giữ danh sách lúc mở, nhưng luôn lấy bản mới nhất của từng ảnh (vd video vừa xử lý xong)
   const byId = useMemo(() => new Map(photos.map((p) => [p.id, p])), [photos]);
+  // Số khung trên cuộn phim = vị trí trong cả album (không đổi khi lọc theo người / yêu thích)
+  const frameIndex = useMemo(() => new Map(photos.map((p, i) => [p.id, i + 1])), [photos]);
+  const frameNo = (id: string) => frameIndex.get(id) ?? 0;
   const liveList = useMemo(() => lightboxList.map((p) => byId.get(p.id) ?? p), [lightboxList, byId]);
   const openIndex = openId ? liveList.findIndex((p) => p.id === openId) : -1;
 
@@ -174,8 +178,8 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
             <ViewButton active={view === "grid"} onClick={() => setView("grid")} label="Grid">
               <IconGrid size={16} />
             </ViewButton>
-            <ViewButton active={view === "days"} onClick={() => setView("days")} label="By day">
-              <IconTimeline size={16} />
+            <ViewButton active={view === "days"} onClick={() => setView("days")} label="Contact sheet">
+              <IconFilm size={16} />
             </ViewButton>
           </div>
         </div>
@@ -205,20 +209,7 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
       ) : view === "grid" ? (
         <PhotoGrid photos={visible} eagerCount={4} {...tileProps} />
       ) : (
-        <div className="flex flex-col gap-10">
-          {days.map(([key, list], i) => (
-            <section key={key}>
-              <h3 className="mb-4 flex items-baseline gap-3">
-                <span className="frame-no text-sm">
-                  Day {i + 1}
-                </span>
-                <span className="font-display text-xl font-bold tracking-tight">{formatDayHeading(list[0].takenAt)}</span>
-                <span className="font-mono text-xs text-ink-soft">{plural(list.length, "photo")}</span>
-              </h3>
-              <PhotoGrid photos={list} eagerCount={i === 0 ? 4 : 0} {...tileProps} />
-            </section>
-          ))}
-        </div>
+        <ContactSheet days={days} frameNo={frameNo} onOpen={tileProps.onOpen} onRetry={tileProps.onRetry} />
       )}
 
       {openIndex >= 0 && (

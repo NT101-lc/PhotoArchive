@@ -22,11 +22,13 @@ import {
   MdOutlineFileDownload,
   MdOutlineFileUpload,
   MdOutlineFolder,
+  MdOutlineInsights,
   MdOutlineLightMode,
   MdOutlineLock,
   MdOutlinePerson,
   MdOutlinePhoto,
   MdOutlinePlace,
+  MdOutlineTheaters,
   MdOutlineViewDay,
   MdPause,
   MdPlayArrow,
@@ -90,6 +92,8 @@ export const IconZoomIn = material(MdZoomIn);
 export const IconZoomOut = material(MdZoomOut);
 export const IconGrid = material(MdOutlineDashboard);
 export const IconTimeline = material(MdOutlineViewDay);
+export const IconFilm = material(MdOutlineTheaters);
+export const IconStats = material(MdOutlineInsights);
 export const IconPlus = material(MdAdd);
 export const IconCheck = material(MdCheck);
 
