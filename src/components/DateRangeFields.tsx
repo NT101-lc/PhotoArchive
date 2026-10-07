@@ -1,9 +1,10 @@
 "use client";
 
 import { tripDays } from "@/lib/format";
+import { DateInput } from "./DateInput";
 
 /**
- * Ngày đi + ngày về. Ngày về để trống = đi trong ngày.
+ * Ngày đi + ngày về (hiển thị dd/mm/yyyy). Ngày về để trống = đi trong ngày.
  * Đổi ngày đi sang sau ngày về → ngày về bị xoá để khoảng ngày luôn hợp lệ.
  */
 export function DateRangeFields({
@@ -24,25 +25,19 @@ export function DateRangeFields({
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-ink-soft">First day</span>
-          <input
-            type="date"
+          <DateInput
             value={start}
             required
-            onChange={(e) => {
-              const next = e.target.value;
-              onChange({ start: next, end: end && next && end < next ? "" : end });
-            }}
-            className="field"
+            onChange={(next) => onChange({ start: next, end: end && next && end < next ? "" : end })}
           />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-ink-soft">Last day (optional)</span>
-          <input
-            type="date"
+          <DateInput
             value={end}
             min={start || undefined}
-            onChange={(e) => onChange({ start, end: e.target.value })}
-            className="field"
+            minMessage="The last day can’t be before the first day."
+            onChange={(next) => onChange({ start, end: next })}
           />
         </label>
       </div>

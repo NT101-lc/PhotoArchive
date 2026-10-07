@@ -1,8 +1,21 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { cleanDescription, dayKey, formatDuration, formatBytes, formatDate, formatDateRange, normalizeText, plural, slugify, tripDays, yearOf } from "./format";
+import { cleanDescription, dayKey, dmyToIso, isoToDmy, maskDmy, formatDuration, formatBytes, formatDate, formatDateRange, normalizeText, plural, slugify, tripDays, yearOf } from "./format";
 
 describe("format", () => {
+  it("dd/mm/yyyy date input helpers", () => {
+    assert.equal(isoToDmy("2026-10-07"), "07/10/2026");
+    assert.equal(isoToDmy(""), "");
+    assert.equal(maskDmy("0710"), "07/10");
+    assert.equal(maskDmy("07102026"), "07/10/2026");
+    assert.equal(maskDmy("07/1"), "07/1");
+    assert.equal(maskDmy("ab07-10-2026999"), "07/10/2026");
+    assert.equal(dmyToIso("07/10/2026"), "2026-10-07");
+    assert.equal(dmyToIso("7/1/26"), "2026-01-07");
+    assert.equal(dmyToIso("31/02/2026"), null);
+    assert.equal(dmyToIso("07/10"), null);
+  });
+
   it("formatDuration shows m:ss, or h:mm:ss for long videos", () => {
     assert.equal(formatDuration(7_400), "0:07");
     assert.equal(formatDuration(185_000), "3:05");

@@ -124,3 +124,32 @@ export function formatDuration(ms: number) {
   const s = String(total % 60).padStart(2, "0");
   return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
 }
+
+// ---- Ngày kiểu dd/mm/yyyy cho ô nhập (giá trị bên trong vẫn là ISO `YYYY-MM-DD`) ----
+
+/** `2026-10-07` → `07/10/2026`; rỗng → rỗng */
+export function isoToDmy(iso: string) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+}
+
+/** Định dạng dần khi gõ: chỉ giữ chữ số, tự chèn "/" → `07`, `07/10`, `07/10/2026`. */
+export function maskDmy(text: string) {
+  const d = text.replace(/\D/g, "").slice(0, 8);
+  return [d.slice(0, 2), d.slice(2, 4), d.slice(4)].filter(Boolean).join("/");
+}
+
+/**
+ * `07/10/2026` hoặc `7/10/26` → `2026-10-07`. Năm 2 chữ số hiểu là 20yy.
+ * Ngày không tồn tại (vd 31/02) → null.
+ */
+export function dmyToIso(text: string) {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(text.trim());
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
