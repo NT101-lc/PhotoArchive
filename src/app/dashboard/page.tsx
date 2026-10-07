@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -64,7 +63,7 @@ export default async function DashboardPage() {
         ]}
       />
 
-      <TheRoll trips={roll.trips} truncated={roll.truncated} />
+      <TheRoll trips={roll.trips} />
 
       <div className="mb-16 grid gap-14 lg:grid-cols-2 lg:gap-16">
         <Section title="Trips per year" note="Tap or hover a year to see how many photos came back.">
@@ -112,57 +111,66 @@ function Section({ title, note, children, className = "" }: { title: string; not
 type Roll = Awaited<ReturnType<typeof getRoll>>;
 
 /**
- * Điểm nhấn của trang: cả kho ảnh như một cuộn phim. Mỗi ảnh / video là một khung nhỏ (bấm để mở),
- * xếp theo chuyến, tên chuyến in màu hổ phách ở mép như chữ trên phim. Các hàng "hiện hình" lần lượt khi tải trang.
+ * Điểm nhấn của trang: các chuyến gần đây như những dải contact sheet. Mỗi chuyến vài khung đầu
+ * (bấm để mở), khung cuối là "+N" dẫn vào album. Tên chuyến in màu hổ phách như chữ trên phim.
  */
-function TheRoll({ trips, truncated }: Roll) {
+function TheRoll({ trips }: Roll) {
   if (trips.length === 0) return null;
-  const frames = trips.reduce((n, t) => n + t.frames.length, 0);
   return (
     <section aria-labelledby="roll-heading" className="mb-16">
       <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
         <h2 id="roll-heading" className="font-display text-2xl font-extrabold tracking-[-0.02em]">
           The roll so far
         </h2>
-        <p className="text-sm text-ink-soft">
-          {plural(frames, "frame")}, one for every photo and video. Amber edge marks a video.
-        </p>
+        <p className="text-sm text-ink-soft">The first frames of the latest trips. Amber edge marks a video.</p>
       </div>
       <div className="overflow-hidden rounded-[3px] bg-film text-white">
         <div className="sprockets h-3" aria-hidden="true" />
         <ol className="flex flex-col gap-4 px-3 py-3 sm:px-4">
-          {trips.map((t, i) => (
-            <li
-              key={t.slug}
-              className="animate-develop grid gap-2 md:grid-cols-[12rem_1fr] md:gap-5"
-              style={{ animationDelay: `${120 + i * 160}ms` }}
-            >
-              <Link href={`/albums/${t.slug}`} className="group min-w-0 self-start">
-                <span className="frame-no block truncate text-xs group-hover:underline">{t.title}</span>
-                <span className="block text-xs text-white/55 tabular-nums">
-                  {formatDate(t.tripDate)}, {plural(t.frames.length, "frame")}
-                </span>
-              </Link>
-              <ul className="flex flex-wrap gap-[3px]">
-                {t.frames.map((f) => (
-                  <li key={f.id}>
-                    <Link
-                      href={`/albums/${t.slug}?photo=${f.id}`}
-                      aria-label={`${f.kind === "video" ? "Video" : "Photo"} from ${t.title}`}
-                      className="relative block h-[22px] w-[33px] overflow-hidden rounded-[1px] bg-white/10 outline-offset-1 transition-[filter] hover:brightness-125 sm:h-7 sm:w-[42px]"
-                    >
-                      {f.thumbUrl && <Image src={f.thumbUrl} alt="" fill sizes="48px" className="object-cover" />}
-                      {f.kind === "video" && <span className="absolute inset-x-0 bottom-0 h-[3px] bg-edge" aria-hidden="true" />}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
+          {trips.map((t, i) => {
+            const more = t.total - t.frames.length;
+            return (
+              <li
+                key={t.slug}
+                className="animate-develop grid gap-2 md:grid-cols-[12rem_1fr] md:items-center md:gap-5"
+                style={{ animationDelay: `${120 + i * 120}ms` }}
+              >
+                <Link href={`/albums/${t.slug}`} className="group min-w-0">
+                  <span className="frame-no block truncate text-xs group-hover:underline">{t.title}</span>
+                  <span className="block text-xs text-white/55 tabular-nums">
+                    {formatDate(t.tripDate)}, {plural(t.total, "frame")}
+                  </span>
+                </Link>
+                <ul className="grid grid-cols-6 gap-1 sm:gap-1.5">
+                  {t.frames.map((f, j) => {
+                    const last = j === t.frames.length - 1 && more > 0;
+                    return (
+                      <li key={f.id}>
+                        <Link
+                          href={last ? `/albums/${t.slug}` : `/albums/${t.slug}?photo=${f.id}`}
+                          aria-label={
+                            last ? `Open all ${t.total} frames of ${t.title}` : `${f.kind === "video" ? "Video" : "Photo"} from ${t.title}`
+                          }
+                          className="relative block aspect-[3/2] overflow-hidden rounded-[1px] bg-white/10 transition-[filter] hover:brightness-125"
+                        >
+                          <SmartImage src={f.thumbUrl} alt="" fill sizes="(max-width: 768px) 16vw, 160px" className="object-cover" />
+                          {f.kind === "video" && <span className="absolute inset-x-0 bottom-0 h-[3px] bg-edge" aria-hidden="true" />}
+                          {last && (
+                            <span className="absolute inset-0 flex items-center justify-center bg-black/60 font-display text-sm font-extrabold sm:text-base">
+                              +{more + 1}
+                            </span>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            );
+          })}
         </ol>
         <div className="sprockets h-3" aria-hidden="true" />
       </div>
-      {truncated && <p className="mt-2 text-xs text-ink-soft">Showing the most recent 600 frames.</p>}
     </section>
   );
 }

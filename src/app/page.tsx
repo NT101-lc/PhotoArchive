@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DragScroll } from "@/components/DragScroll";
 import { EmptyState } from "@/components/EmptyState";
 import { IconArrowRight, IconImage, IconPin, IconUpload } from "@/components/Icons";
 import { SmartImage } from "@/components/SmartImage";
@@ -188,97 +189,82 @@ function tripLabel(a: Album) {
 }
 
 /**
- * Dòng thời gian dạng trục dọc, mới nhất ở trên.
- * Desktop: [ngày + thứ] — trục có chấm — [chuyến đi]. Mobile: trục bên trái, ngày nằm trên thẻ.
- * Mốc năm là nhãn màu mép phim nằm ngay trên trục.
+ * Dòng thời gian dạng trục ngang, mới nhất bên trái, cuộn ngang (snap theo từng chuyến).
+ * Mỗi chuyến: [ngày + thứ] — chấm trên trục — [thẻ chuyến]. Mốc năm là nhãn màu mép phim đè lên trục.
  */
 function Timeline({ albums, years }: { albums: Album[]; years: string[] }) {
-  // Cột: [ngày 8.5rem] [trục 2.5rem] [thẻ] trên md; [trục 1.5rem] [nội dung] trên mobile
-  const cols = "grid grid-cols-[1.5rem_1fr] gap-x-3 md:grid-cols-[8.5rem_2.5rem_1fr] md:gap-x-4";
   return (
-    <div className="relative max-w-4xl">
-      {/* Trục: tâm cột trục = 0.75rem (mobile) / 8.5rem + 1rem + 1.25rem (md) */}
-      <div
-        aria-hidden="true"
-        className="absolute top-3 bottom-3 left-[calc(0.75rem-1px)] w-[2px] rounded-full bg-ink/25 md:left-[calc(10.75rem-1px)]"
-      />
-      <ol className="relative flex flex-col gap-6">
+    <div className="relative -mx-4 sm:-mx-6">
+      <DragScroll
+        className="scrollbar-none flex snap-x snap-mandatory scroll-px-4 overflow-x-auto px-4 pb-2 sm:scroll-px-6 sm:px-6"
+        aria-label="Trips, newest first"
+      >
         {years.map((year) => {
           const trips = albums.filter((a) => yearOf(a.tripDate) === year);
           return (
-            <li key={year} className="flex flex-col gap-5">
-              {/* Mobile: nhãn năm đè lên trục ở mép trái; desktop: căn giữa trên trục */}
-              <div className="flex items-center gap-2.5 md:grid md:grid-cols-[8.5rem_2.5rem_1fr] md:gap-x-4">
-                <span className="hidden text-right text-sm text-ink-soft md:block">{plural(trips.length, "trip")}</span>
-                <span className="relative z-10 flex md:justify-center">
+            <li key={year} className="flex shrink-0">
+              {/* Mốc năm: nhãn nằm trên trục, số chuyến ở dưới */}
+              <div className="flex w-20 shrink-0 snap-start flex-col">
+                <span className="h-12" />
+                <span className="relative flex h-6 items-center">
+                  <span aria-hidden="true" className="absolute inset-x-0 h-[2px] bg-ink/25" />
                   <span
-                    className="rounded-[3px] bg-edge px-1.5 py-0.5 font-display text-xs leading-none font-extrabold text-film tabular-nums md:px-2 md:text-sm"
+                    className="relative rounded-[3px] bg-edge px-2 py-0.5 font-display text-sm leading-none font-extrabold text-film tabular-nums"
                     style={{ fontStretch: "125%" }}
                   >
                     {year}
                   </span>
                 </span>
-                <span className="text-sm text-ink-soft md:hidden">{plural(trips.length, "trip")}</span>
+                <span className="mt-3 text-sm text-ink-soft">{plural(trips.length, "trip")}</span>
               </div>
 
-              <ol className="flex flex-col gap-3">
+              <ol className="flex">
                 {trips.map((a) => (
-                  <li key={a.id} className={`${cols} items-center`}>
-                    <time dateTime={a.tripDate} className="hidden text-right md:block">
-                      <span className="block font-semibold text-balance tabular-nums">
-                        {formatDateRange(a.tripDate, a.endDate)}
-                      </span>
-                      <span className="text-sm text-ink-soft">{tripLabel(a)}</span>
+                  <li key={a.id} className="flex w-60 shrink-0 snap-start flex-col pr-4 sm:w-64 sm:pr-5">
+                    <time dateTime={a.tripDate} className="flex h-12 flex-col justify-end pb-1.5">
+                      <span className="block truncate font-semibold tabular-nums">{formatDateRange(a.tripDate, a.endDate)}</span>
+                      <span className="block truncate text-sm text-ink-soft">{tripLabel(a)}</span>
                     </time>
-                    <span className="relative z-10 flex justify-center">
-                      <span className="h-3.5 w-3.5 rounded-full bg-accent ring-4 ring-bg md:h-4 md:w-4" />
+                    <span className="relative flex h-6 items-center" aria-hidden="true">
+                      <span className="absolute -right-4 left-0 h-[2px] bg-ink/25 sm:-right-5" />
+                      <span className="relative h-4 w-4 rounded-full bg-accent ring-4 ring-bg" />
                     </span>
-                    <div className="min-w-0">
-                      <time dateTime={a.tripDate} className="mb-0.5 block text-sm text-ink-soft tabular-nums md:hidden">
-                        {formatDateRange(a.tripDate, a.endDate)}, {tripLabel(a)}
-                      </time>
-                      <TripRow album={a} />
-                    </div>
+                    <TripCard album={a} />
                   </li>
                 ))}
               </ol>
             </li>
           );
         })}
-      </ol>
+      </DragScroll>
     </div>
   );
 }
 
-function TripRow({ album }: { album: Album }) {
+function TripCard({ album }: { album: Album }) {
   return (
-    <Link
-      href={`/albums/${album.id}`}
-      className="group -mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-surface/70 sm:gap-5"
-    >
-      <span className="print shrink-0 p-1">
-        <span className="relative block h-12 w-16 overflow-hidden rounded-[1px] bg-surface-2 sm:h-[4.5rem] sm:w-24">
-          <SmartImage src={album.coverUrl} alt="" fill sizes="96px" className="object-cover" />
+    <Link href={`/albums/${album.id}`} className="group mt-3 block">
+      <span className="print block p-1.5">
+        <span className="relative block aspect-[3/2] overflow-hidden rounded-[1px] bg-surface-2">
+          <SmartImage
+            src={album.coverUrl}
+            alt=""
+            fill
+            sizes="256px"
+            className="object-cover transition-[filter] duration-200 group-hover:brightness-110"
+          />
         </span>
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-display text-lg font-bold tracking-[-0.01em] group-hover:text-accent">
-          {album.title}
-        </span>
-        <span className="flex items-center gap-1 truncate text-sm text-ink-soft">
-          <IconPin size={14} className="shrink-0" />
-          <span className="truncate">
-            {album.location}
-            <span className="sm:hidden">, {plural(album.photoCount, "photo")}</span>
-          </span>
-        </span>
-        {album.description && (
-          <span className="mt-0.5 hidden truncate text-sm text-ink-soft sm:block">{album.description}</span>
-        )}
+      <span className="mt-2.5 block truncate font-display text-lg font-bold tracking-[-0.01em] group-hover:text-accent">
+        {album.title}
       </span>
-      <span className="hidden w-20 shrink-0 text-right text-sm text-ink-soft tabular-nums sm:block">
-        {plural(album.photoCount, "photo")}
+      <span className="flex items-center gap-1 text-sm text-ink-soft">
+        <IconPin size={14} className="shrink-0" />
+        <span className="truncate">
+          {album.location}, {plural(album.photoCount, "photo")}
+        </span>
       </span>
+      {album.description && <span className="mt-0.5 line-clamp-2 text-sm text-ink-soft">{album.description}</span>}
     </Link>
   );
 }

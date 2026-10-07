@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, countDistinct, desc, eq, isNotNull, lt, ne, sql } from "drizzle-orm";
+import { and, asc, countDistinct, desc, eq, inArray, isNotNull, lt, lte, ne, sql } from "drizzle-orm";
 import { connection } from "next/server";
 import { albums, db, members, photos } from "@/db";
 import { displayUrl } from "./data";
@@ -155,37 +155,58 @@ export async function getVideoQueue() {
   };
 }
 
-/** Tối đa số khung trên "cuộn phim" ở đầu dashboard (mới nhất trước khi vượt) */
-const ROLL_LIMIT = 600;
+/** Số chuyến gần nhất trên "cuộn phim" ở đầu dashboard, và số khung đại diện mỗi chuyến */
+const ROLL_TRIPS = 8;
+const ROLL_FRAMES = 6;
 
 /**
- * "The roll": mọi ảnh / video xem được, gom theo chuyến (chuyến mới nhất trên cùng),
- * trong chuyến theo thứ tự chụp. Mỗi ảnh một khung nhỏ.
+ * "The roll": mỗi chuyến gần đây là một dải contact sheet ngắn — vài khung đầu (theo thứ tự chụp)
+ * cùng tổng số khung, để trang không phải tải cả nghìn thumbnail.
  */
 export async function getRoll() {
   await connection();
-  const rows = await db
+  const trips = await db
     .select({
-      photo: photos,
-      albumId: albums.id,
-      albumSlug: albums.slug,
-      albumTitle: albums.title,
+      id: albums.id,
+      slug: albums.slug,
+      title: albums.title,
       tripDate: albums.tripDate,
+      total: sql<number>`count(${photos.id})::int`,
+    })
+    .from(albums)
+    .innerJoin(photos, and(eq(photos.albumId, albums.id), eq(photos.status, "ready")))
+    .groupBy(albums.id)
+    .orderBy(desc(albums.tripDate), desc(albums.createdAt))
+    .limit(ROLL_TRIPS);
+  if (trips.length === 0) return { trips: [] };
+
+  const ranked = db
+    .select({
+      id: photos.id,
+      rn: sql<number>`row_number() over (partition by ${photos.albumId} order by ${photos.takenAt}, ${photos.createdAt})`.as("rn"),
     })
     .from(photos)
-    .innerJoin(albums, eq(albums.id, photos.albumId))
-    .where(eq(photos.status, "ready"))
-    .orderBy(desc(albums.tripDate), desc(albums.createdAt), asc(photos.takenAt), asc(photos.createdAt))
-    .limit(ROLL_LIMIT);
+    .where(and(eq(photos.status, "ready"), inArray(photos.albumId, trips.map((t) => t.id))))
+    .as("ranked");
+  const rows = await db
+    .select({ photo: photos })
+    .from(photos)
+    .innerJoin(ranked, eq(ranked.id, photos.id))
+    .where(lte(ranked.rn, ROLL_FRAMES))
+    .orderBy(asc(photos.takenAt), asc(photos.createdAt));
+  const frames = await Promise.all(
+    rows.map(async ({ photo }) => ({ id: photo.id, albumId: photo.albumId, kind: photo.kind, thumbUrl: await displayUrl(photo) })),
+  );
 
-  const groups = new Map<string, { slug: string; title: string; tripDate: string; frames: Array<{ id: string; kind: "photo" | "video"; thumbUrl: string }> }>();
-  const urls = await Promise.all(rows.map((r) => displayUrl(r.photo)));
-  rows.forEach((r, i) => {
-    const g = groups.get(r.albumId) ?? { slug: r.albumSlug, title: r.albumTitle, tripDate: r.tripDate, frames: [] };
-    g.frames.push({ id: r.photo.id, kind: r.photo.kind, thumbUrl: urls[i] });
-    groups.set(r.albumId, g);
-  });
-  return { trips: [...groups.values()], truncated: rows.length === ROLL_LIMIT };
+  return {
+    trips: trips.map((t) => ({
+      slug: t.slug,
+      title: t.title,
+      tripDate: t.tripDate,
+      total: t.total,
+      frames: frames.filter((f) => f.albumId === t.id),
+    })),
+  };
 }
 
 /** Những nơi đã đến: số chuyến, số ảnh, lần gần nhất. */

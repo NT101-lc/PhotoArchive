@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Bản sao giờ chụp cũ do src/db/fix-taken-at.ts tạo ra
+fix-taken-at-backup-*.json

@@ -40,7 +40,7 @@ export class BadRequestError extends Error {}
 
 async function findAlbum(slug: string) {
   const [row] = await db
-    .select({ id: albums.id, createdById: albums.createdById })
+    .select({ id: albums.id, createdById: albums.createdById, tripDate: albums.tripDate, endDate: albums.endDate })
     .from(albums)
     .where(eq(albums.slug, slug))
     .limit(1);
@@ -294,7 +294,10 @@ export const addPhotosInput = z.object({
         height: z.number().int().positive().max(100_000),
         sizeBytes: z.number().int().positive(),
         mimeType: mediaType,
+        // Giờ chụp đọc từ EXIF (nếu có)
         takenAt: z.iso.datetime({ offset: true }).optional(),
+        // Thời gian sửa file — chỉ dùng khi không có EXIF và nó rơi vào khoảng ngày của chuyến
+        modifiedAt: z.iso.datetime({ offset: true }).optional(),
         // Video: thời lượng đọc được trên trình duyệt (worker sẽ ghi lại số chính xác)
         durationMs: z.number().int().nonnegative().optional(),
       }),
@@ -304,6 +307,26 @@ export const addPhotosInput = z.object({
   // Ảnh được chọn làm bìa (một trong các key ở trên). Bỏ trống → bìa vẫn là ảnh đầu tiên.
   coverKey: z.string().optional(),
 });
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Thời điểm chụp: EXIF nếu có. Không có (ảnh qua Zalo / Messenger, ảnh chụp màn hình...) thì dùng
+ * thời gian sửa file khi nó nằm trong chuyến (lùi 1 ngày, thêm 2 ngày cho chắc); còn lại là trưa ngày đầu chuyến,
+ * cộng thêm vài giây theo thứ tự upload để giữ nguyên thứ tự.
+ */
+function guessTakenAt(
+  p: { takenAt?: string; modifiedAt?: string },
+  album: { tripDate: string; endDate: string | null },
+  index: number,
+) {
+  if (p.takenAt) return new Date(p.takenAt);
+  const from = new Date(`${album.tripDate}T00:00:00+07:00`).getTime() - DAY_MS;
+  const to = new Date(`${album.endDate ?? album.tripDate}T00:00:00+07:00`).getTime() + 3 * DAY_MS;
+  const modified = p.modifiedAt ? new Date(p.modifiedAt).getTime() : NaN;
+  if (modified >= from && modified < to) return new Date(modified);
+  return new Date(new Date(`${album.tripDate}T12:00:00+07:00`).getTime() + index * 1000);
+}
 
 /**
  * Bước 2: sau khi upload xong, ghi vào DB (người upload = actor) và đặt ảnh bìa nếu có chọn.
@@ -328,7 +351,7 @@ export async function addPhotos(actor: Actor, albumSlug: string, input: z.infer<
   const rows = await db
     .insert(photos)
     .values(
-      input.photos.map((p) => {
+      input.photos.map((p, i) => {
         const video = isVideoType(p.mimeType);
         return {
           albumId: album.id,
@@ -338,7 +361,7 @@ export async function addPhotos(actor: Actor, albumSlug: string, input: z.infer<
           sizeBytes: p.sizeBytes,
           mimeType: p.mimeType,
           uploadedById: actor.id,
-          takenAt: p.takenAt ? new Date(p.takenAt) : undefined,
+          takenAt: guessTakenAt(p, album, i),
           kind: video ? ("video" as const) : ("photo" as const),
           status: video ? ("queued" as const) : ("ready" as const),
           durationMs: video ? p.durationMs : undefined,

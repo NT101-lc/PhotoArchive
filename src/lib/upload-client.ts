@@ -1,4 +1,5 @@
 import { api } from "./api-client";
+import { readTakenAt } from "./exif";
 import { isVideoType, mediaTypeOf, type MediaType } from "./media";
 
 // Upload từ trình duyệt. Luồng: xin chỗ upload → PUT thẳng lên R2 → báo server ghi vào DB.
@@ -198,7 +199,7 @@ export async function uploadFiles(
       continue;
     }
 
-    type Entry = { key: string; width: number; height: number; sizeBytes: number; mimeType: MediaType; takenAt: string; durationMs?: number };
+    type Entry = { key: string; width: number; height: number; sizeBytes: number; mimeType: MediaType; takenAt?: string; modifiedAt?: string; durationMs?: number };
     let pending: Entry[] = [];
     let coverKey: string | undefined;
 
@@ -222,8 +223,9 @@ export async function uploadFiles(
         if (signal.aborted) return events.onFailed(index, "Cancelled");
         try {
           const video = isVideoType(up.contentType);
-          const [size] = await Promise.all([
+          const [size, takenAt] = await Promise.all([
             video ? videoSize(file) : imageSize(file),
+            video ? undefined : readTakenAt(file),
             "multipart" in up
               ? uploadMultipart(file, up, (l) => events.onProgress(index, l), signal)
               : put(up.uploadUrl, file, { "Content-Type": up.contentType }, (l) => events.onProgress(index, l), signal),
@@ -233,8 +235,9 @@ export async function uploadFiles(
             ...size,
             sizeBytes: file.size,
             mimeType: up.contentType,
-            // Chưa đọc EXIF: tạm dùng thời gian sửa file làm thời điểm chụp
-            takenAt: new Date(file.lastModified || Date.now()).toISOString(),
+            // Giờ chụp trong EXIF; không có thì server tự chọn giữa thời gian sửa file và ngày chuyến đi
+            takenAt,
+            modifiedAt: file.lastModified ? new Date(file.lastModified).toISOString() : undefined,
           });
           if (index === coverIndex) coverKey = up.key;
           if (video) await flush();
