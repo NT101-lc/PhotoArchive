@@ -1,11 +1,10 @@
 // Kế hoạch chuyển mã video — hàm thuần, dùng trong scripts/transcode-worker.ts (và test).
 
-/** Độ phân giải đầu ra, tính theo cạnh ngắn (video dọc 1080×1920 vẫn là "1080"). */
-export const RENDITIONS = [720, 1080] as const;
-export type Rendition = (typeof RENDITIONS)[number];
-
-/** Chỉ làm bản 1080 khi nguồn đủ nét hơn hẳn 720 (tránh phóng to vô ích). */
-const MIN_SHORT_SIDE_FOR_1080 = 900;
+/**
+ * Mỗi video chỉ còn một bản: MP4 H.264 720p, tính theo cạnh ngắn (video dọc 720×1280 vẫn là "720";
+ * nguồn nhỏ hơn thì giữ nguyên cỡ). Bản này thay luôn file gốc — worker xoá file gốc sau khi xong.
+ */
+export const TARGET_SHORT_SIDE = 720;
 
 export type ProbeStream = {
   codec_type?: string;
@@ -42,19 +41,14 @@ export function sourceInfo(probe: Probe): SourceInfo {
   };
 }
 
-/** Các bản cần làm: luôn có 720 (nguồn nhỏ hơn thì giữ nguyên cỡ), thêm 1080 nếu nguồn đủ lớn. */
-export function plannedRenditions(src: Pick<SourceInfo, "width" | "height">): Rendition[] {
-  return Math.min(src.width, src.height) >= MIN_SHORT_SIDE_FOR_1080 ? [720, 1080] : [720];
-}
-
 const even = (n: number) => Math.max(2, Math.floor(n / 2) * 2);
 
 /**
- * Chuỗi filter `-vf` cho một bản: (tone-map HDR → SDR) → thu nhỏ cạnh ngắn về `target` → yuv420p.
+ * Chuỗi filter `-vf`: (tone-map HDR → SDR) → thu nhỏ cạnh ngắn về 720 → yuv420p.
  * ffmpeg tự xoay theo metadata trước khi chạy filter, nên iw/ih đã là kích thước hiển thị.
  */
-export function videoFilter(src: SourceInfo, target: Rendition, opts: { tonemap: boolean }) {
-  const short = even(Math.min(target, Math.min(src.width, src.height)));
+export function videoFilter(src: SourceInfo, opts: { tonemap: boolean }) {
+  const short = even(Math.min(TARGET_SHORT_SIDE, Math.min(src.width, src.height)));
   const scale = src.width >= src.height ? `scale=-2:${short}` : `scale=${short}:-2`;
   const steps: string[] = [];
   if (src.hdr && opts.tonemap) {
@@ -70,8 +64,8 @@ export function videoFilter(src: SourceInfo, target: Rendition, opts: { tonemap:
   return steps.join(",");
 }
 
-/** Tham số ffmpeg cho một bản MP4 H.264 + AAC, phát được ngay khi đang tải (faststart). */
-export function encodeArgs(input: string, output: string, filter: string, target: Rendition) {
+/** Tham số ffmpeg cho bản MP4 H.264 + AAC, phát được ngay khi đang tải (faststart). */
+export function encodeArgs(input: string, output: string, filter: string) {
   return [
     "-hide_banner",
     "-y",
@@ -88,7 +82,7 @@ export function encodeArgs(input: string, output: string, filter: string, target
     "-preset",
     "veryfast",
     "-crf",
-    target === 1080 ? "22" : "23",
+    "23",
     "-profile:v",
     "high",
     "-color_primaries",
@@ -119,7 +113,7 @@ export function posterArgs(input: string, output: string, durationMs: number) {
 export function outputKeys(originalKey: string) {
   const base = originalKey.replace(/\.[^./]+$/, "");
   return {
-    video: (r: Rendition) => `${base}.${r}.mp4`,
+    video: `${base}.${TARGET_SHORT_SIDE}.mp4`,
     poster: `${base}.poster.jpg`,
   };
 }

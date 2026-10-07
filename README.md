@@ -161,9 +161,10 @@ Lỗi trả về `{ error }` với mã 400 (input sai), 401 (chưa chọn tên /
 ## Video
 
 Video upload thẳng lên R2 theo từng phần (multipart, không giới hạn dung lượng; ảnh vẫn tối đa 50 MB).
-File gốc được giữ nguyên; worker chuyển mã ra MP4 H.264 720p và 1080p (nếu nguồn đủ nét) + ảnh poster,
-tone-map HDR (video iPhone) về SDR. Khi xem, trình duyệt tự chọn 720p / 1080p theo mạng và màn hình,
-người xem đổi tay được.
+Worker chuyển mã ra **một** MP4 H.264 720p (theo cạnh ngắn) + ảnh poster, tone-map HDR (video iPhone)
+về SDR, rồi **xoá file gốc**: bản 720p thay luôn file gốc (`storage_key` trỏ sang nó, dùng để xem và tải về).
+File gốc chỉ bị xoá sau khi bản 720p đã lên R2 và DB đã cập nhật; chuyển mã lỗi thì file gốc vẫn còn để thử lại.
+Video cũ (trước thay đổi này) có thể còn bản 1080p; khi đó Lightbox vẫn cho đổi 720p / 1080p.
 
 Worker là `scripts/transcode-worker.ts`, chạy trên GitHub Actions (`.github/workflows/transcode.yml`):
 được gọi ngay khi có video mới, và chạy lại mỗi 3 giờ để nhặt video bị sót. Hàng đợi nằm ngay trong

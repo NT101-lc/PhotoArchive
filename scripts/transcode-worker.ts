@@ -2,8 +2,8 @@
 // Chạy trong GitHub Actions (.github/workflows/transcode.yml), cũng chạy được trên máy có ffmpeg.
 //
 // Mỗi vòng: nhận một video đang chờ trong bảng photos (FOR UPDATE SKIP LOCKED nên nhiều worker
-// chạy cùng lúc không đụng nhau) → tải file gốc từ R2 → ffmpeg ra MP4 720p / 1080p + poster
-// → đẩy lên R2 → đánh dấu "ready". Lỗi thì trả về hàng đợi, quá MAX_TRANSCODE_ATTEMPTS lần thì "failed".
+// chạy cùng lúc không đụng nhau) → tải file gốc từ R2 → ffmpeg ra một MP4 720p + poster
+// → đẩy lên R2 → đánh dấu "ready" và trỏ storage_key sang bản 720p → xoá file gốc. Lỗi thì trả về hàng đợi, quá MAX_TRANSCODE_ATTEMPTS lần thì "failed".
 // Chạy tới khi hết việc (hoặc gần hết giờ của job).
 
 import { loadEnvConfig } from "@next/env";
@@ -18,16 +18,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { MAX_TRANSCODE_ATTEMPTS } from "../src/db/schema";
-import {
-  encodeArgs,
-  outputKeys,
-  plannedRenditions,
-  posterArgs,
-  sourceInfo,
-  videoFilter,
-  type Probe,
-  type Rendition,
-} from "../src/lib/transcode-plan";
+import { encodeArgs, outputKeys, posterArgs, sourceInfo, videoFilter, type Probe } from "../src/lib/transcode-plan";
 
 loadEnvConfig(process.cwd());
 
@@ -190,38 +181,36 @@ async function processJob(job: Job) {
     const tonemap = src.hdr && (await canTonemap());
     if (src.hdr && !tonemap) console.warn(`${TAG}  HDR source but ffmpeg has no zscale — colors may look washed out`);
 
-    const renditions = plannedRenditions(src);
-    const outputs: Partial<Record<Rendition, string>> = {};
-    for (const r of renditions) {
-      const out = join(dir, `${r}.mp4`);
-      console.log(`${TAG}  encoding ${r}p…`);
-      await run("ffmpeg", encodeArgs(input, out, videoFilter(src, r, { tonemap }), r));
-      outputs[r] = out;
-    }
+    const video = join(dir, "720.mp4");
+    console.log(`${TAG}  encoding 720p…`);
+    await run("ffmpeg", encodeArgs(input, video, videoFilter(src, { tonemap })));
 
-    // Poster + kích thước hiển thị lấy từ bản nét nhất (đã SDR, đã xoay đúng chiều)
-    const best = outputs[1080] ?? outputs[720]!;
+    // Poster + kích thước hiển thị lấy từ bản vừa mã hoá (đã SDR, đã xoay đúng chiều)
     const poster = join(dir, "poster.jpg");
-    await run("ffmpeg", posterArgs(best, poster, src.durationMs));
-    const out = sourceInfo(await probe(best));
+    await run("ffmpeg", posterArgs(video, poster, src.durationMs));
+    const out = sourceInfo(await probe(video));
+    const { size } = await stat(video);
 
-    for (const r of renditions) {
-      await upload(keys.video(r), outputs[r]!, "video/mp4");
-      uploaded.push(keys.video(r));
-    }
+    await upload(keys.video, video, "video/mp4");
+    uploaded.push(keys.video);
     await upload(keys.poster, poster, "image/jpeg");
     uploaded.push(keys.poster);
 
+    // Bản 720p thay luôn file gốc: storage_key trỏ sang nó (dùng cả để xem lẫn để tải về)
     const done = await sql`
       update photos set status = 'ready', locked_at = null, processing_error = null, updated_at = now(),
         width = ${out.width}, height = ${out.height}, duration_ms = ${out.durationMs || src.durationMs},
-        poster_key = ${keys.poster},
-        video720_key = ${outputs[720] ? keys.video(720) : null},
-        video1080_key = ${outputs[1080] ? keys.video(1080) : null}
+        storage_key = ${keys.video}, size_bytes = ${size}, mime_type = 'video/mp4',
+        poster_key = ${keys.poster}, video720_key = ${keys.video}, video1080_key = null
       where id = ${job.id}
       returning id`;
-    // Video bị xoá trong lúc đang xử lý → dọn file vừa sinh
-    if (done.length === 0) await remove(uploaded);
+    if (done.length === 0) {
+      // Video bị xoá trong lúc đang xử lý → dọn file vừa sinh
+      await remove(uploaded);
+      return;
+    }
+    // DB đã trỏ sang bản mới → xoá file gốc. Lỗi ở đây chỉ để lại file mồ côi, không ảnh hưởng app.
+    await remove([job.storage_key]);
   } catch (err) {
     await remove(uploaded);
     throw err;

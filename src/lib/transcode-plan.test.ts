@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { outputKeys, plannedRenditions, posterArgs, sourceInfo, videoFilter } from "./transcode-plan";
+import { encodeArgs, outputKeys, posterArgs, sourceInfo, videoFilter } from "./transcode-plan";
 
 const iphonePortraitHdr = {
   streams: [
@@ -26,25 +26,26 @@ describe("transcode plan", () => {
     assert.throws(() => sourceInfo({ streams: [{ codec_type: "audio" }] }), /No video stream/);
   });
 
-  it("makes 1080p only when the source is sharp enough", () => {
-    assert.deepEqual(plannedRenditions({ width: 1920, height: 1080 }), [720, 1080]);
-    assert.deepEqual(plannedRenditions({ width: 1080, height: 1920 }), [720, 1080]);
-    assert.deepEqual(plannedRenditions({ width: 1280, height: 720 }), [720]);
-    assert.deepEqual(plannedRenditions({ width: 640, height: 360 }), [720]);
+  it("scales the short side to 720, never upscales, and tone-maps HDR when possible", () => {
+    const portrait = sourceInfo(iphonePortraitHdr);
+    assert.match(videoFilter(portrait, { tonemap: true }), /^zscale=t=linear.*tonemap=hable.*scale=720:-2:flags=lanczos,format=yuv420p$/);
+    assert.equal(videoFilter(portrait, { tonemap: false }), "scale=720:-2:flags=lanczos,format=yuv420p");
+    const landscape = { width: 1920, height: 1080, durationMs: 0, hdr: false };
+    assert.equal(videoFilter(landscape, { tonemap: true }), "scale=-2:720:flags=lanczos,format=yuv420p");
+    const small = { width: 641, height: 359, durationMs: 0, hdr: false };
+    assert.equal(videoFilter(small, { tonemap: true }), "scale=-2:358:flags=lanczos,format=yuv420p");
   });
 
-  it("scales the short side, never upscales, and tone-maps HDR when possible", () => {
-    const portrait = sourceInfo(iphonePortraitHdr);
-    assert.match(videoFilter(portrait, 1080, { tonemap: true }), /^zscale=t=linear.*tonemap=hable.*scale=1080:-2:flags=lanczos,format=yuv420p$/);
-    assert.equal(videoFilter(portrait, 720, { tonemap: false }), "scale=720:-2:flags=lanczos,format=yuv420p");
-    const small = { width: 641, height: 359, durationMs: 0, hdr: false };
-    assert.equal(videoFilter(small, 720, { tonemap: true }), "scale=-2:358:flags=lanczos,format=yuv420p");
+  it("encodes one H.264 MP4 that can start playing while downloading", () => {
+    const args = encodeArgs("in.mov", "out.mp4", "scale=-2:720");
+    assert.equal(args[args.indexOf("-c:v") + 1], "libx264");
+    assert.equal(args[args.indexOf("-movflags") + 1], "+faststart");
+    assert.equal(args.at(-1), "out.mp4");
   });
 
   it("names outputs next to the original", () => {
     const keys = outputKeys("albums/a1/9f3c.mov");
-    assert.equal(keys.video(720), "albums/a1/9f3c.720.mp4");
-    assert.equal(keys.video(1080), "albums/a1/9f3c.1080.mp4");
+    assert.equal(keys.video, "albums/a1/9f3c.720.mp4");
     assert.equal(keys.poster, "albums/a1/9f3c.poster.jpg");
   });
 

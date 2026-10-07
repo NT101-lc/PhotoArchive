@@ -239,7 +239,7 @@ export function Lightbox({
               {zoomed ? <IconZoomOut size={18} /> : <IconZoomIn size={18} />}
             </LbButton>
           )}
-          <LbButton onClick={download} label="Download original" className="max-sm:hidden">
+          <LbButton onClick={download} label={isVideo ? "Download video" : "Download original"} className="max-sm:hidden">
             <IconDownload size={18} />
           </LbButton>
           <LbButton onClick={copyLink} label="Copy photo link" className="max-sm:hidden">
@@ -576,7 +576,7 @@ function InfoPanel({
           rel="noopener noreferrer"
           className="flex flex-col items-center gap-1 rounded-xl border border-white/15 py-2 text-xs font-semibold hover:bg-white/10"
         >
-          <IconExternal size={16} /> Original
+          <IconExternal size={16} /> {photo.kind === "video" ? "Open file" : "Original"}
         </a>
       </div>
     </aside>
