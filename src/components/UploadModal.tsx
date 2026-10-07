@@ -45,6 +45,8 @@ type Props = {
   albums: Pick<Album, "id" | "title" | "createdById">[];
   /** Album chọn sẵn (khi mở từ trang album) */
   defaultAlbumId?: string;
+  /** Mở thẳng ở chế độ "New album" (nút tạo album, chưa cần ảnh) */
+  startNew?: boolean;
 };
 
 /**
@@ -55,6 +57,7 @@ type Props = {
 export function UploadButton({
   albums,
   defaultAlbumId,
+  startNew,
   className = "btn btn-primary",
   children,
 }: Props & { className?: string; children?: ReactNode }) {
@@ -70,7 +73,7 @@ export function UploadButton({
           </>
         )}
       </button>
-      {open && <UploadModal albums={albums} defaultAlbumId={defaultAlbumId} onClose={() => setOpen(false)} />}
+      {open && <UploadModal albums={albums} defaultAlbumId={defaultAlbumId} startNew={startNew} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -119,14 +122,14 @@ async function walkEntry(entry: FileSystemEntry): Promise<Array<{ file: File; pa
   return [];
 }
 
-function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () => void }) {
+function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { onClose: () => void }) {
   const toast = useToast();
   const router = useRouter();
   const [items, setItems] = useState<Picked[]>([]);
   const [target, setTarget] = useState<Target>(() =>
-    albums.length > 0 ? { mode: "existing", albumId: defaultAlbumId ?? albums[0].id } : newTarget(),
+    albums.length > 0 && !startNew ? { mode: "existing", albumId: defaultAlbumId ?? albums[0].id } : newTarget(),
   );
-  const [targetTouched, setTargetTouched] = useState(false);
+  const [targetTouched, setTargetTouched] = useState(!!startNew);
   const [dragging, setDragging] = useState(false);
   const [reading, setReading] = useState(false);
   const [storageReady, setStorageReady] = useState<boolean | null>(null);
@@ -280,6 +283,9 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
     .filter(Boolean)
     .join(" and ");
 
+  // Album mới được tạo rỗng (thêm ảnh sau); album có sẵn thì phải chọn ít nhất một file
+  const emptyAlbum = items.length === 0 && target.mode === "new";
+
   /** Tạo album (nếu cần) rồi giao file cho UploadManager chạy nền; modal đóng ngay. */
   async function onSave() {
     setSaving(true);
@@ -302,12 +308,14 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
         ).slug;
       }
 
-      uploads.enqueue({
-        albumSlug: slug,
-        albumTitle: title,
-        files: items.map((i) => i.file),
-        coverIndex: coverItem ? items.indexOf(coverItem) : undefined,
-      });
+      if (items.length > 0) {
+        uploads.enqueue({
+          albumSlug: slug,
+          albumTitle: title,
+          files: items.map((i) => i.file),
+          coverIndex: coverItem ? items.indexOf(coverItem) : undefined,
+        });
+      }
       onClose();
       // Album mới → mở luôn để thấy ảnh hiện dần; album có sẵn → để người dùng ở yên chỗ đang xem
       if (target.mode === "new") {
@@ -328,13 +336,15 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
       }}
       maxWidth="max-w-[720px]"
       eyebrow="Add to the archive"
-      title="Upload photos, videos or folders"
+      title={startNew ? "Start a new trip album" : "Upload photos, videos or folders"}
       footer={
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <p className="font-mono text-xs text-ink-soft sm:flex-1">
             {items.length > 0
               ? `${countLabel} · ${formatBytes(totalSize)}${folderCount ? ` · ${plural(folderCount, "folder")}` : ""}`
-              : "Nothing selected yet"}
+              : emptyAlbum
+                ? "No files yet: the album starts empty, add photos any time"
+                : "Nothing selected yet"}
             {items.length > 0 && canPickCover && (
               <span className="block">
                 Cover: {coverItem ? coverItem.path.split("/").pop() : "first photo (default)"}
@@ -344,13 +354,18 @@ function UploadModal({ albums, defaultAlbumId, onClose }: Props & { onClose: () 
           <button
             type="button"
             className="btn btn-primary h-11 px-6"
-            disabled={items.length === 0 || !targetValid || saving || storageReady !== true || !me || switching || picking}
+            disabled={(items.length === 0 && !emptyAlbum) || !targetValid || saving || storageReady !== true || !me || switching || picking}
             onClick={onSave}
           >
             {saving ? (
               <>
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-on-accent/25 border-t-on-accent" />
                 Creating album…
+              </>
+            ) : emptyAlbum ? (
+              <>
+                <IconPlus size={16} />
+                Create empty album
               </>
             ) : (
               <>

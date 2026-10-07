@@ -1,5 +1,6 @@
 "use client";
 
+import { BlankRoll } from "./BlankRoll";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { deletePhoto, retryVideo, updateAlbum } from "@/lib/api-client";
@@ -12,7 +13,7 @@ import { EmptyState } from "./EmptyState";
 import { useIdentity } from "./Identity";
 import { useToast } from "./Toast";
 import { ContactSheet } from "./ContactSheet";
-import { IconFilm, IconGrid, IconHeart, IconImage } from "./Icons";
+import { IconFilm, IconGrid, IconHeart } from "./Icons";
 import { Lightbox } from "./Lightbox";
 import { PhotoGrid } from "./PhotoGrid";
 
@@ -20,7 +21,7 @@ type View = "grid" | "days";
 const ALL = "all";
 
 type Props = {
-  album: Pick<Album, "id" | "coverPhotoId" | "createdById">;
+  album: Pick<Album, "id" | "title" | "location" | "coverPhotoId" | "createdById">;
   photos: Photo[];
   initialPhotoId?: string;
 };
@@ -139,11 +140,7 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
   }
 
   if (photos.length === 0) {
-    return (
-      <EmptyState icon={<IconImage size={26} />} title="This album is empty">
-        No photos from this trip yet. Hit “Upload photos” to add the first ones.
-      </EmptyState>
-    );
+    return <BlankRoll album={album} />;
   }
 
   return (

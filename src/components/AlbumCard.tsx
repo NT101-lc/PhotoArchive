@@ -1,27 +1,21 @@
 import Link from "next/link";
 import { formatDateRange, plural } from "@/lib/format";
 import type { Album } from "@/lib/types";
+import { CoverPrint } from "./CoverPrint";
 import { IconPin } from "./Icons";
-import { SmartImage } from "./SmartImage";
 
 type Props = { album: Album; index: number; preload?: boolean };
 
 /** Album là một tấm ảnh in nằm trên bàn soi; tên chuyến và thông tin viết bên dưới như ghi chú. */
 export function AlbumCard({ album, preload = false }: Props) {
   return (
-    <Link href={`/albums/${album.id}`} className="group flex flex-col gap-3 rounded-md focus-visible:outline-offset-4">
-      <div className="print transition-transform duration-200 group-hover:-translate-y-1">
-        <div className="relative aspect-[3/2] overflow-hidden rounded-[1px] bg-surface-2">
-          <SmartImage
-            src={album.coverUrl}
-            alt={`Cover of ${album.title}`}
-            fill
-            preload={preload}
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            className="object-cover"
-          />
-        </div>
-      </div>
+    <Link href={`/albums/${album.id}`} prefetch className="group flex flex-col gap-3 rounded-md focus-visible:outline-offset-4">
+      <CoverPrint
+        album={album}
+        preload={preload}
+        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+        className="transition-transform duration-200 group-hover:-translate-y-1"
+      />
 
       <div className="flex flex-col gap-1 px-0.5">
         <div className="flex items-baseline justify-between gap-3">

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AlbumBrowser, SORTS, type SortKey } from "@/components/AlbumBrowser";
 import { PageHero } from "@/components/PageHero";
+import { IconPlus } from "@/components/Icons";
 import { UploadButton } from "@/components/UploadModal";
 import { getAlbums } from "@/lib/data";
 
@@ -18,6 +19,7 @@ function list(v: string | string[] | undefined) {
 export default async function AlbumsPage({ searchParams }: PageProps<"/albums">) {
   const [albums, sp] = await Promise.all([getAlbums(), searchParams]);
   const totalPhotos = albums.reduce((sum, a) => sum + a.photoCount, 0);
+  const albumOptions = albums.map(({ id, title, createdById }) => ({ id, title, createdById }));
   const places = new Set(albums.map((a) => a.location)).size;
 
   const sort = first(sp.sort);
@@ -39,7 +41,15 @@ export default async function AlbumsPage({ searchParams }: PageProps<"/albums">)
           { value: totalPhotos, label: "photos" },
           { value: places, label: "places" },
         ]}
-        actions={<UploadButton albums={albums.map(({ id, title, createdById }) => ({ id, title, createdById }))} />}
+        actions={
+          <>
+            <UploadButton albums={albumOptions} startNew className="btn">
+              <IconPlus size={16} />
+              New album
+            </UploadButton>
+            <UploadButton albums={albumOptions} />
+          </>
+        }
       />
       <AlbumBrowser albums={albums} initial={initial} />
     </main>

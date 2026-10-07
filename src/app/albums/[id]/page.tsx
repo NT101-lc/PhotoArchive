@@ -4,6 +4,7 @@ import { AlbumAdminActions } from "@/components/AlbumAdminActions";
 import { AlbumDetailButton } from "@/components/AlbumDetailButton";
 import { AlbumView } from "@/components/AlbumView";
 import { IconCalendar, IconPin } from "@/components/Icons";
+import { CoverPrint } from "@/components/CoverPrint";
 import { PageHero } from "@/components/PageHero";
 import { UploadButton } from "@/components/UploadModal";
 import { getAlbum, getAlbums, getPhotos } from "@/lib/data";
@@ -51,6 +52,16 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
           { value: photos.length, label: "photos" },
           { value: contributors, label: "people" },
         ]}
+        media={
+          // Ảnh bìa in, đặt hơi lệch như vừa thả lên bàn soi
+          // Album rỗng: trên điện thoại bỏ tấm in trống, dải phim trống bên dưới đã đủ
+          <CoverPrint
+            album={album}
+            preload
+            sizes="(max-width: 768px) 100vw, 42vw"
+            className={`rotate-[1.25deg] shadow-[var(--shadow-hard-lg)] max-md:order-first ${album.coverUrl ? "" : "max-md:hidden"}`}
+          />
+        }
         actions={
           <>
             <UploadButton albums={albums.map(({ id, title, createdById }) => ({ id, title, createdById }))} defaultAlbumId={album.id} />

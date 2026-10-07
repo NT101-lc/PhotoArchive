@@ -3,6 +3,8 @@ import { DragScroll } from "@/components/DragScroll";
 import { EmptyState } from "@/components/EmptyState";
 import { IconArrowRight, IconImage, IconPin, IconUpload } from "@/components/Icons";
 import { SmartImage } from "@/components/SmartImage";
+import { BlankStrip } from "@/components/BlankRoll";
+import { CoverPrint } from "@/components/CoverPrint";
 import { UploadButton } from "@/components/UploadModal";
 import { getAlbums, getPhotos } from "@/lib/data";
 import { dayKey, formatDateRange, plural, tripDays, yearOf } from "@/lib/format";
@@ -47,38 +49,42 @@ export default async function HomePage() {
     <>
       <main>
         {/* ---------- Chuyến gần nhất ---------- */}
-        <section className="mx-auto max-w-[1280px] px-4 pt-10 pb-8 sm:px-6 sm:pt-14">
-          <p className="eyebrow">Latest trip, {formatDateRange(latest.tripDate, latest.endDate)}</p>
-          <h1
-            className="mt-2 max-w-[16ch] font-display text-[clamp(2.6rem,8vw,6.25rem)] leading-[0.9] font-extrabold tracking-[-0.04em] text-balance"
-            style={{ fontStretch: "125%" }}
-          >
-            {latest.title}
-          </h1>
-          {latest.description && (
-            <p className="mt-5 line-clamp-4 max-w-[60ch] text-lg leading-relaxed whitespace-pre-line text-ink">
-              {latest.description}
-            </p>
-          )}
-          <div className="mt-6 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <p className="max-w-[46ch] text-lg leading-relaxed text-ink-soft">
-              <span className="mr-2 inline-flex items-center gap-1 align-[-2px] font-semibold text-ink">
-                <IconPin size={18} className="text-accent" />
-                {latest.location}
-              </span>
-              {plural(latestPhotos.length, "photo")} from {people} {people === 1 ? "person" : "people"}
-              {days > 1 ? ` across ${days} days` : ""}.
-            </p>
-            <div className="flex flex-wrap gap-2.5">
-              <Link href={`/albums/${latest.id}`} className="btn btn-primary h-11 px-5">
-                Open album
-              </Link>
-              <UploadButton albums={albumOptions} className="btn h-11 px-5">
-                <IconUpload size={18} />
-                Upload photos
-              </UploadButton>
+        <section className="mx-auto grid max-w-[1280px] gap-10 px-4 pt-10 pb-10 sm:px-6 sm:pt-14 md:grid-cols-[minmax(0,1fr)_minmax(0,40%)] md:items-center lg:gap-16">
+          <div className="min-w-0">
+            <p className="eyebrow">Latest trip, {formatDateRange(latest.tripDate, latest.endDate)}</p>
+            <h1
+              className="mt-2 max-w-[16ch] font-display text-[clamp(2.6rem,6.6vw,5.75rem)] leading-[0.9] font-extrabold tracking-[-0.04em] text-balance"
+              style={{ fontStretch: "125%" }}
+            >
+              {latest.title}
+            </h1>
+            {latest.description && (
+              <p className="mt-5 line-clamp-4 max-w-[60ch] text-lg leading-relaxed whitespace-pre-line text-ink">
+                {latest.description}
+              </p>
+            )}
+            <div className="mt-6 flex flex-col gap-6">
+              <p className="max-w-[46ch] text-lg leading-relaxed text-ink-soft">
+                <span className="mr-2 inline-flex items-center gap-1 align-[-2px] font-semibold text-ink">
+                  <IconPin size={18} className="text-accent" />
+                  {latest.location}
+                </span>
+                {plural(latestPhotos.length, "photo")} from {people} {people === 1 ? "person" : "people"}
+                {days > 1 ? ` across ${days} days` : ""}.
+              </p>
+              <div className="flex flex-wrap gap-2.5">
+                <Link href={`/albums/${latest.id}`} className="btn btn-primary h-11 px-5">
+                  Open album
+                </Link>
+                <UploadButton albums={albumOptions} className="btn h-11 px-5">
+                  <IconUpload size={18} />
+                  Upload photos
+                </UploadButton>
+              </div>
             </div>
           </div>
+
+          <PrintStack album={latest} photos={latestPhotos} />
         </section>
 
         <ContactSheet album={latest} photos={latestPhotos} />
@@ -99,7 +105,7 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <Timeline albums={albums} years={years} />
+          <Timeline albums={albums} years={years} heroId={latest.id} />
         </section>
       </main>
 
@@ -129,7 +135,8 @@ export default async function HomePage() {
 function ContactSheet({ album, photos }: { album: Album; photos: Photo[] }) {
   const frames = photos.slice(0, SHEET_FRAMES);
   const more = photos.length - frames.length;
-  if (frames.length === 0) return null;
+  // Chuyến mới nhất chưa có ảnh → dải phim trống, khung đầu là nút upload
+  if (frames.length === 0) return <BlankStrip album={album} wide />;
 
   return (
     <div className="bg-film text-white">
@@ -177,6 +184,31 @@ function ContactSheet({ album, photos }: { album: Album; photos: Photo[] }) {
   );
 }
 
+/**
+ * Xấp ảnh in của chuyến mới nhất nằm trên bàn soi: ảnh bìa ở trên, hai tấm khác lệch phía sau.
+ * Rê chuột thì xấp ảnh xoè ra; bấm để mở album (ảnh bìa bay sang đầu trang album).
+ */
+function PrintStack({ album, photos }: { album: Album; photos: Photo[] }) {
+  const behind = photos.filter((p) => p.thumbUrl && p.thumbUrl !== album.coverUrl).slice(0, 2);
+  return (
+    <Link
+      href={`/albums/${album.id}`}
+      prefetch
+      className="print-stack group relative mx-auto block w-full max-w-[520px] focus-visible:outline-offset-8 md:mt-6"
+      aria-label={`Open ${album.title}`}
+    >
+      {behind.map((p, i) => (
+        <span key={p.id} className="print absolute inset-0" data-layer={i + 1} aria-hidden="true">
+          <span className="relative block aspect-[3/2] overflow-hidden rounded-[1px] bg-surface-2">
+            <SmartImage src={p.thumbUrl} alt="" fill sizes="(max-width: 768px) 90vw, 40vw" className="object-cover" />
+          </span>
+        </span>
+      ))}
+      <CoverPrint album={album} preload sizes="(max-width: 768px) 90vw, 40vw" className="relative" />
+    </Link>
+  );
+}
+
 const weekdayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: "Asia/Ho_Chi_Minh" });
 function weekday(isoDate: string) {
   return weekdayFmt.format(new Date(`${isoDate}T12:00:00+07:00`));
@@ -192,7 +224,7 @@ function tripLabel(a: Album) {
  * Dòng thời gian dạng trục ngang, mới nhất bên trái, cuộn ngang (snap theo từng chuyến).
  * Mỗi chuyến: [ngày + thứ] — chấm trên trục — [thẻ chuyến]. Mốc năm là nhãn màu mép phim đè lên trục.
  */
-function Timeline({ albums, years }: { albums: Album[]; years: string[] }) {
+function Timeline({ albums, years, heroId }: { albums: Album[]; years: string[]; heroId: string }) {
   return (
     <div className="relative -mx-4 sm:-mx-6">
       <DragScroll
@@ -229,7 +261,7 @@ function Timeline({ albums, years }: { albums: Album[]; years: string[] }) {
                       <span className="absolute -right-4 left-0 h-[2px] bg-ink/25 sm:-right-5" />
                       <span className="relative h-4 w-4 rounded-full bg-accent ring-4 ring-bg" />
                     </span>
-                    <TripCard album={a} />
+                    <TripCard album={a} morph={a.id !== heroId} />
                   </li>
                 ))}
               </ol>
@@ -241,20 +273,15 @@ function Timeline({ albums, years }: { albums: Album[]; years: string[] }) {
   );
 }
 
-function TripCard({ album }: { album: Album }) {
+function TripCard({ album, morph }: { album: Album; morph: boolean }) {
   return (
-    <Link href={`/albums/${album.id}`} className="group mt-3 block">
-      <span className="print block p-1.5">
-        <span className="relative block aspect-[3/2] overflow-hidden rounded-[1px] bg-surface-2">
-          <SmartImage
-            src={album.coverUrl}
-            alt=""
-            fill
-            sizes="256px"
-            className="object-cover transition-[filter] duration-200 group-hover:brightness-110"
-          />
-        </span>
-      </span>
+    <Link href={`/albums/${album.id}`} prefetch className="group mt-3 block">
+      <CoverPrint
+        album={album}
+        sizes="256px"
+        morph={morph}
+        className="p-1.5 transition-transform duration-200 group-hover:-translate-y-1"
+      />
       <span className="mt-2.5 block truncate font-display text-lg font-bold tracking-[-0.01em] group-hover:text-accent">
         {album.title}
       </span>

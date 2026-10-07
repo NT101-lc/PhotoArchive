@@ -7,7 +7,7 @@ import { ThemeToggle } from "./ThemeToggle";
 /** Thanh trên cùng, dính khi cuộn. */
 export function AppBar() {
   return (
-    <div className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur-md">
+    <div className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur-md" style={{ viewTransitionName: "app-bar" }}>
       <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-3 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5" aria-label="thesix — home">
           <Logo />
