@@ -168,6 +168,8 @@ người xem đổi tay được.
 Worker là `scripts/transcode-worker.ts`, chạy trên GitHub Actions (`.github/workflows/transcode.yml`):
 được gọi ngay khi có video mới, và chạy lại mỗi 3 giờ để nhặt video bị sót. Hàng đợi nằm ngay trong
 bảng `photos` (`status`: queued → processing → ready / failed, thử tối đa 3 lần).
+Mỗi lượt chạy bật tối đa 4 worker song song (theo số video đang chờ, `MAX_WORKERS` trong workflow);
+các worker cùng lấy việc từ hàng đợi bằng `FOR UPDATE SKIP LOCKED` nên không làm trùng.
 
 Cài đặt một lần:
 

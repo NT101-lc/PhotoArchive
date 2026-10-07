@@ -12,7 +12,9 @@ on:
     - cron: "17 */3 * * *"
   workflow_dispatch:
 
-# Một worker tại một thời điểm; lượt mới chờ lượt cũ xong (worker chạy tới khi hết việc)
+# Một lượt chạy tại một thời điểm; lượt mới chờ lượt cũ xong.
+# Trong một lượt có nhiều worker song song (xem job "plan"); worker nào cũng chạy tới khi hàng đợi trống,
+# nên video upload thêm trong lúc đang chạy cũng được nhặt luôn.
 concurrency:
   group: transcode
   cancel-in-progress: false
@@ -20,11 +22,57 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # Số máy chuyển mã chạy song song tối đa (repo public: GitHub cho tới 20 job cùng lúc, miễn phí)
+  MAX_WORKERS: 4
+
 jobs:
+  # Đếm video đang chờ → quyết định bật bao nhiêu worker (0 nếu không có việc / chưa cấu hình)
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      workers: ${{ steps.queue.outputs.workers }}
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+    steps:
+      - name: Check configuration and queue
+        id: queue
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$R2_BUCKET" ] || [ -z "$R2_ACCESS_KEY_ID" ]; then
+            echo "Transcoding is not configured (missing repository secrets) — skipping."
+            echo "workers=[]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # psql có sẵn trên runner: hỏi nhanh, không phải cài gì khi hàng đợi trống
+          read -r queued processing < <(psql "$DATABASE_URL" -tA -F ' ' -c \
+            "select count(*) filter (where status = 'queued'), count(*) filter (where status = 'processing') from photos where kind = 'video'")
+          echo "Queued: $queued, processing: $processing"
+          if [ "$queued" -gt 0 ]; then
+            n=$(( queued < MAX_WORKERS ? queued : MAX_WORKERS ))
+          elif [ "$processing" -gt 0 ]; then
+            n=1 # có thể là việc bị bỏ dở từ lượt trước — một worker để nhận lại
+          else
+            n=0
+          fi
+          workers=$(seq -s, 1 "$n")
+          echo "Starting $n worker(s)"
+          echo "workers=[${workers}]" >> "$GITHUB_OUTPUT"
+
   transcode:
+    needs: plan
+    if: needs.plan.outputs.workers != '[]'
+    name: Worker ${{ matrix.worker }}
     runs-on: ubuntu-latest
     timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        worker: ${{ fromJSON(needs.plan.outputs.workers) }}
     env:
+      WORKER_ID: ${{ matrix.worker }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
@@ -32,31 +80,13 @@ jobs:
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
     steps:
-      - name: Check configuration and queue
-        id: secrets
-        run: |
-          if [ -z "$DATABASE_URL" ] || [ -z "$R2_BUCKET" ] || [ -z "$R2_ACCESS_KEY_ID" ]; then
-            echo "Transcoding is not configured (missing repository secrets) — skipping."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # Hỏi nhanh bằng psql (có sẵn trên runner) để lượt chạy định kỳ không phải cài gì khi hàng đợi trống
-          pending=$(psql "$DATABASE_URL" -tAc "select count(*) from photos where kind = 'video' and status in ('queued', 'processing')")
-          echo "Videos waiting: $pending"
-          if [ "$pending" = "0" ]; then echo "ready=false" >> "$GITHUB_OUTPUT"; else echo "ready=true" >> "$GITHUB_OUTPUT"; fi
-
       - uses: actions/checkout@v7
-        if: steps.secrets.outputs.ready == 'true'
       - uses: actions/setup-node@v7
-        if: steps.secrets.outputs.ready == 'true'
         with:
           node-version-file: .nvmrc
           cache: npm
       - name: Install ffmpeg
-        if: steps.secrets.outputs.ready == 'true'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg && ffmpeg -version | head -1
       - run: npm ci
-        if: steps.secrets.outputs.ready == 'true'
       - name: Transcode queued videos
-        if: steps.secrets.outputs.ready == 'true'
         run: npx tsx scripts/transcode-worker.ts

@@ -36,6 +36,8 @@ const STALE_LOCK = "3 hours";
 /** GitHub Actions cắt job ở 6 giờ; dừng nhận việc mới sau 5 giờ. */
 const STOP_AFTER_MS = 5 * 60 * 60 * 1000;
 const SINGLE_PUT_MAX = 256 * 1024 * 1024;
+/** Số hiệu worker khi chạy song song trong GitHub Actions (matrix), chỉ để đọc log */
+const TAG = process.env.WORKER_ID ? `[worker ${process.env.WORKER_ID}] ` : "";
 const PART_SIZE = 64 * 1024 * 1024;
 
 function env(name: string) {
@@ -186,13 +188,13 @@ async function processJob(job: Job) {
     await download(job.storage_key, input);
     const src = sourceInfo(await probe(input));
     const tonemap = src.hdr && (await canTonemap());
-    if (src.hdr && !tonemap) console.warn("  HDR source but ffmpeg has no zscale — colors may look washed out");
+    if (src.hdr && !tonemap) console.warn(`${TAG}  HDR source but ffmpeg has no zscale — colors may look washed out`);
 
     const renditions = plannedRenditions(src);
     const outputs: Partial<Record<Rendition, string>> = {};
     for (const r of renditions) {
       const out = join(dir, `${r}.mp4`);
-      console.log(`  encoding ${r}p…`);
+      console.log(`${TAG}  encoding ${r}p…`);
       await run("ffmpeg", encodeArgs(input, out, videoFilter(src, r, { tonemap }), r));
       outputs[r] = out;
     }
@@ -235,23 +237,23 @@ async function main() {
   while (Date.now() - started < STOP_AFTER_MS) {
     const job = await claim();
     if (!job) break;
-    console.log(`Video ${job.id} (attempt ${job.attempts}/${MAX_TRANSCODE_ATTEMPTS})`);
+    console.log(`${TAG}Video ${job.id} (attempt ${job.attempts}/${MAX_TRANSCODE_ATTEMPTS})`);
     const t = Date.now();
     try {
       await processJob(job);
       processed++;
-      console.log(`  done in ${Math.round((Date.now() - t) / 1000)}s`);
+      console.log(`${TAG}  done in ${Math.round((Date.now() - t) / 1000)}s`);
     } catch (err) {
       failed++;
       const message = (err instanceof Error ? err.message : String(err)).slice(0, 500);
-      console.error(`  failed: ${message}`);
+      console.error(`${TAG}  failed: ${message}`);
       await sql`
         update photos set locked_at = null, processing_error = ${message}, updated_at = now(),
           status = case when attempts >= ${MAX_TRANSCODE_ATTEMPTS} then 'failed' else 'queued' end
         where id = ${job.id}`;
     }
   }
-  console.log(`Finished: ${processed} processed, ${failed} failed.`);
+  console.log(`${TAG}Finished: ${processed} processed, ${failed} failed.`);
 }
 
 main().catch((err) => {
