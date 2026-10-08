@@ -98,8 +98,8 @@ export const photos = pgTable(
     takenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 
     // ---- Video ----
-    // `storageKey` luôn là file gốc. Video được worker (scripts/transcode-worker.ts) chuyển mã
-    // thành MP4 H.264 720p / 1080p + ảnh poster; trong lúc đó `status` khác "ready".
+    // Video được worker (scripts/transcode-worker.ts) chuyển mã thành một MP4 H.264 + ảnh poster; trong lúc đó
+    // `status` khác "ready". Xong thì `storageKey` trỏ sang bản nén và file gốc bị xoá khỏi R2.
     kind: text({ enum: MEDIA_KINDS }).notNull().default("photo"),
     status: text({ enum: MEDIA_STATUSES }).notNull().default("ready"),
     durationMs: integer(),
@@ -110,6 +110,16 @@ export const photos = pgTable(
     attempts: smallint().notNull().default(0),
     lockedAt: timestamp({ withTimezone: true }),
     processingError: text(),
+
+    // ---- Backup Google Drive — CHƯA DÙNG ----
+    // Cột đã có trên DB (migration 0010) cho tính năng backup đang làm dở ở nhánh feature/drive-backup.
+    // App chỉ thêm file lên Drive, không bao giờ sửa / xoá trên Drive.
+    driveFileId: text(),
+    backedUpAt: timestamp({ withTimezone: true }),
+    backupAttempts: smallint().notNull().default(0),
+    backupError: text(),
+    // Video: file gốc còn giữ trên R2 vì chuyển mã xong mà chưa backup được; xoá sau khi backup xong
+    originalKey: text(),
     ...timestamps,
   },
   (t) => [

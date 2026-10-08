@@ -25,6 +25,7 @@ There is no Prettier config: don't run Prettier (it would rewrap files to 80 col
 - **There is only one database, and it's production.** Ask before `npm run db:migrate`, and before any write or delete of real data. Test rows you create, clean them up afterwards.
 - The hook also blocks any Bash command containing words like `truncate` or `drop`, including Tailwind's `truncate` class in a heredoc. Write such files with the Write tool.
 - Don't run `npm run build` while `npm run dev` is running. Both write `.next/dev/types/routes.d.ts`, the file gets corrupted, and nested API routes (e.g. `/api/photos/[id]/*`) then 404 in dev. Fix: stop the dev server, run the build, start dev again.
+- After adding columns to `schema.ts` (and migrating), **restart `npm run dev`**. The `db` instance lives on `globalThis` across HMR, and Drizzle caches each table's column names the first time it's used. New columns then come out as `undefined`, which shows up as `Cannot read properties of undefined (reading 'replace')` in Drizzle's `escapeName`.
 - Windows + `core.autocrlf`: files may be CRLF. If an exact-string edit fails, normalise `\r\n` first.
 - The user writes in Vietnamese; reply in Vietnamese, concisely. **UI copy is English.** Code comments are Vietnamese (match the file).
 - Before writing Next.js code, check `node_modules/next/dist/docs/` (see AGENTS.md). Next 16 specifics in use: `after()`, `connection()`, typed `PageProps<"/route">` / `RouteContext<"/api/route">`, `<Link prefetch>`, React `<ViewTransition>`, `next/image` `preload` prop.
@@ -57,7 +58,8 @@ No passwords for the crew. A user (role 1) picks their name, which sets a cookie
 
 - **Uploads.** The browser uploads straight to R2 with presigned URLs; videos use S3 multipart. `UploadManager` keeps uploads running in the background while you browse, and `UploadDock` shows their progress.
 - **Video rows.** A video is inserted as `status='queued'`, and the app sends a `repository_dispatch` to GitHub (env `GITHUB_DISPATCH_TOKEN`, `GITHUB_REPOSITORY`). A cron job every 3 h is the fallback.
-- **The worker.** The GitHub Actions worker runs a matrix of up to 4 runners. Each claims jobs with `FOR UPDATE SKIP LOCKED` and makes a single 720p H.264 MP4 plus a poster (HDR is tone-mapped). It points `storage_key` at the 720p file and **deletes the original**. Max 3 attempts; a lock older than 3 h counts as stale.
+- **The worker.** The GitHub Actions worker runs a matrix of up to 4 runners. Each claims jobs with `FOR UPDATE SKIP LOCKED` and makes a single H.264 MP4 plus a poster (HDR is tone-mapped). Encoding is tuned for storage (`ENCODE` / `TIERS` in `transcode-plan.ts`: preset slow, CRF 26, ≤30 fps; ≤5 min → 720p capped at 2.5 Mbps, longer → 540p capped at 1.5 Mbps, file named `.540.mp4` but still stored in `video720_key`). Keep H.264 since it's the only copy. It points `storage_key` at the compressed file and **deletes the original**. Max 3 attempts; a lock older than 3 h counts as stale.
+- **Google Drive backup (not built yet).** It is half-done on branch `feature/drive-backup`. Its columns (`drive_file_id`, `backed_up_at`, `backup_attempts`, `backup_error`, `original_key`) already exist in the DB through migration 0010 but are unused on main. Rule from the user: Drive is append-only, so never edit or delete Drive files.
 - **Deletes.** Deleting an album or photo also deletes its R2 objects (`deleteObjects`). A failed delete is only logged.
 
 ## Design system ("light table / darkroom")

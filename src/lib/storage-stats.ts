@@ -6,7 +6,7 @@ export const R2_FREE_BYTES = 10 * 1000 ** 3;
 export const STORAGE_CATEGORIES = {
   photos: "Photos",
   videoOriginals: "Original videos",
-  videoCopies: "Video copies (720p / 1080p)",
+  videoCopies: "Compressed videos",
   posters: "Video posters",
   avatars: "Profile pictures",
 } as const;
@@ -17,7 +17,7 @@ const VIDEO_EXT = /\.(mp4|mov|webm|m4v|mkv|3gp)$/i;
 /** Loại file theo key trên R2 (xem cách đặt tên trong lib/transcode-plan.ts và lib/mutations.ts). */
 export function categorizeKey(key: string): StorageCategory {
   if (key.startsWith("avatars/")) return "avatars";
-  if (/\.(720|1080)\.mp4$/.test(key)) return "videoCopies";
+  if (/\.(540|720|1080)\.mp4$/.test(key)) return "videoCopies";
   if (/\.poster\.jpg$/.test(key)) return "posters";
   if (VIDEO_EXT.test(key)) return "videoOriginals";
   return "photos";

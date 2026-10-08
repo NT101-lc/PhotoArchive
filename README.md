@@ -161,10 +161,24 @@ Lỗi trả về `{ error }` với mã 400 (input sai), 401 (chưa chọn tên /
 ## Video
 
 Video upload thẳng lên R2 theo từng phần (multipart, không giới hạn dung lượng; ảnh vẫn tối đa 50 MB).
-Worker chuyển mã ra **một** MP4 H.264 720p (theo cạnh ngắn) + ảnh poster, tone-map HDR (video iPhone)
-về SDR, rồi **xoá file gốc**: bản 720p thay luôn file gốc (`storage_key` trỏ sang nó, dùng để xem và tải về).
-File gốc chỉ bị xoá sau khi bản 720p đã lên R2 và DB đã cập nhật; chuyển mã lỗi thì file gốc vẫn còn để thử lại.
+Worker chuyển mã ra **một** MP4 H.264 (720p theo cạnh ngắn, video dài hơn 5 phút 540p) + ảnh poster, tone-map HDR (video iPhone)
+về SDR, rồi **xoá file gốc**: bản nén thay luôn file gốc (`storage_key` trỏ sang nó, dùng để xem và tải về).
+File gốc chỉ bị xoá sau khi bản nén đã lên R2 và DB đã cập nhật; chuyển mã lỗi thì file gốc vẫn còn để thử lại.
 Video cũ (trước thay đổi này) có thể còn bản 1080p; khi đó Lightbox vẫn cho đổi 720p / 1080p.
+
+Cấu hình mã hoá ưu tiên dung lượng (`ENCODE` / `TIERS` trong `src/lib/transcode-plan.ts`): x264 preset `slow`, CRF 26,
+tối đa 30 fps, AAC 96 kbps, kèm trần bitrate theo độ dài video — nên dung lượng sau nén chỉ phụ thuộc độ dài,
+không phụ thuộc file gốc nặng bao nhiêu:
+
+| Độ dài | Độ phân giải | Trần bitrate | Tối đa |
+|---|---|---|---|
+| ≤ 5 phút | 720p | 2,5 Mbps | ~19 MB/phút (≤ ~97 MB) |
+| > 5 phút | 540p | 1,5 Mbps | ~12 MB/phút (20 phút ≤ ~240 MB) |
+
+Ví dụ file gốc 3,5 GB quay 4K 30 fps (~20 phút) còn ≤ ~240 MB. Đo trên một clip điện thoại quay trong nhà (nhiều nhiễu):
+cấu hình cũ (`veryfast`, CRF 23, không trần) ra ~6 Mbps ≈ 45 MB/phút; mức 720p mới ~2,5 Mbps (giảm ~60%, VMAF ~92).
+Cùng 1,5 Mbps thì 540p đẹp hơn 720p (VMAF 81,5 so với 78,5), nên video dài hạ độ phân giải thay vì chỉ bóp bitrate. Vẫn dùng H.264 vì chỉ lưu một bản, phải phát được trên mọi trình duyệt (HEVC / AV1 nhỏ hơn nhưng
+iPhone đời cũ / Firefox không phát được). Mã hoá chậm hơn ~3 lần nhưng chạy trên GitHub Actions nên không tốn tiền.
 
 Worker là `scripts/transcode-worker.ts`, chạy trên GitHub Actions (`.github/workflows/transcode.yml`):
 được gọi ngay khi có video mới, và chạy lại mỗi 3 giờ để nhặt video bị sót. Hàng đợi nằm ngay trong

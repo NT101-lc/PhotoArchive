@@ -2,8 +2,8 @@
 // Chạy trong GitHub Actions (.github/workflows/transcode.yml), cũng chạy được trên máy có ffmpeg.
 //
 // Mỗi vòng: nhận một video đang chờ trong bảng photos (FOR UPDATE SKIP LOCKED nên nhiều worker
-// chạy cùng lúc không đụng nhau) → tải file gốc từ R2 → ffmpeg ra một MP4 720p + poster
-// → đẩy lên R2 → đánh dấu "ready" và trỏ storage_key sang bản 720p → xoá file gốc. Lỗi thì trả về hàng đợi, quá MAX_TRANSCODE_ATTEMPTS lần thì "failed".
+// chạy cùng lúc không đụng nhau) → tải file gốc từ R2 → ffmpeg ra một MP4 (720p, video dài 540p) + poster
+// → đẩy lên R2 → đánh dấu "ready" và trỏ storage_key sang bản nén → xoá file gốc. Lỗi thì trả về hàng đợi, quá MAX_TRANSCODE_ATTEMPTS lần thì "failed".
 // Chạy tới khi hết việc (hoặc gần hết giờ của job).
 
 import { loadEnvConfig } from "@next/env";
@@ -18,7 +18,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { MAX_TRANSCODE_ATTEMPTS } from "../src/db/schema";
-import { encodeArgs, outputKeys, posterArgs, sourceInfo, videoFilter, type Probe } from "../src/lib/transcode-plan";
+import { encodeArgs, outputKeys, pickTier, posterArgs, sourceInfo, videoFilter, type Probe } from "../src/lib/transcode-plan";
 
 loadEnvConfig(process.cwd());
 
@@ -172,7 +172,6 @@ async function claim(): Promise<Job | null> {
 
 async function processJob(job: Job) {
   const dir = await mkdtemp(join(tmpdir(), "transcode-"));
-  const keys = outputKeys(job.storage_key);
   const uploaded: string[] = [];
   try {
     const input = join(dir, "original");
@@ -181,9 +180,12 @@ async function processJob(job: Job) {
     const tonemap = src.hdr && (await canTonemap());
     if (src.hdr && !tonemap) console.warn(`${TAG}  HDR source but ffmpeg has no zscale — colors may look washed out`);
 
-    const video = join(dir, "720.mp4");
-    console.log(`${TAG}  encoding 720p…`);
-    await run("ffmpeg", encodeArgs(input, video, videoFilter(src, { tonemap })));
+    // Mức nén theo độ dài video: clip ngắn 720p, video dài 540p + trần bitrate thấp hơn
+    const tier = pickTier(src.durationMs);
+    const keys = outputKeys(job.storage_key, tier);
+    const video = join(dir, "out.mp4");
+    console.log(`${TAG}  encoding ${tier.shortSide}p (≤ ${tier.maxrateKbps} kbps, ${Math.round(src.durationMs / 1000)}s, ${src.fps} fps)…`);
+    await run("ffmpeg", encodeArgs(input, video, videoFilter(src, { tonemap }), tier));
 
     // Poster + kích thước hiển thị lấy từ bản vừa mã hoá (đã SDR, đã xoay đúng chiều)
     const poster = join(dir, "poster.jpg");
@@ -196,7 +198,7 @@ async function processJob(job: Job) {
     await upload(keys.poster, poster, "image/jpeg");
     uploaded.push(keys.poster);
 
-    // Bản 720p thay luôn file gốc: storage_key trỏ sang nó (dùng cả để xem lẫn để tải về)
+    // Bản nén thay luôn file gốc: storage_key trỏ sang nó (dùng cả để xem lẫn để tải về)
     const done = await sql`
       update photos set status = 'ready', locked_at = null, processing_error = null, updated_at = now(),
         width = ${out.width}, height = ${out.height}, duration_ms = ${out.durationMs || src.durationMs},

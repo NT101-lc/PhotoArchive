@@ -8,6 +8,7 @@ describe("storage stats", () => {
   it("sorts R2 keys into categories", () => {
     assert.equal(categorizeKey("avatars/m1/a.jpg"), "avatars");
     assert.equal(categorizeKey("albums/a/9f.720.mp4"), "videoCopies");
+    assert.equal(categorizeKey("albums/a/9f.540.mp4"), "videoCopies");
     assert.equal(categorizeKey("albums/a/9f.1080.mp4"), "videoCopies");
     assert.equal(categorizeKey("albums/a/9f.poster.jpg"), "posters");
     assert.equal(categorizeKey("albums/a/9f.mov"), "videoOriginals");
