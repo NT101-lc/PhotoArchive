@@ -64,6 +64,13 @@
       "when": 1791363981260,
       "tag": "0008_trip_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791426473958,
+      "tag": "0009_photo_social",
+      "breakpoints": true
     }
   ]
 }

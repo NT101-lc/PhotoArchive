@@ -3,6 +3,7 @@
 import { formatDayHeading, plural } from "@/lib/format";
 import type { Photo } from "@/lib/types";
 import { IconPlay, IconReset } from "./Icons";
+import { SocialBadge } from "./PhotoSocial";
 import { SmartImage } from "./SmartImage";
 
 /** Một dải phim trên tờ contact sheet 35mm có 6 khung. */
@@ -14,6 +15,7 @@ type Props = {
   /** Số khung của mỗi ảnh trong cả cuộn (album), bắt đầu từ 1 — giữ nguyên khi lọc */
   frameNo: (id: string) => number;
   onOpen: (photo: Photo) => void;
+  onOpenComments?: (photo: Photo) => void;
   onRetry?: (photo: Photo) => void;
 };
 
@@ -21,7 +23,7 @@ type Props = {
  * Chế độ xem "Contact sheet": mỗi ngày là một chồng dải phim 6 khung, số khung màu hổ phách ở mép
  * như chữ in trên phim. Khung cắt 3:2 như phim 35mm; bấm vào để xem cả ảnh.
  */
-export function ContactSheet({ days, frameNo, onOpen, onRetry }: Props) {
+export function ContactSheet({ days, frameNo, onOpen, onOpenComments, onRetry }: Props) {
   return (
     <div className="flex flex-col gap-10">
       {days.map(([key, list], i) => (
@@ -33,7 +35,7 @@ export function ContactSheet({ days, frameNo, onOpen, onRetry }: Props) {
           </h3>
           <div className="flex flex-col gap-2">
             {chunk(list, FRAMES_PER_STRIP).map((strip) => (
-              <Strip key={strip[0].id} frames={strip} frameNo={frameNo} onOpen={onOpen} onRetry={onRetry} />
+              <Strip key={strip[0].id} frames={strip} frameNo={frameNo} onOpen={onOpen} onOpenComments={onOpenComments} onRetry={onRetry} />
             ))}
           </div>
         </section>
@@ -46,11 +48,13 @@ function Strip({
   frames,
   frameNo,
   onOpen,
+  onOpenComments,
   onRetry,
 }: {
   frames: Photo[];
   frameNo: (id: string) => number;
   onOpen: (photo: Photo) => void;
+  onOpenComments?: (photo: Photo) => void;
   onRetry?: (photo: Photo) => void;
 }) {
   return (
@@ -61,7 +65,7 @@ function Strip({
         style={{ gridTemplateColumns: `repeat(${FRAMES_PER_STRIP}, minmax(0, 1fr))` }}
       >
         {frames.map((p) => (
-          <Frame key={p.id} photo={p} n={frameNo(p.id)} onOpen={onOpen} onRetry={onRetry} />
+          <Frame key={p.id} photo={p} n={frameNo(p.id)} onOpen={onOpen} onOpenComments={onOpenComments} onRetry={onRetry} />
         ))}
       </ol>
       <div className="sprockets h-3" aria-hidden="true" />
@@ -73,11 +77,13 @@ function Frame({
   photo,
   n,
   onOpen,
+  onOpenComments,
   onRetry,
 }: {
   photo: Photo;
   n: number;
   onOpen: (photo: Photo) => void;
+  onOpenComments?: (photo: Photo) => void;
   onRetry?: (photo: Photo) => void;
 }) {
   const video = photo.kind === "video";
@@ -121,6 +127,12 @@ function Frame({
           </span>
         )}
       </button>
+      <SocialBadge
+        commentCount={photo.commentCount}
+        reactionCount={photo.reactionCount}
+        onClick={() => (onOpenComments ?? onOpen)(photo)}
+        className="absolute top-[1.6rem] right-1.5"
+      />
       {failed && onRetry && (
         <button
           type="button"

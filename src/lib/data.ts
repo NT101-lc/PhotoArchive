@@ -3,6 +3,7 @@ import { and, asc, desc, eq, getTableColumns, inArray, isNotNull, or } from "dri
 import { connection } from "next/server";
 import { cache } from "react";
 import { albums, db, members, photos, ROLE_USER, type AlbumRow, type PhotoRow } from "@/db";
+import { getSocialCounts } from "./social";
 import { resolveObjectUrl, resolvePhotoUrl } from "./storage";
 import type { Album, Member, Photo } from "./types";
 
@@ -98,6 +99,7 @@ export const getPhotos = cache(async (slug: string): Promise<Photo[]> => {
     .leftJoin(members, eq(members.id, photos.uploadedById))
     .where(eq(albums.slug, slug))
     .orderBy(asc(photos.takenAt), asc(photos.createdAt));
+  const social = await getSocialCounts(rows.map((r) => r.photo.id));
 
   return Promise.all(
     rows.map(async ({ photo, uploader }) => {
@@ -125,6 +127,8 @@ export const getPhotos = cache(async (slug: string): Promise<Photo[]> => {
         durationMs: photo.durationMs,
         sources: v720 || v1080 ? { ...(v720 && { "720": v720 }), ...(v1080 && { "1080": v1080 }) } : null,
         processingError: photo.processingError,
+        commentCount: social.get(photo.id)?.comments ?? 0,
+        reactionCount: social.get(photo.id)?.reactions ?? 0,
       };
     }),
   );

@@ -37,6 +37,9 @@ export type Photo = {
   sources: VideoSources | null;
   /** Video: lỗi chuyển mã gần nhất */
   processingError: string | null;
+  /** Số bình luận / số người thả cảm xúc (cho ô ảnh); chi tiết lấy riêng khi mở lightbox */
+  commentCount: number;
+  reactionCount: number;
 };
 
 export type VideoSources = { "720"?: string; "1080"?: string };

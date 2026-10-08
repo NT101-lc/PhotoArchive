@@ -5,7 +5,10 @@ type SeedAlbum = Omit<Album, "coverPhotoId" | "createdById" | "endDate" | "descr
   endDate?: string | null;
   description?: string | null;
 };
-type SeedPhoto = Omit<Photo, "uploadedById" | "kind" | "status" | "durationMs" | "sources" | "processingError">;
+type SeedPhoto = Omit<
+  Photo,
+  "uploadedById" | "kind" | "status" | "durationMs" | "sources" | "processingError" | "commentCount" | "reactionCount"
+>;
 
 // Dữ liệu mẫu để seed DB (npm run db:seed).
 // Mọi giá trị đều tất định (không dùng Math.random) để server/client render giống nhau.

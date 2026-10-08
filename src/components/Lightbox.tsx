@@ -4,11 +4,13 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode, type TouchEvent } from "react";
 import { formatDateTime, formatDuration, pad2 } from "@/lib/format";
 import type { Photo } from "@/lib/types";
+import { canComment } from "@/lib/permissions";
 import { useVideoQuality, type Quality } from "@/lib/video-quality";
 import {
   IconChevronLeft,
   IconChevronRight,
   IconClose,
+  IconComment,
   IconDownload,
   IconExternal,
   IconHeart,
@@ -21,7 +23,9 @@ import {
   IconZoomIn,
   IconZoomOut,
 } from "./Icons";
+import { useIdentity } from "./Identity";
 import { useBodyScrollLock } from "./Modal";
+import { CommentsPanel, ReactionBar, usePhotoSocial, type SocialCounts } from "./PhotoSocial";
 import { useToast } from "./Toast";
 
 type Props = {
@@ -37,6 +41,10 @@ type Props = {
   remove?: { canDelete: (photo: Photo) => boolean; onDelete: (photo: Photo) => void };
   /** Tắt phím tắt khi có hộp thoại khác mở phía trên (vd xác nhận xoá) */
   paused?: boolean;
+  /** Mở sẵn bảng bình luận (bấm từ huy hiệu bình luận trên ô ảnh) */
+  startWithComments?: boolean;
+  /** Báo số bình luận / cảm xúc mới để ô ảnh ngoài lưới cập nhật theo */
+  onSocialChange?: (photoId: string, counts: SocialCounts) => void;
 };
 
 const SWIPE_MIN_PX = 50;
@@ -58,9 +66,16 @@ export function Lightbox({
   cover,
   remove,
   paused = false,
+  startWithComments = false,
+  onSocialChange,
 }: Props) {
   const toast = useToast();
-  const [showInfo, setShowInfo] = useState(false);
+  const me = useIdentity();
+  // Bảng bên phải: chi tiết ảnh hoặc bình luận (một lúc chỉ mở một)
+  const [panel, setPanel] = useState<"info" | "comments" | null>(startWithComments ? "comments" : null);
+  const showInfo = panel === "info";
+  const showComments = panel === "comments";
+  const togglePanel = useCallback((p: "info" | "comments") => setPanel((cur) => (cur === p ? null : p)), []);
   const [playing, setPlaying] = useState(false);
   const [zoomed, setZoomed] = useState(false);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
@@ -73,6 +88,8 @@ export function Lightbox({
   const isVideo = photo?.kind === "video";
   const playable = isVideo && photo.status === "ready" && !!photo.sources;
   const quality = useVideoQuality();
+  const social = usePhotoSocial(photo?.id ?? "", onSocialChange);
+  const commentCount = social.social?.comments.length ?? photo?.commentCount ?? 0;
 
   useBodyScrollLock(true);
 
@@ -94,6 +111,9 @@ export function Lightbox({
   useEffect(() => {
     if (paused) return;
     const onKey = (e: KeyboardEvent) => {
+      // Đang gõ bình luận: phím là chữ, không phải phím tắt
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable)) return;
       if (e.key === "Escape") {
         if (zoomed) setZoomed(false);
         else onClose();
@@ -106,13 +126,14 @@ export function Lightbox({
           if (v.paused) void v.play();
           else v.pause();
         } else setPlaying((p) => !p);
-      } else if (e.key === "i" || e.key === "I") setShowInfo((v) => !v);
+      } else if (e.key === "i" || e.key === "I") togglePanel("info");
+      else if (e.key === "c" || e.key === "C") togglePanel("comments");
       else if ((e.key === "z" || e.key === "Z") && !isVideo) setZoomed((v) => !v);
       else if ((e.key === "f" || e.key === "F") && photo) onToggleFavorite(photo.id);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, onClose, zoomed, photo, onToggleFavorite, paused, isVideo]);
+  }, [go, onClose, zoomed, photo, onToggleFavorite, paused, isVideo, togglePanel]);
 
   // Tải trước ảnh kế bên để chuyển ảnh mượt hơn
   useEffect(() => {
@@ -259,7 +280,17 @@ export function Lightbox({
               <IconTrash size={18} />
             </LbButton>
           )}
-          <LbButton onClick={() => setShowInfo((v) => !v)} label="Info (I)" active={showInfo}>
+          <LbButton onClick={() => togglePanel("comments")} label="Comments (C)" active={showComments}>
+            <span className="relative">
+              <IconComment size={18} />
+              {commentCount > 0 && (
+                <span className="absolute -top-2 -right-2.5 min-w-4 rounded-full bg-[#6cc79c] px-1 text-[0.6rem] leading-4 font-bold text-[#0b1a14] tabular-nums">
+                  {commentCount}
+                </span>
+              )}
+            </span>
+          </LbButton>
+          <LbButton onClick={() => togglePanel("info")} label="Info (I)" active={showInfo}>
             <IconInfo size={18} />
           </LbButton>
           <span className="mx-0.5 h-6 w-px bg-white/15" aria-hidden="true" />
@@ -301,17 +332,28 @@ export function Lightbox({
           </>
         )}
 
-        {showInfo && <InfoPanel photo={photo} onClose={() => setShowInfo(false)} onDownload={download} onCopyLink={copyLink} />}
+        {showInfo && <InfoPanel photo={photo} onClose={() => setPanel(null)} onDownload={download} onCopyLink={copyLink} />}
+        {showComments && (
+          <CommentsPanel
+            key={`comments-${photo.id}`}
+            social={social.social}
+            canComment={canComment(me)}
+            onSend={social.comment}
+            onDelete={social.remove}
+            onClose={() => setPanel(null)}
+          />
+        )}
       </div>
 
       {/* Dải phim */}
       <div className="shrink-0 border-t border-white/10 bg-black/40">
-        <div className="flex items-center justify-between gap-3 px-3 pt-2 font-mono text-[0.7rem] sm:px-5">
-          <span className="truncate">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 pt-2 sm:px-5">
+          <span className="min-w-0 truncate font-mono text-[0.7rem]">
             <span className="text-[#6cc79c]">{photo.uploadedBy}</span>
             <span className="opacity-60"> · {formatDateTime(photo.takenAt)}</span>
           </span>
-          <span className="hidden opacity-40 md:inline">← → navigate · Space slideshow · Z zoom · F favorite · Esc close</span>
+          <ReactionBar social={social.social} canReact={canComment(me)} onReact={social.react} />
+          <span className="hidden font-mono text-[0.7rem] opacity-40 xl:inline">← → navigate · Space slideshow · F favorite · C comments · Esc close</span>
         </div>
         <div ref={stripRef} className="scrollbar-none flex gap-1.5 overflow-x-auto px-3 py-2.5 sm:px-5">
           {photos.map((p, i) => (

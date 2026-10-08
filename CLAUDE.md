@@ -24,6 +24,7 @@ There is no Prettier config: don't run Prettier (it would rewrap files to 80 col
 - **Never read or write `.env*` files** (also blocked). Scripts get env via `loadEnvConfig` from `@next/env`.
 - **There is only one database, and it's production.** Ask before `npm run db:migrate`, and before any write or delete of real data. Test rows you create, clean them up afterwards.
 - The hook also blocks any Bash command containing words like `truncate` or `drop`, including Tailwind's `truncate` class in a heredoc. Write such files with the Write tool.
+- Don't run `npm run build` while `npm run dev` is running. Both write `.next/dev/types/routes.d.ts`, the file gets corrupted, and nested API routes (e.g. `/api/photos/[id]/*`) then 404 in dev. Fix: stop the dev server, run the build, start dev again.
 - Windows + `core.autocrlf`: files may be CRLF. If an exact-string edit fails, normalise `\r\n` first.
 - The user writes in Vietnamese; reply in Vietnamese, concisely. **UI copy is English.** Code comments are Vietnamese (match the file).
 - Before writing Next.js code, check `node_modules/next/dist/docs/` (see AGENTS.md). Next 16 specifics in use: `after()`, `connection()`, typed `PageProps<"/route">` / `RouteContext<"/api/route">`, `<Link prefetch>`, React `<ViewTransition>`, `next/image` `preload` prop.

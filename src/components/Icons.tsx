@@ -2,6 +2,7 @@ import type { SVGProps } from "react";
 import type { IconType } from "react-icons";
 import {
   MdAdd,
+  MdChatBubbleOutline,
   MdArrowBack,
   MdArrowForward,
   MdCheck,
@@ -96,6 +97,7 @@ export const IconFilm = material(MdOutlineTheaters);
 export const IconStats = material(MdOutlineInsights);
 export const IconPlus = material(MdAdd);
 export const IconCheck = material(MdCheck);
+export const IconComment = material(MdChatBubbleOutline);
 
 export const IconGoogle = ({ size = 20, ...props }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" {...props}>

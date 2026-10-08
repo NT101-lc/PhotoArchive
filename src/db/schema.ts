@@ -6,6 +6,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -13,6 +14,7 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { REACTIONS } from "../lib/photo-social";
 
 // Tên cột viết camelCase ở đây, drizzle tự đổi sang snake_case trong DB (casing: "snake_case").
 
@@ -159,6 +161,40 @@ export const plans = pgTable(
   (t) => [
     index("plans_start_date_idx").on(t.startDate),
     check("plans_end_after_start", sql`${t.endDate} >= ${t.startDate}`),
+  ],
+);
+
+/** Bình luận dưới một ảnh / video. Xoá ảnh → xoá luôn bình luận. */
+export const photoComments = pgTable(
+  "photo_comments",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    photoId: uuid()
+      .notNull()
+      .references(() => photos.id, { onDelete: "cascade" }),
+    authorId: uuid().references(() => members.id, { onDelete: "set null" }),
+    body: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("photo_comments_photo_idx").on(t.photoId, t.createdAt), index("photo_comments_created_idx").on(t.createdAt)],
+);
+
+/** Cảm xúc thả vào ảnh: mỗi người một cái cho mỗi ảnh, chọn cái khác thì đổi. */
+export const photoReactions = pgTable(
+  "photo_reactions",
+  {
+    photoId: uuid()
+      .notNull()
+      .references(() => photos.id, { onDelete: "cascade" }),
+    memberId: uuid()
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    emoji: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.photoId, t.memberId] }),
+    check("photo_reactions_emoji_valid", sql.raw(`emoji in (${REACTIONS.map((r) => `'${r}'`).join(", ")})`)),
   ],
 );
 

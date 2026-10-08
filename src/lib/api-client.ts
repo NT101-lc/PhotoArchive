@@ -105,3 +105,21 @@ export function patchPlan<T>(slug: string, op: Record<string, unknown>) {
 export function deletePlan(slug: string) {
   return api<{ ok: true }>(`/api/plans/${encodeURIComponent(slug)}`, { method: "DELETE" });
 }
+
+// ---------- Bình luận & cảm xúc ----------
+
+export function getPhotoSocial<T>(photoId: string) {
+  return api<T>(`/api/photos/${encodeURIComponent(photoId)}/social`, { cache: "no-store" });
+}
+
+export function addPhotoComment<T>(photoId: string, body: string) {
+  return api<T>(`/api/photos/${encodeURIComponent(photoId)}/comments`, { method: "POST", body: JSON.stringify({ body }) });
+}
+
+export function deletePhotoComment<T>(commentId: string) {
+  return api<T>(`/api/comments/${encodeURIComponent(commentId)}`, { method: "DELETE" });
+}
+
+export function setPhotoReaction<T>(photoId: string, emoji: string | null) {
+  return api<T>(`/api/photos/${encodeURIComponent(photoId)}/reaction`, { method: "PUT", body: JSON.stringify({ emoji }) });
+}

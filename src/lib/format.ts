@@ -153,3 +153,19 @@ export function dmyToIso(text: string) {
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
+
+const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+/** `just now`, `5 min ago`, `yesterday`, `3 days ago`; quá một tháng → ngày tháng. */
+export function timeAgo(iso: string, now = Date.now()) {
+  const s = Math.round((now - Date.parse(iso)) / 1000);
+  if (s < 45) return "just now";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return rtf.format(-h, "hour");
+  const d = Math.round(h / 24);
+  if (d < 30) return rtf.format(-d, "day");
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(
+    new Date(iso),
+  );
+}

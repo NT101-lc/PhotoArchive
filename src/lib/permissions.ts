@@ -28,6 +28,13 @@ export const canEditPlan = (a: Actor | null | undefined) => !!a;
 export const canDeletePlan = (a: Actor | null | undefined, plan: { createdById: string | null }) =>
   isAdmin(a) || (!!a && plan.createdById === a.id);
 
+/** Bình luận / thả cảm xúc vào ảnh: mọi thành viên đã chọn tên. */
+export const canComment = (a: Actor | null | undefined) => !!a;
+
+/** Xoá bình luận: admin, hoặc chính người viết. */
+export const canDeleteComment = (a: Actor | null | undefined, comment: { authorId: string | null }) =>
+  isAdmin(a) || (!!a && comment.authorId === a.id);
+
 /** Đổi ảnh bìa: admin, hoặc người đã tạo album đó. */
 export const canSetCover = (a: Actor | null | undefined, album: { createdById: string | null }) =>
   isAdmin(a) || (!!a && album.createdById === a.id);

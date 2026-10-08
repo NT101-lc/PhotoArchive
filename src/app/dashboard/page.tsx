@@ -10,7 +10,8 @@ import { SmartImage } from "@/components/SmartImage";
 import { VideoQueue } from "@/components/VideoQueue";
 import { ROLE_ADMIN } from "@/db";
 import { getCurrentMember } from "@/lib/auth";
-import { formatDate, plural } from "@/lib/format";
+import { formatDate, plural, timeAgo } from "@/lib/format";
+import { getRecentComments } from "@/lib/social";
 import {
   getCrewStats,
   getOnThisDay,
@@ -33,12 +34,13 @@ export default async function DashboardPage() {
   if (!me) redirect("/login?next=/dashboard");
   const admin = me.role === ROLE_ADMIN;
 
-  const [crew, onThisDay, roll, places, recent, quiet] = await Promise.all([
+  const [crew, onThisDay, roll, places, uploads, comments, quiet] = await Promise.all([
     getCrewStats(),
     getOnThisDay(),
     getRoll(),
     getPlaces(),
-    getRecentUploads(),
+    getRecentUploads(8),
+    getRecentComments(8),
     getQuietMembers(),
   ]);
   // Không có ảnh nào quanh ngày này năm xưa → vài khung ngẫu nhiên (đổi mỗi ngày) để mục này không trống
@@ -76,8 +78,8 @@ export default async function DashboardPage() {
           <TopUploaders data={crew.uploaders} />
           <QuietMembers members={quiet} />
         </Section>
-        <Section title="Latest uploads" note="What came in most recently, grouped by person and album.">
-          <RecentUploads rows={recent} />
+        <Section title="Recent activity" note="New uploads and comments, newest first.">
+          <RecentActivity uploads={uploads} comments={comments} />
         </Section>
       </div>
 
@@ -225,34 +227,54 @@ function QuietMembers({ members }: { members: Awaited<ReturnType<typeof getQuiet
   );
 }
 
-const relative = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-function timeAgo(iso: string) {
-  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
-  if (min < 60) return relative.format(-Math.max(1, min), "minute");
-  if (min < 60 * 24) return relative.format(-Math.round(min / 60), "hour");
-  if (min < 60 * 24 * 30) return relative.format(-Math.round(min / 1440), "day");
-  return formatDate(iso);
-}
 
-function RecentUploads({ rows }: { rows: Awaited<ReturnType<typeof getRecentUploads>> }) {
-  if (rows.length === 0) return <p className="text-sm text-ink-soft">No uploads yet.</p>;
+type Upload = Awaited<ReturnType<typeof getRecentUploads>>[number];
+type Comment = Awaited<ReturnType<typeof getRecentComments>>[number];
+
+/** Upload và bình luận gần đây trộn theo thời gian. Bình luận dẫn thẳng tới ảnh (mở lightbox). */
+function RecentActivity({ uploads, comments }: { uploads: Upload[]; comments: Comment[] }) {
+  const items = [
+    ...uploads.map((u) => ({ kind: "upload" as const, at: u.at, u })),
+    ...comments.map((c) => ({ kind: "comment" as const, at: c.at, c })),
+  ]
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 8);
+  if (items.length === 0) return <p className="text-sm text-ink-soft">Nothing yet.</p>;
+
   return (
     <ol className="flex flex-col">
-      {rows.map((r, i) => {
-        const what = [r.photos && plural(r.photos, "photo"), r.videos && plural(r.videos, "video")].filter(Boolean).join(" and ");
-        return (
-          <li key={i} className="flex items-start gap-3 border-b border-line py-3 first:pt-0 last:border-b-0">
-            <Avatar name={r.name ?? "?"} url={r.avatarUrl} size={30} />
-            <p className="min-w-0 flex-1 text-sm leading-snug">
-              <b className="font-semibold">{r.name ?? "Someone"}</b> added {what} to{" "}
-              <Link href={`/albums/${r.albumSlug}`} className="font-semibold hover:text-accent">
-                {r.albumTitle}
-              </Link>
-              <span className="block text-xs text-ink-soft">{timeAgo(r.at)}</span>
-            </p>
-          </li>
-        );
-      })}
+      {items.map((it) => (
+        <li
+          key={it.kind === "comment" ? it.c.id : `${it.u.albumSlug}-${it.u.at}-${it.u.name}`}
+          className="flex items-start gap-3 border-b border-line py-3 first:pt-0 last:border-b-0"
+        >
+          {it.kind === "upload" ? (
+            <>
+              <Avatar name={it.u.name ?? "?"} url={it.u.avatarUrl} size={30} />
+              <p className="min-w-0 flex-1 text-sm leading-snug">
+                <b className="font-semibold">{it.u.name ?? "Someone"}</b> added{" "}
+                {[it.u.photos && plural(it.u.photos, "photo"), it.u.videos && plural(it.u.videos, "video")].filter(Boolean).join(" and ")} to{" "}
+                <Link href={`/albums/${it.u.albumSlug}`} className="font-semibold hover:text-accent">
+                  {it.u.albumTitle}
+                </Link>
+                <span className="block text-xs text-ink-soft">{timeAgo(it.at)}</span>
+              </p>
+            </>
+          ) : (
+            <>
+              <Avatar name={it.c.name} url={it.c.avatarUrl} size={30} />
+              <p className="min-w-0 flex-1 text-sm leading-snug">
+                <b className="font-semibold">{it.c.name}</b> commented on{" "}
+                <Link href={`/albums/${it.c.albumSlug}?photo=${it.c.photoId}`} className="font-semibold hover:text-accent">
+                  a photo in {it.c.albumTitle}
+                </Link>
+                <span className="mt-1 line-clamp-2 border-l-2 border-line pl-2 text-ink-soft">{it.c.body}</span>
+                <span className="mt-1 block text-xs text-ink-soft">{timeAgo(it.at)}</span>
+              </p>
+            </>
+          )}
+        </li>
+      ))}
     </ol>
   );
 }

@@ -15,6 +15,7 @@ import { useToast } from "./Toast";
 import { ContactSheet } from "./ContactSheet";
 import { IconFilm, IconGrid, IconHeart } from "./Icons";
 import { Lightbox } from "./Lightbox";
+import type { SocialCounts } from "./PhotoSocial";
 import { PhotoGrid } from "./PhotoGrid";
 
 type View = "grid" | "days";
@@ -27,12 +28,20 @@ type Props = {
 };
 
 /** Phần thân trang album: thanh lọc, lưới / dòng thời gian, lightbox, đặt bìa / xoá ảnh. */
-export function AlbumView({ album, photos, initialPhotoId }: Props) {
+export function AlbumView({ album, photos: serverPhotos, initialPhotoId }: Props) {
   const favorites = useFavorites();
   const me = useIdentity();
   const router = useRouter();
   const toast = useToast();
   const [toDelete, setToDelete] = useState<Photo | null>(null);
+  // Số bình luận / cảm xúc vừa đổi trong lightbox, đè lên số từ server để ô ảnh cập nhật ngay
+  const [socialCounts, setSocialCounts] = useState<ReadonlyMap<string, SocialCounts>>(new Map());
+  const photos = useMemo(
+    () => (socialCounts.size ? serverPhotos.map((p) => ({ ...p, ...socialCounts.get(p.id) })) : serverPhotos),
+    [serverPhotos, socialCounts],
+  );
+  // Mở lightbox từ huy hiệu bình luận → mở sẵn bảng bình luận
+  const [startWithComments, setStartWithComments] = useState(false);
   // Bìa hiện tại: ảnh đã chọn, nếu chưa chọn thì ảnh đầu tiên (photos đã xếp theo thời gian chụp)
   const coverId = album.coverPhotoId ?? photos[0]?.id;
   const [person, setPerson] = useState(ALL);
@@ -92,6 +101,12 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
 
   const tileProps = {
     onOpen: (p: Photo) => {
+      setStartWithComments(false);
+      setLightboxList(visible);
+      setOpenId(p.id);
+    },
+    onOpenComments: (p: Photo) => {
+      setStartWithComments(true);
       setLightboxList(visible);
       setOpenId(p.id);
     },
@@ -206,7 +221,13 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
       ) : view === "grid" ? (
         <PhotoGrid photos={visible} eagerCount={4} {...tileProps} />
       ) : (
-        <ContactSheet days={days} frameNo={frameNo} onOpen={tileProps.onOpen} onRetry={tileProps.onRetry} />
+        <ContactSheet
+          days={days}
+          frameNo={frameNo}
+          onOpen={tileProps.onOpen}
+          onOpenComments={tileProps.onOpenComments}
+          onRetry={tileProps.onRetry}
+        />
       )}
 
       {openIndex >= 0 && (
@@ -220,6 +241,8 @@ export function AlbumView({ album, photos, initialPhotoId }: Props) {
           cover={canSetCover(me, album) ? { isCover: (id) => id === coverId, onSet: setCover } : undefined}
           remove={{ canDelete: (p) => canDeletePhoto(me, p), onDelete: setToDelete }}
           paused={!!toDelete}
+          startWithComments={startWithComments}
+          onSocialChange={(id, counts) => setSocialCounts((m) => new Map(m).set(id, counts))}
         />
       )}
 

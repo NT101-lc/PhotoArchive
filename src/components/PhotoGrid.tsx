@@ -3,11 +3,14 @@
 import { formatDuration } from "@/lib/format";
 import type { Photo } from "@/lib/types";
 import { IconHeart, IconPlay, IconReset } from "./Icons";
+import { SocialBadge } from "./PhotoSocial";
 import { SmartImage } from "./SmartImage";
 
 type Props = {
   photos: Photo[];
   onOpen: (photo: Photo) => void;
+  /** Mở ảnh với bảng bình luận (bấm huy hiệu bình luận / cảm xúc) */
+  onOpenComments?: (photo: Photo) => void;
   isFavorite: (id: string) => boolean;
   onToggleFavorite: (id: string) => void;
   /** Có thì video lỗi chuyển mã hiện nút "Try again" */
@@ -24,7 +27,7 @@ const clampRatio = (p: Photo) => Math.min(2.4, Math.max(0.6, p.width / p.height)
  * đúng thứ tự thời gian. CSS thuần (xem .justified trong globals.css): flex-grow tỉ lệ với tỉ lệ khung.
  * Video hiện poster + thời lượng; đang chuyển mã thì hiện trạng thái.
  */
-export function PhotoGrid({ photos, onOpen, isFavorite, onToggleFavorite, onRetry, eagerCount = 0 }: Props) {
+export function PhotoGrid({ photos, onOpen, onOpenComments, isFavorite, onToggleFavorite, onRetry, eagerCount = 0 }: Props) {
   return (
     <ul className="justified">
       {photos.map((photo, i) => {
@@ -68,6 +71,12 @@ export function PhotoGrid({ photos, onOpen, isFavorite, onToggleFavorite, onRetr
                 {photo.uploadedBy}
               </span>
             </button>
+            <SocialBadge
+              commentCount={photo.commentCount}
+              reactionCount={photo.reactionCount}
+              onClick={() => (onOpenComments ?? onOpen)(photo)}
+              className="absolute top-2 left-2"
+            />
             {video && photo.status === "failed" && onRetry && (
               <button
                 type="button"
