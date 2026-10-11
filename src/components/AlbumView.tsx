@@ -85,8 +85,8 @@ export function AlbumView({ album, photos: serverPhotos, initialPhotoId }: Props
   const liveList = useMemo(() => lightboxList.map((p) => byId.get(p.id) ?? p), [lightboxList, byId]);
   const openIndex = openId ? liveList.findIndex((p) => p.id === openId) : -1;
 
-  // Còn video đang chờ / đang chuyển mã → hỏi lại server mỗi 10 giây
-  const processing = photos.some((p) => p.kind === "video" && (p.status === "queued" || p.status === "processing"));
+  // Còn video / ảnh HEIC đang chờ xử lý → hỏi lại server mỗi 10 giây
+  const processing = photos.some((p) => p.status === "queued" || p.status === "processing");
   useEffect(() => {
     if (!processing) return;
     const t = setInterval(() => router.refresh(), 10_000);
@@ -120,7 +120,7 @@ export function AlbumView({ album, photos: serverPhotos, initialPhotoId }: Props
   async function retry(photo: Photo) {
     try {
       await retryVideo(photo.id);
-      toast.show({ tone: "success", title: t.album.videoQueued, message: t.album.videoQueuedBody });
+      toast.show({ tone: "success", title: photo.kind === "video" ? t.album.videoQueued : t.album.photoQueued, message: t.album.videoQueuedBody });
       router.refresh();
     } catch (err) {
       toast.show({ tone: "warn", title: t.album.couldntRetry, message: (err as Error).message });

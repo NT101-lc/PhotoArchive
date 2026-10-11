@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, getTableColumns, inArray, isNotNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { connection } from "next/server";
 import { cache } from "react";
 import { albums, db, members, photos, ROLE_USER, type AlbumRow, type PhotoRow } from "@/db";
@@ -15,8 +15,10 @@ import type { Album, Member, Photo } from "./types";
 const photoCount = () => db.$count(photos, eq(photos.albumId, albums.id));
 
 /** URL để hiện như ảnh: ảnh → file ảnh; video → poster (rỗng nếu chưa chuyển mã xong). */
-export async function displayUrl(p: Pick<PhotoRow, "kind" | "storageKey" | "sourceUrl" | "posterKey">) {
+export async function displayUrl(p: Pick<PhotoRow, "kind" | "status" | "storageKey" | "sourceUrl" | "posterKey">) {
   if (p.kind === "video") return (await resolveObjectUrl(p.posterKey)) ?? "";
+  // Ảnh HEIC đang chờ đổi sang JPEG: chưa có gì hiển thị được
+  if (p.status !== "ready") return "";
   return resolvePhotoUrl(p);
 }
 
@@ -34,7 +36,8 @@ async function coverUrls(rows: AlbumRow[]): Promise<Map<string, string>> {
       .where(
         and(
           inArray(photos.albumId, rows.map((r) => r.id)),
-          or(eq(photos.kind, "photo"), isNotNull(photos.posterKey)),
+          // Ảnh / video đã xử lý xong (video xong là có poster, ảnh HEIC xong là đã thành JPEG)
+          eq(photos.status, "ready"),
         ),
       )
       .orderBy(photos.albumId, asc(photos.takenAt)),

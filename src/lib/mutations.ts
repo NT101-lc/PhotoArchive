@@ -16,6 +16,7 @@ import {
   type Actor,
 } from "./permissions";
 import { IMAGE_TYPES, isVideoType, MEDIA_TYPES, type ImageType, type MediaType } from "./media";
+import { needsConversion } from "./photo-convert";
 import { addPlace, joinPlaces, MAX_PLACE_LENGTH, MAX_PLACES, tripPlace, type TripPlace } from "./places-format";
 import {
   abortMultipartUpload,
@@ -346,7 +347,7 @@ function guessTakenAt(
 
 /**
  * Bước 2: sau khi upload xong, ghi vào DB (người upload = actor) và đặt ảnh bìa nếu có chọn.
- * Video vào hàng đợi chuyển mã (status "queued"); trả về `queuedVideos` để route gọi worker.
+ * Video và ảnh HEIC vào hàng đợi xử lý (status "queued"); trả về `queued` để route gọi worker.
  */
 export async function addPhotos(actor: Actor, albumSlug: string, input: z.infer<typeof addPhotosInput>) {
   const album = await findAlbum(albumSlug);
@@ -369,6 +370,8 @@ export async function addPhotos(actor: Actor, albumSlug: string, input: z.infer<
     .values(
       input.photos.map((p, i) => {
         const video = isVideoType(p.mimeType);
+        // Ảnh HEIC: trình duyệt / Next không hiển thị được → worker đổi sang JPEG (lib/photo-convert.ts)
+        const convert = !video && needsConversion({ mimeType: p.mimeType, key: p.key });
         return {
           albumId: album.id,
           storageKey: p.key,
@@ -379,31 +382,31 @@ export async function addPhotos(actor: Actor, albumSlug: string, input: z.infer<
           uploadedById: actor.id,
           takenAt: guessTakenAt(p, album, i),
           kind: video ? ("video" as const) : ("photo" as const),
-          status: video ? ("queued" as const) : ("ready" as const),
+          status: video || convert ? ("queued" as const) : ("ready" as const),
           durationMs: video ? p.durationMs : undefined,
         };
       }),
     )
     .onConflictDoNothing({ target: photos.storageKey })
-    .returning({ id: photos.id, storageKey: photos.storageKey, kind: photos.kind });
+    .returning({ id: photos.id, storageKey: photos.storageKey, kind: photos.kind, status: photos.status });
 
-  // Video chưa có poster nên chưa làm bìa được; bìa sẽ đổi khi chọn lại sau khi xử lý xong
-  const cover = input.coverKey && rows.find((r) => r.storageKey === input.coverKey && r.kind === "photo");
+  // Video / ảnh HEIC chưa xử lý xong thì chưa làm bìa được; bìa sẽ đổi khi chọn lại sau khi xử lý xong
+  const cover = input.coverKey && rows.find((r) => r.storageKey === input.coverKey && r.kind === "photo" && r.status === "ready");
   if (cover) await db.update(albums).set({ coverPhotoId: cover.id }).where(eq(albums.id, album.id));
 
-  return { added: rows.length, coverSet: !!cover, queuedVideos: rows.filter((r) => r.kind === "video").length };
+  return { added: rows.length, coverSet: !!cover, queued: rows.filter((r) => r.status === "queued").length };
 }
 
-/** Cho video bị lỗi chuyển mã vào hàng đợi lại (mọi thành viên đã chọn tên). */
+/** Cho video / ảnh HEIC bị lỗi xử lý vào hàng đợi lại (mọi thành viên đã chọn tên). */
 export async function retryVideo(actor: Actor, photoId: string) {
   if (!canUpload(actor)) throw new ForbiddenError("Choose who you are first.");
-  if (!z.uuid().safeParse(photoId).success) throw new NotFoundError("Video not found");
+  if (!z.uuid().safeParse(photoId).success) throw new NotFoundError("Photo not found");
   const [row] = await db
     .update(photos)
     .set({ status: "queued", attempts: 0, lockedAt: null, processingError: null })
-    .where(and(eq(photos.id, photoId), eq(photos.kind, "video"), eq(photos.status, "failed")))
+    .where(and(eq(photos.id, photoId), eq(photos.status, "failed")))
     .returning({ id: photos.id });
-  if (!row) throw new BadRequestError("Only videos that failed to process can be retried.");
+  if (!row) throw new BadRequestError("Only photos and videos that failed to process can be retried.");
   return { ok: true };
 }
 

@@ -172,6 +172,13 @@ Lỗi trả về `{ error }` với mã 400 (input sai), 401 (chưa chọn tên /
 
 4. Khởi động lại `npm run dev` sau khi sửa `.env`.
 
+## Ảnh HEIC (iPhone)
+
+Ảnh HEIC / HEIF nén bằng HEVC: chỉ Safari xem được; Chrome, Firefox, Android và bộ tối ưu ảnh của Next (sharp bản dựng sẵn
+không có bộ giải mã HEVC) đều không. Nên ảnh HEIC vào cùng hàng đợi với video (`status = 'queued'`); worker ở mục dưới giải mã
+bằng libheif (gói `heic-decode`, WASM), lưu lại thành JPEG (mozjpeg chất lượng 80 — dung lượng gần bằng file HEIC), ghi kích thước
+thật rồi xoá file HEIC. Trong lúc chờ, ô ảnh hiện "Converting photo…". Thông tin EXIF trong file không giữ lại (giờ chụp đã lưu trong DB).
+
 ## Video
 
 Video upload thẳng lên R2 theo từng phần (multipart, không giới hạn dung lượng; ảnh vẫn tối đa 50 MB).

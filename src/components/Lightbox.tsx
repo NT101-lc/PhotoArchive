@@ -321,6 +321,8 @@ export function Lightbox({
               if (playing && total > 1) go(1);
             }}
           />
+        ) : photo.status !== "ready" ? (
+          <PhotoPending photo={photo} />
         ) : zoomed ? (
           <ZoomedImage key={photo.id} photo={photo} onExit={() => setZoomed(false)} />
         ) : (
@@ -464,6 +466,30 @@ function VideoStage({
         onEnded={onEnded}
         className="h-full w-full object-contain"
       />
+    </div>
+  );
+}
+
+/** Ảnh HEIC chưa đổi sang JPEG xong (hoặc lỗi): chưa có gì để hiển thị. */
+function PhotoPending({ photo }: { photo: Photo }) {
+  const { t } = useI18n();
+  const failed = photo.status === "failed";
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+      {failed ? (
+        <>
+          <p className="font-display text-xl font-bold">{t.lightbox.photoFailed}</p>
+          <p className="max-w-sm text-sm text-white/60">
+            {photo.processingError ?? t.lightbox.videoFailedGeneric} {t.lightbox.videoFailedHint}
+          </p>
+        </>
+      ) : (
+        <>
+          <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-white/15 border-t-[#6cc79c]" aria-hidden="true" />
+          <p className="font-display text-xl font-bold">{photo.status === "processing" ? t.lightbox.photoConverting : t.lightbox.waiting}</p>
+          <p className="max-w-sm text-sm text-white/60">{t.lightbox.photoConvertingHint}</p>
+        </>
+      )}
     </div>
   );
 }

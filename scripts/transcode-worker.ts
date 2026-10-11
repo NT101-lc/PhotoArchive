@@ -4,6 +4,8 @@
 // Mỗi vòng: nhận một video đang chờ trong bảng photos (FOR UPDATE SKIP LOCKED nên nhiều worker
 // chạy cùng lúc không đụng nhau) → tải file gốc từ R2 → ffmpeg ra một MP4 (720p, video dài 540p) + poster
 // → đẩy lên R2 → đánh dấu "ready" và trỏ storage_key sang bản nén → xoá file gốc. Lỗi thì trả về hàng đợi, quá MAX_TRANSCODE_ATTEMPTS lần thì "failed".
+// Ảnh HEIC / HEIF (iPhone) cũng vào hàng đợi này: giải mã bằng libheif (heic-decode) → JPEG → xoá file HEIC
+// (trình duyệt và bộ tối ưu ảnh của Next không đọc được HEIC, xem src/lib/photo-convert.ts).
 // Chạy tới khi hết việc (hoặc gần hết giờ của job).
 
 import { loadEnvConfig } from "@next/env";
@@ -17,7 +19,10 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
+import decodeHeic from "heic-decode";
+import sharp from "sharp";
 import { MAX_TRANSCODE_ATTEMPTS } from "../src/db/schema";
+import { convertedKey, JPEG_QUALITY } from "../src/lib/photo-convert";
 import { encodeArgs, outputKeys, pickTier, posterArgs, sourceInfo, videoFilter, type Probe } from "../src/lib/transcode-plan";
 
 loadEnvConfig(process.cwd());
@@ -147,30 +152,72 @@ async function canTonemap() {
 
 // ---------- Hàng đợi ----------
 
-type Job = { id: string; storage_key: string; attempts: number };
+type Job = { id: string; kind: "photo" | "video"; storage_key: string; attempts: number };
 
 async function claim(): Promise<Job | null> {
   // Việc bị bỏ dở mà đã hết lượt thử → failed
   await sql`
     update photos set status = 'failed', locked_at = null,
       processing_error = coalesce(processing_error, 'Processing took too long and was stopped.')
-    where kind = 'video' and status = 'processing' and locked_at < now() - ${STALE_LOCK}::interval
+    where status = 'processing' and locked_at < now() - ${STALE_LOCK}::interval
       and attempts >= ${MAX_TRANSCODE_ATTEMPTS}`;
   const rows = await sql`
     update photos set status = 'processing', locked_at = now(), attempts = attempts + 1, updated_at = now()
     where id = (
       select id from photos
-      where kind = 'video' and attempts < ${MAX_TRANSCODE_ATTEMPTS}
+      where attempts < ${MAX_TRANSCODE_ATTEMPTS}
         and (status = 'queued' or (status = 'processing' and locked_at < now() - ${STALE_LOCK}::interval))
       order by created_at
       for update skip locked
       limit 1
     )
-    returning id, storage_key, attempts`;
+    returning id, kind, storage_key, attempts`;
   return (rows[0] as Job | undefined) ?? null;
 }
 
-async function processJob(job: Job) {
+function processJob(job: Job) {
+  return job.kind === "video" ? processVideo(job) : processPhoto(job);
+}
+
+/** Ảnh HEIC → JPEG (mozjpeg), ghi lại kích thước thật, rồi xoá file HEIC. */
+async function processPhoto(job: Job) {
+  const dir = await mkdtemp(join(tmpdir(), "convert-"));
+  const key = convertedKey(job.storage_key);
+  let uploaded = false;
+  try {
+    const input = join(dir, "original");
+    await download(job.storage_key, input);
+    const { width, height, data } = await decodeHeic({ buffer: await readFile(input) });
+    const output = join(dir, "photo.jpg");
+    await sharp(Buffer.from(data.buffer, data.byteOffset, data.byteLength), { raw: { width, height, channels: 4 } })
+      .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+      .toFile(output);
+    const { size } = await stat(output);
+    console.log(`${TAG}  converted to JPEG ${width}×${height}, ${Math.round(size / 1024)} KB`);
+
+    await upload(key, output, "image/jpeg");
+    uploaded = true;
+    const done = await sql`
+      update photos set status = 'ready', locked_at = null, processing_error = null, updated_at = now(),
+        width = ${width}, height = ${height}, storage_key = ${key}, size_bytes = ${size}, mime_type = 'image/jpeg'
+      where id = ${job.id}
+      returning id`;
+    if (done.length === 0) {
+      // Ảnh bị xoá trong lúc đang xử lý → dọn file vừa sinh
+      await remove([key]);
+      return;
+    }
+    // DB đã trỏ sang bản JPEG → xoá file HEIC
+    await remove([job.storage_key]);
+  } catch (err) {
+    if (uploaded) await remove([key]);
+    throw err;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function processVideo(job: Job) {
   const dir = await mkdtemp(join(tmpdir(), "transcode-"));
   const uploaded: string[] = [];
   try {
@@ -228,7 +275,7 @@ async function main() {
   while (Date.now() - started < STOP_AFTER_MS) {
     const job = await claim();
     if (!job) break;
-    console.log(`${TAG}Video ${job.id} (attempt ${job.attempts}/${MAX_TRANSCODE_ATTEMPTS})`);
+    console.log(`${TAG}${job.kind === "video" ? "Video" : "Photo"} ${job.id} (attempt ${job.attempts}/${MAX_TRANSCODE_ATTEMPTS})`);
     const t = Date.now();
     try {
       await processJob(job);

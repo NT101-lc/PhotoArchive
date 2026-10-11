@@ -1,6 +1,6 @@
 name: Transcode videos
 
-# Chuyển mã video đang chờ (scripts/transcode-worker.ts).
+# Chuyển mã video và đổi ảnh HEIC sang JPEG đang chờ (scripts/transcode-worker.ts).
 # - repository_dispatch: app gọi ngay sau khi có video mới (cần GITHUB_DISPATCH_TOKEN trên Vercel)
 # - schedule: lưới an toàn, nhặt video bị sót hoặc khi chưa cấu hình token
 # - workflow_dispatch: chạy tay từ tab Actions
@@ -48,7 +48,7 @@ jobs:
           fi
           # psql có sẵn trên runner: hỏi nhanh, không phải cài gì khi hàng đợi trống
           read -r queued processing < <(psql "$DATABASE_URL" -tA -F ' ' -c \
-            "select count(*) filter (where status = 'queued'), count(*) filter (where status = 'processing') from photos where kind = 'video'")
+            "select count(*) filter (where status = 'queued'), count(*) filter (where status = 'processing') from photos")
           echo "Queued: $queued, processing: $processing"
           if [ "$queued" -gt 0 ]; then
             n=$(( queued < MAX_WORKERS ? queued : MAX_WORKERS ))

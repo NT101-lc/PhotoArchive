@@ -89,8 +89,8 @@ function Frame({
   onRetry?: (photo: Photo) => void;
 }) {
   const video = photo.kind === "video";
-  const pending = video && photo.status !== "ready";
-  const failed = video && photo.status === "failed";
+  const pending = photo.status !== "ready";
+  const failed = photo.status === "failed";
   const { t } = useI18n();
 
   return (

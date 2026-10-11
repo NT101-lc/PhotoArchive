@@ -35,7 +35,7 @@ export function PhotoGrid({ photos, onOpen, onOpenComments, isFavorite, onToggle
       {photos.map((photo, i) => {
         const fav = isFavorite(photo.id);
         const video = photo.kind === "video";
-        const pending = video && photo.status !== "ready";
+        const pending = photo.status !== "ready";
         const ratio = clampRatio(photo);
         return (
           <li
@@ -79,7 +79,7 @@ export function PhotoGrid({ photos, onOpen, onOpenComments, isFavorite, onToggle
               onClick={() => (onOpenComments ?? onOpen)(photo)}
               className="absolute top-2 left-2"
             />
-            {video && photo.status === "failed" && onRetry && (
+            {photo.status === "failed" && onRetry && (
               <button
                 type="button"
                 onClick={() => onRetry(photo)}
@@ -109,18 +109,19 @@ export function PhotoGrid({ photos, onOpen, onOpenComments, isFavorite, onToggle
   );
 }
 
-/** Ô video chưa xem được: đang chờ / đang chuyển mã / lỗi. */
+/** Ô video / ảnh HEIC chưa xem được: đang chờ / đang xử lý / lỗi. */
 function ProcessingState({ photo }: { photo: Photo }) {
   const failed = photo.status === "failed";
+  const video = photo.kind === "video";
   const { t } = useI18n();
   return (
     <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center text-white">
       {failed ? (
-        <span className="text-sm font-semibold text-[#f0907c]">{t.tile.couldntProcess}</span>
+        <span className="text-sm font-semibold text-[#f0907c]">{video ? t.tile.couldntProcess : t.tile.couldntConvert}</span>
       ) : (
         <>
           <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-[#6cc79c]" aria-hidden="true" />
-          <span className="text-sm font-semibold">{photo.status === "processing" ? t.tile.processing : t.tile.waiting}</span>
+          <span className="text-sm font-semibold">{photo.status !== "processing" ? t.tile.waiting : video ? t.tile.processing : t.tile.converting}</span>
           <span className="text-xs text-white/60">{t.tile.usuallyReady}</span>
         </>
       )}

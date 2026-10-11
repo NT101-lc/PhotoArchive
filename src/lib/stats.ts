@@ -150,7 +150,7 @@ export async function getVideoQueue() {
     .from(photos)
     .innerJoin(albums, eq(albums.id, photos.albumId))
     .leftJoin(members, eq(members.id, photos.uploadedById))
-    .where(and(eq(photos.kind, "video"), ne(photos.status, "ready")))
+    .where(ne(photos.status, "ready"))
     .orderBy(desc(photos.createdAt))
     .limit(50);
   // Video chờ quá 1 giờ mà chưa ai nhận → nhiều khả năng worker chưa được cấu hình
