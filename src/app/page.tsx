@@ -47,7 +47,9 @@ export default async function HomePage() {
 
   return (
     <>
-      <main>
+      {/* Góc các tấm ảnh in xoay lệch (và xoè ra khi rê chuột) thò quá mép màn hình → cắt theo chiều ngang.
+          clip chứ không phải hidden: không tạo vùng cuộn mới nên AppBar sticky vẫn chạy. */}
+      <main className="overflow-x-clip">
         {/* ---------- Chuyến gần nhất ---------- */}
         <section className="mx-auto grid max-w-[1280px] gap-10 px-4 pt-10 pb-10 sm:px-6 sm:pt-14 md:grid-cols-[minmax(0,1fr)_minmax(0,40%)] md:items-center lg:gap-16">
           <div className="min-w-0">
