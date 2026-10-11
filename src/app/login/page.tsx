@@ -3,11 +3,15 @@ import { Logo } from "@/components/Logo";
 import { getCurrentMember } from "@/lib/auth";
 import { getMembers } from "@/lib/data";
 import { IdentityForm } from "@/components/IdentityForm";
+import { getT } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "Who are you?" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.login.metaTitle };
+}
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  const [members, me, sp] = await Promise.all([getMembers(), getCurrentMember(), searchParams]);
+  const [members, me, sp, { t }] = await Promise.all([getMembers(), getCurrentMember(), searchParams, getT()]);
   // Chỉ nhận đường dẫn nội bộ để tránh chuyển hướng ra trang ngoài
   const next = typeof sp.next === "string" && sp.next.startsWith("/") && !sp.next.startsWith("//") ? sp.next : "/";
 
@@ -19,11 +23,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <div className="flex flex-col items-center gap-4 text-center">
             <Logo size={56} />
             <div>
-              <p className="eyebrow mb-1">Private archive</p>
-              <h1 className="font-display text-[2rem] leading-none font-extrabold tracking-[-0.03em]">Who are you?</h1>
+              <p className="eyebrow mb-1">{t.login.eyebrow}</p>
+              <h1 className="font-display text-[2rem] leading-none font-extrabold tracking-[-0.03em]">{t.login.title}</h1>
             </div>
             <p className="text-[0.95rem] text-ink-soft">
-              No sign-in needed — just pick your name so your uploads are credited to you.
+              {t.login.body}
             </p>
           </div>
 

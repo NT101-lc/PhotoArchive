@@ -5,8 +5,12 @@ import { IconPlus } from "@/components/Icons";
 import { UploadButton } from "@/components/UploadModal";
 import { getAlbums } from "@/lib/data";
 import { distinctPlaceNames } from "@/lib/places-format";
+import { getT } from "@/i18n/server";
 
-export const metadata: Metadata = { title: "All albums" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.albums.metaTitle };
+}
 
 function first(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v;
@@ -18,7 +22,7 @@ function list(v: string | string[] | undefined) {
 }
 
 export default async function AlbumsPage({ searchParams }: PageProps<"/albums">) {
-  const [albums, sp] = await Promise.all([getAlbums(), searchParams]);
+  const [albums, sp, { t }] = await Promise.all([getAlbums(), searchParams, getT()]);
   const totalPhotos = albums.reduce((sum, a) => sum + a.photoCount, 0);
   const albumOptions = albums.map(({ id, title, createdById }) => ({ id, title, createdById }));
   const places = distinctPlaceNames(albums).length;
@@ -34,19 +38,19 @@ export default async function AlbumsPage({ searchParams }: PageProps<"/albums">)
   return (
     <main className="mx-auto max-w-[1280px] px-4 pb-20 sm:px-6">
       <PageHero
-        eyebrow="Trip archive"
-        title="Every trip we took"
-        description="All of the crew's travel photos, grouped by trip — come back to them any time."
+        eyebrow={t.albums.eyebrow}
+        title={t.albums.title}
+        description={t.albums.description}
         stats={[
-          { value: albums.length, label: "albums" },
-          { value: totalPhotos, label: "photos" },
-          { value: places, label: "places" },
+          { value: albums.length, label: t.albums.statAlbums },
+          { value: totalPhotos, label: t.albums.statPhotos },
+          { value: places, label: t.albums.statPlaces },
         ]}
         actions={
           <>
             <UploadButton albums={albumOptions} startNew className="btn">
               <IconPlus size={16} />
-              New album
+              {t.albums.newAlbum}
             </UploadButton>
             <UploadButton albums={albumOptions} />
           </>

@@ -27,7 +27,8 @@ There is no Prettier config: don't run Prettier (it would rewrap files to 80 col
 - Don't run `npm run build` while `npm run dev` is running. Both write `.next/dev/types/routes.d.ts`, the file gets corrupted, and nested API routes (e.g. `/api/photos/[id]/*`) then 404 in dev. Fix: stop the dev server, run the build, start dev again.
 - After adding columns to `schema.ts` (and migrating), **restart `npm run dev`**. The `db` instance lives on `globalThis` across HMR, and Drizzle caches each table's column names the first time it's used. New columns then come out as `undefined`, which shows up as `Cannot read properties of undefined (reading 'replace')` in Drizzle's `escapeName`.
 - Windows + `core.autocrlf`: files may be CRLF. If an exact-string edit fails, normalise `\r\n` first.
-- The user writes in Vietnamese; reply in Vietnamese, concisely. **UI copy is English.** Code comments are Vietnamese (match the file).
+- The user writes in Vietnamese; reply in Vietnamese, concisely. Code comments are Vietnamese (match the file).
+- **UI copy is bilingual (English / Vietnamese).** Never hard-code UI text in components. Add the key to `src/i18n/en.ts` **and** `src/i18n/vi.ts`: the `Dict` type and `src/i18n/i18n.test.ts` both fail if a key is missing. Server components use `const { t, locale } = await getT()` (from `@/i18n/server`), and client components use `useI18n()` (from `@/i18n/client`). Pass `locale` to the date helpers in `format.ts`. Use `t.count.*` instead of `plural()`, because Vietnamese has no plurals. The locale lives in the `thesix-lang` cookie (URLs never change), the EN/VI button sits in the AppBar, and the default comes from `Accept-Language`. API error messages are still English only.
 - Before writing Next.js code, check `node_modules/next/dist/docs/` (see AGENTS.md). Next 16 specifics in use: `after()`, `connection()`, typed `PageProps<"/route">` / `RouteContext<"/api/route">`, `<Link prefetch>`, React `<ViewTransition>`, `next/image` `preload` prop.
 
 ## Layout
@@ -44,7 +45,7 @@ There is no Prettier config: don't run Prettier (it would rewrap files to 80 col
   - `auth.ts`: `getCurrentMember`, `requireMember`, `requireAdmin`.
   - `storage.ts`: R2 via aws4fetch (presign, multipart, delete, list).
   - `places.ts` (server) + `places-format.ts` (pure): place search through Photon / OpenStreetMap (free, no key). It is proxied and cached in memory. `PlacesInput` is the multi-place combobox (chips) used by the album and plan forms. An album's places live in `albums.places` (jsonb `TripPlace[]`), and `albums.location` is the joined display string, which mutations keep in sync. `albums.latitude/longitude` are deprecated: drop them once the multi-place build is deployed. `photo-places.ts` suggests a place from photo GPS, read by `exif.ts`.
-  - `format.ts`: dates (dd/mm/yyyy input, `Asia/Ho_Chi_Minh`), bytes, plurals.
+  - `format.ts`: dates (dd/mm/yyyy input, `Asia/Ho_Chi_Minh`, an optional `locale` param), bytes.
   - Pure helpers that the client can import too: `plan-utils.ts`, `about-text.ts`, `transcode-plan.ts`, `media.ts`, `places-format.ts`, `exif.ts`.
 - `scripts/transcode-worker.ts` + `.github/workflows/transcode.yml`: the video pipeline (below).
 - `docs/plans/next-features.md`: feature plan notes.

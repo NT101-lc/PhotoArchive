@@ -3,6 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { searchPlaces } from "@/lib/api-client";
 import { addPlace, MAX_PLACE_LENGTH, MAX_PLACES, sameName, tripPlace, withDraft, type Place, type TripPlace } from "@/lib/places-format";
+import { useI18n } from "@/i18n/client";
 import { IconClose, IconPin } from "./Icons";
 
 type Props = {
@@ -35,13 +36,14 @@ export function PlacesInput({
   draft,
   onChange,
   suggestions = [],
-  suggestionsLabel = "Suggested",
-  placeholder = "Add a place",
+  suggestionsLabel,
+  placeholder,
   disabled,
   className = "",
   "aria-label": ariaLabel,
 }: Props) {
   const listId = useId();
+  const { t } = useI18n();
   // Chữ người dùng vừa gõ để tìm (null = chưa gõ gì → không tìm)
   const [query, setQuery] = useState<string | null>(null);
   // Kết quả của lần tìm gần nhất, kèm chữ đã tìm để biết nó còn khớp với chữ đang gõ không
@@ -188,19 +190,19 @@ export function PlacesInput({
           aria-hidden="true"
           className={`pointer-events-none absolute top-[11px] left-3 ${places.some((p) => p.lat !== null) ? "text-accent" : "text-ink-soft"}`}
         />
-        <ul aria-label="Chosen places" className="contents">
+        <ul aria-label={t.places.chosen} className="contents">
           {places.map((p, i) => (
             <li
               key={`${p.name}|${i}`}
               className="inline-flex h-7 max-w-full items-center gap-1 rounded-full border border-line bg-surface-2 pr-1 pl-2.5 text-sm"
-              title={p.lat === null ? "Typed by hand" : undefined}
+              title={p.lat === null ? t.places.typedByHand : undefined}
             >
               <span className="min-w-0 truncate">{p.name}</span>
               {!disabled && (
                 <button
                   type="button"
                   onClick={() => remove(i)}
-                  aria-label={`Remove ${p.name}`}
+                  aria-label={t.places.remove(p.name)}
                   className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-line hover:text-ink"
                 >
                   <IconClose size={13} />
@@ -227,7 +229,7 @@ export function PlacesInput({
             onFocus={() => results.length > 0 && setOpen(true)}
             onBlur={commitDraft}
             onKeyDown={onKeyDown}
-            placeholder={full ? `Up to ${MAX_PLACES} places` : places.length ? "Add another" : placeholder}
+            placeholder={full ? t.places.upTo(MAX_PLACES) : places.length ? t.places.addAnother : (placeholder ?? t.places.addPlace)}
             disabled={full}
             maxLength={MAX_PLACE_LENGTH}
             autoComplete="off"
@@ -242,16 +244,16 @@ export function PlacesInput({
           ref={listRef}
           id={listId}
           role="listbox"
-          aria-label="Places"
+          aria-label={t.places.list}
           // Vị trí, kích thước: xem useLayoutEffect ở trên. z trên Modal (z-[1200])
           className="fixed z-[1300] overflow-y-auto rounded-lg border border-line bg-surface py-1 shadow-[var(--shadow-hard)]"
         >
-          {status === "loading" && results.length === 0 && <li className="px-3 py-2 text-sm text-ink-soft">Searching…</li>}
+          {status === "loading" && results.length === 0 && <li className="px-3 py-2 text-sm text-ink-soft">{t.places.searching}</li>}
           {status === "error" && (
-            <li className="px-3 py-2 text-sm text-ink-soft">Place search isn’t available right now. Type the name and press Enter.</li>
+            <li className="px-3 py-2 text-sm text-ink-soft">{t.places.unavailable}</li>
           )}
           {status === "done" && results.length === 0 && (
-            <li className="px-3 py-2 text-sm text-ink-soft">No match. Press Enter to keep what you typed.</li>
+            <li className="px-3 py-2 text-sm text-ink-soft">{t.places.noMatch}</li>
           )}
           {results.map((p, i) => (
             <li
@@ -277,7 +279,7 @@ export function PlacesInput({
 
       {chips.length > 0 && !disabled && !full && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="text-ink-soft">{suggestionsLabel}:</span>
+          <span className="text-ink-soft">{suggestionsLabel ?? t.places.suggested}:</span>
           {chips.map((p) => (
             <button key={`${p.name}|${p.lat}`} type="button" className="chip h-7 px-2.5 text-xs" onClick={() => pick(p)} title={p.detail}>
               <IconPin size={13} aria-hidden="true" />

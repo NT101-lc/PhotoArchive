@@ -7,6 +7,7 @@ import { canEditPlan } from "@/lib/permissions";
 import { DateRangeFields } from "./DateRangeFields";
 import { IconPlus } from "./Icons";
 import { PlacesInput } from "./PlacesInput";
+import { useI18n } from "@/i18n/client";
 import { joinPlaces, withDraft, type TripPlace } from "@/lib/places-format";
 import { useIdentity } from "./Identity";
 import { Modal } from "./Modal";
@@ -21,6 +22,7 @@ export function NewPlanButton({ className = "btn btn-primary" }: { className?: s
   // Kế hoạch chỉ lưu tên các nơi ghép thành một chuỗi ("Đà Lạt, Nha Trang"), không lưu toạ độ
   const [form, setForm] = useState({ title: "", places: [] as TripPlace[], placeDraft: "", start: "", end: "" });
   const [saving, setSaving] = useState(false);
+  const { t } = useI18n();
 
   if (!canEditPlan(me)) return null;
   const valid = form.title.trim() && (form.places.length > 0 || form.placeDraft.trim()) && form.start;
@@ -37,7 +39,7 @@ export function NewPlanButton({ className = "btn btn-primary" }: { className?: s
       });
       router.push(`/plans/${slug}`);
     } catch (err) {
-      toast.show({ tone: "warn", title: "Couldn’t create the plan", message: (err as Error).message });
+      toast.show({ tone: "warn", title: t.newPlan.couldntCreate, message: (err as Error).message });
       setSaving(false);
     }
   }
@@ -46,20 +48,20 @@ export function NewPlanButton({ className = "btn btn-primary" }: { className?: s
     <>
       <button type="button" className={className} onClick={() => setOpen(true)}>
         <IconPlus size={16} />
-        New plan
+        {t.newPlan.button}
       </button>
       <Modal
         open={open}
         onClose={() => !saving && setOpen(false)}
-        eyebrow="Planner"
-        title="Plan a trip"
+        eyebrow={t.newPlan.eyebrow}
+        title={t.newPlan.title}
         footer={
           <div className="flex justify-end gap-2">
             <button type="button" className="btn" onClick={() => setOpen(false)} disabled={saving}>
-              Cancel
+              {t.common.cancel}
             </button>
             <button type="submit" form="new-plan" className="btn btn-primary" disabled={!valid || saving}>
-              {saving ? "Creating…" : "Create plan"}
+              {saving ? t.newPlan.creating : t.newPlan.create}
             </button>
           </div>
         }
@@ -75,9 +77,9 @@ export function NewPlanButton({ className = "btn btn-primary" }: { className?: s
           <input
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
-            placeholder="Trip name, e.g. Đà Lạt for Tết"
+            placeholder={t.newPlan.tripNamePlaceholder}
             className="field sm:col-span-2"
-            aria-label="Trip name"
+            aria-label={t.newPlan.tripName}
             autoFocus
           />
           <PlacesInput
@@ -85,8 +87,8 @@ export function NewPlanButton({ className = "btn btn-primary" }: { className?: s
             places={form.places}
             draft={form.placeDraft}
             onChange={(places, placeDraft) => setForm({ ...form, places, placeDraft })}
-            placeholder="Places, e.g. Đà Lạt, Nha Trang"
-            aria-label="Places"
+            placeholder={t.newPlan.placesPlaceholder}
+            aria-label={t.newPlan.places}
           />
           <DateRangeFields
             className="sm:col-span-2"
@@ -95,7 +97,7 @@ export function NewPlanButton({ className = "btn btn-primary" }: { className?: s
             onChange={({ start, end }) => setForm({ ...form, start, end })}
           />
           <p className="text-sm text-ink-soft sm:col-span-2">
-            You get a sheet with one column per day. Everyone in the crew can fill it in.
+            {t.newPlan.hint}
           </p>
         </form>
       </Modal>

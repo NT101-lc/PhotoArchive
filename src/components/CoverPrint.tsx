@@ -26,7 +26,7 @@ export function CoverPrint({
   const image = (
     <span className="relative block aspect-[3/2] overflow-hidden rounded-[1px] bg-surface-2">
       {album.coverUrl ? (
-        <SmartImage src={album.coverUrl} alt={`Cover of ${album.title}`} fill preload={preload} sizes={sizes} className="object-cover" />
+        <SmartImage src={album.coverUrl} alt={album.title} fill preload={preload} sizes={sizes} className="object-cover" />
       ) : (
         <UnexposedCover />
       )}

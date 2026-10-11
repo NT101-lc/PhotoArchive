@@ -1,18 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { normalizeText, plural, yearOf } from "@/lib/format";
+import { useI18n } from "@/i18n/client";
+import { normalizeText, yearOf } from "@/lib/format";
 import type { Album } from "@/lib/types";
 import { AlbumCard } from "./AlbumCard";
 import { EmptyState } from "./EmptyState";
 import { IconClose, IconReset, IconSearch } from "./Icons";
 import { distinctPlaceNames, sameName } from "@/lib/places-format";
 
-export const SORTS = {
-  newest: "Newest",
-  oldest: "Oldest",
-  most: "Most photos",
-} as const;
+/** Cách xếp (nhãn trong từ điển: albums.sorts) */
+export const SORTS = { newest: true, oldest: true, most: true } as const;
 export type SortKey = keyof typeof SORTS;
 
 /** `year` / `place` rỗng = tất cả. Chọn nhiều: cùng hàng là "hoặc", khác hàng là "và". */
@@ -26,6 +24,7 @@ export function AlbumBrowser({ albums, initial }: Props) {
   const [place, setPlace] = useState<string[]>(initial.place);
   const [sort, setSort] = useState<SortKey>(initial.sort);
   const searchRef = useRef<HTMLInputElement>(null);
+  const { t } = useI18n();
 
   const years = useMemo(
     () => [...new Set(albums.map((a) => yearOf(a.tripDate)))].sort((a, b) => b.localeCompare(a)),
@@ -94,13 +93,13 @@ export function AlbumBrowser({ albums, initial }: Props) {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search trips, places…"
-              aria-label="Search albums"
+              placeholder={t.albums.searchPlaceholder}
+              aria-label={t.albums.searchLabel}
               autoComplete="off"
               className="min-w-0 flex-1 bg-transparent font-medium outline-none placeholder:text-ink-soft/70 [&::-webkit-search-cancel-button]:hidden"
             />
             {query ? (
-              <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 hover:bg-surface-2" aria-label="Clear search">
+              <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 hover:bg-surface-2" aria-label={t.albums.clearSearch}>
                 <IconClose size={16} />
               </button>
             ) : (
@@ -108,15 +107,15 @@ export function AlbumBrowser({ albums, initial }: Props) {
             )}
           </label>
           <label className="flex items-center gap-2">
-            <span className="eyebrow shrink-0">Sort</span>
+            <span className="eyebrow shrink-0">{t.albums.sort}</span>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
               className="field h-11 pr-9 sm:w-[170px]"
             >
-              {Object.entries(SORTS).map(([k, label]) => (
+              {(Object.keys(SORTS) as SortKey[]).map((k) => (
                 <option key={k} value={k}>
-                  {label}
+                  {t.albums.sorts[k]}
                 </option>
               ))}
             </select>
@@ -124,16 +123,16 @@ export function AlbumBrowser({ albums, initial }: Props) {
         </div>
 
         <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-6">
-          <ChipRow label="Year" value={year} onChange={setYear} options={years} />
-          <ChipRow label="Place" value={place} onChange={setPlace} options={places} />
+          <ChipRow label={t.albums.year} value={year} onChange={setYear} options={years} />
+          <ChipRow label={t.albums.place} value={place} onChange={setPlace} options={places} />
           <div className="flex items-center gap-3 lg:ml-auto">
             <span className="font-mono text-xs text-ink-soft">
-              {filtered.length}/{plural(albums.length, "album")}
+              {t.albums.shown(filtered.length, albums.length)}
             </span>
             {isFiltering && (
               <button type="button" onClick={resetFilters} className="chip border-accent text-accent">
                 <IconReset size={13} />
-                Clear all
+                {t.albums.clearAll}
               </button>
             )}
           </div>
@@ -151,17 +150,15 @@ export function AlbumBrowser({ albums, initial }: Props) {
       ) : (
         <EmptyState
           icon={<IconSearch size={26} />}
-          title="No trips match"
+          title={t.albums.noMatch}
           action={
             <button type="button" onClick={resetFilters} className="btn btn-primary">
               <IconReset size={16} />
-              Clear filters
+              {t.albums.clearFilters}
             </button>
           }
         >
-          {query.trim()
-            ? `Nothing found for “${query.trim()}”. Try a shorter keyword (accents optional) or clear the year / place filters.`
-            : "No albums match this year and place combination. Try another one."}
+          {query.trim() ? t.albums.nothingFor(query.trim()) : t.albums.noCombo}
         </EmptyState>
       )}
     </>
@@ -180,6 +177,7 @@ function ChipRow({
   options: string[];
   onChange: (v: string[]) => void;
 }) {
+  const { t } = useI18n();
   const toggle = (opt: string) =>
     onChange(value.includes(opt) ? value.filter((v) => v !== opt) : [...value, opt]);
 
@@ -189,11 +187,11 @@ function ChipRow({
       {/* Mobile: cuộn ngang thay vì xuống nhiều dòng */}
       <div
         role="group"
-        aria-label={`Filter by ${label.toLowerCase()} (multiple allowed)`}
+        aria-label={t.albums.filterBy(label)}
         className="scrollbar-none -my-1 flex min-w-0 gap-1.5 overflow-x-auto py-1 pr-1 lg:flex-wrap lg:overflow-visible"
       >
         <button type="button" className="chip" aria-pressed={value.length === 0} onClick={() => onChange([])}>
-          All
+          {t.albums.all}
         </button>
         {options.map((opt) => (
           <button key={opt} type="button" className="chip" aria-pressed={value.includes(opt)} onClick={() => toggle(opt)}>
@@ -205,8 +203,8 @@ function ChipRow({
         type="button"
         onClick={() => onChange([])}
         disabled={value.length === 0}
-        title={`Reset ${label.toLowerCase()} filter`}
-        aria-label={`Reset ${label.toLowerCase()} filter`}
+        title={t.albums.resetFilter(label)}
+        aria-label={t.albums.resetFilter(label)}
         className="flex h-8 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-semibold text-ink-soft transition-colors hover:text-ink disabled:opacity-35"
       >
         <IconReset size={13} />

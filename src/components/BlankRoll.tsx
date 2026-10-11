@@ -1,3 +1,6 @@
+"use client";
+
+import { useI18n } from "@/i18n/client";
 import type { Album } from "@/lib/types";
 import { IconUpload } from "./Icons";
 import { UploadButton } from "./UploadModal";
@@ -9,17 +12,17 @@ const FRAMES = 6;
  * Khung 1 sáng đèn buồng tối và là nút upload.
  */
 export function BlankRoll({ album }: { album: Pick<Album, "id" | "title" | "location" | "createdById"> }) {
+  const { t } = useI18n();
   return (
     <section className="my-6 flex flex-col gap-8" aria-labelledby="blank-roll-title">
       <BlankStrip album={album} />
 
       <div className="max-w-[52ch]">
         <h2 id="blank-roll-title" className="font-display text-3xl font-extrabold tracking-[-0.02em] [font-stretch:115%]">
-          Nothing developed yet
+          {t.blank.title}
         </h2>
         <p className="mt-2 text-[1.02rem] leading-relaxed text-ink-soft">
-          The roll for {album.location} is loaded and waiting. Add photos or videos from the trip and they fill in here, frame
-          by frame, for the whole crew.
+          {t.blank.body(album.location)}
         </p>
       </div>
     </section>
@@ -29,6 +32,7 @@ export function BlankRoll({ album }: { album: Pick<Album, "id" | "title" | "loca
 /** Dải phim trống. `wide`: tràn hết chiều ngang như contact sheet ở trang chủ. */
 export function BlankStrip({ album, wide = false }: { album: Pick<Album, "id" | "title" | "createdById">; wide?: boolean }) {
   const options = [{ id: album.id, title: album.title, createdById: album.createdById }];
+  const { t } = useI18n();
 
   return (
     <div className={wide ? "bg-film text-white" : "overflow-hidden rounded-[3px] bg-film text-white"}>
@@ -51,7 +55,7 @@ export function BlankStrip({ album, wide = false }: { album: Pick<Album, "id" | 
                 className="unexposed safelight group flex aspect-[3/2] w-full flex-col items-center justify-center gap-1.5 rounded-[2px] text-sm font-semibold text-white focus-visible:outline-offset-2"
               >
                 <IconUpload size={22} className="transition-transform duration-200 group-hover:-translate-y-0.5" />
-                Add the first shots
+                {t.blank.firstShots}
               </UploadButton>
             ) : (
               // Các khung sau mờ dần về cuối cuộn
@@ -67,10 +71,11 @@ export function BlankStrip({ album, wide = false }: { album: Pick<Album, "id" | 
 
 /** Bìa của album chưa có ảnh: tấm in chưa tráng, mép hở sáng màu hổ phách. */
 export function UnexposedCover() {
+  const { t } = useI18n();
   return (
     <span className="unexposed absolute inset-0 flex items-end justify-between p-3" aria-hidden="true">
       <span className="frame-no text-[0.7rem]">&#9656; 1</span>
-      <span className="text-xs font-medium text-white/55">Not developed yet</span>
+      <span className="text-xs font-medium text-white/55">{t.blank.notDeveloped}</span>
     </span>
   );
 }

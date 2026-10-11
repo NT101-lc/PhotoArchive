@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { formatDate, formatDateRange, formatDateTime, plural, tripDays } from "@/lib/format";
+import { useI18n } from "@/i18n/client";
+import { formatDate, formatDateRange, formatDateTime, tripDays } from "@/lib/format";
 import type { Album, Photo } from "@/lib/types";
 import { IconInfo } from "./Icons";
 import { Modal } from "./Modal";
@@ -11,6 +12,7 @@ const AVATAR_BG = ["bg-butter", "bg-teal", "bg-lilac", "bg-sky", "bg-accent"];
 /** Nút "Chi tiết" + modal thông tin chuyến đi. */
 export function AlbumDetailButton({ album, photos }: { album: Album; photos: Photo[] }) {
   const [open, setOpen] = useState(false);
+  const { t, locale } = useI18n();
 
   const contributors = Object.entries(
     photos.reduce<Record<string, number>>((acc, p) => {
@@ -25,33 +27,33 @@ export function AlbumDetailButton({ album, photos }: { album: Album; photos: Pho
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="btn" title="Trip details">
+      <button type="button" onClick={() => setOpen(true)} className="btn" title={t.details.title}>
         <IconInfo size={16} />
-        Details
+        {t.details.button}
       </button>
 
-      <Modal open={open} onClose={() => setOpen(false)} eyebrow="Trip details" title={album.title}>
+      <Modal open={open} onClose={() => setOpen(false)} eyebrow={t.details.title} title={album.title}>
         <div className="flex flex-col gap-6 p-5">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-surface-2/70 p-4">
-            <Meta k="Place" v={album.location} />
+            <Meta k={album.places.length > 1 ? t.details.places : t.details.place} v={album.location} />
             <Meta
-              k={album.endDate ? "Trip dates" : "Trip date"}
+              k={album.endDate ? t.details.tripDates : t.details.tripDate}
               v={
                 album.endDate
-                  ? `${formatDateRange(album.tripDate, album.endDate)} (${plural(tripDays(album.tripDate, album.endDate), "day")})`
-                  : formatDate(album.tripDate)
+                  ? `${formatDateRange(album.tripDate, album.endDate, locale)} (${t.count.days(tripDays(album.tripDate, album.endDate))})`
+                  : formatDate(album.tripDate, locale)
               }
             />
-            {first && <Meta k="First photo" v={formatDateTime(first)} />}
-            {last && <Meta k="Last photo" v={formatDateTime(last)} />}
-            <Meta k="Photos" v={String(album.photoCount)} />
-            <Meta k="Album ID" v={album.id} mono />
+            {first && <Meta k={t.details.firstPhoto} v={formatDateTime(first, locale)} />}
+            {last && <Meta k={t.details.lastPhoto} v={formatDateTime(last, locale)} />}
+            <Meta k={t.details.photos} v={String(album.photoCount)} />
+            <Meta k={t.details.albumId} v={album.id} mono />
           </dl>
 
           <section>
-            <h3 className="eyebrow mb-3">Top contributors</h3>
+            <h3 className="eyebrow mb-3">{t.details.topContributors}</h3>
             {contributors.length === 0 ? (
-              <p className="text-sm text-ink-soft italic">Nobody has uploaded photos yet.</p>
+              <p className="text-sm text-ink-soft italic">{t.details.nobody}</p>
             ) : (
               <ul className="flex flex-col gap-2.5">
                 {contributors.map(([name, count], i) => (
@@ -66,7 +68,7 @@ export function AlbumDetailButton({ album, photos }: { album: Album; photos: Pho
                     <div className="min-w-0 flex-1">
                       <div className="flex justify-between text-sm">
                         <span className="font-semibold">{name}</span>
-                        <span className="font-mono text-xs text-ink-soft">{plural(count, "photo")}</span>
+                        <span className="font-mono text-xs text-ink-soft">{t.count.photos(count)}</span>
                       </div>
                       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2">
                         <div className="h-full rounded-full bg-ink" style={{ width: `${(count / max) * 100}%` }} />

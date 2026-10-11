@@ -2,23 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useI18n } from "@/i18n/client";
 import { IconCalendar, IconInfo, IconStats } from "./Icons";
 
 const LINKS = [
   // Màn hình hẹp: bỏ "Home" (bấm logo là về trang chủ) để thanh trên không bị tràn
-  { href: "/", label: "Home", match: (p: string) => p === "/", hideOnMobile: true },
-  { href: "/albums", label: "Albums", match: (p: string) => p.startsWith("/albums") },
-  { href: "/plans", label: "Plans", match: (p: string) => p.startsWith("/plans"), icon: IconCalendar },
+  { href: "/", label: "home", match: (p: string) => p === "/", hideOnMobile: true },
+  { href: "/albums", label: "albums", match: (p: string) => p.startsWith("/albums") },
+  { href: "/plans", label: "plans", match: (p: string) => p.startsWith("/plans"), icon: IconCalendar },
   // Màn hình hẹp chỉ hiện icon để thanh trên không bị tràn
-  { href: "/dashboard", label: "Dashboard", match: (p: string) => p.startsWith("/dashboard"), icon: IconStats },
-  { href: "/about", label: "About", match: (p: string) => p.startsWith("/about"), icon: IconInfo },
-];
+  { href: "/dashboard", label: "dashboard", match: (p: string) => p.startsWith("/dashboard"), icon: IconStats },
+  { href: "/about", label: "about", match: (p: string) => p.startsWith("/about"), icon: IconInfo },
+] as const;
 
 export function NavLinks() {
   const pathname = usePathname();
+  const { t } = useI18n();
   return (
     <div className="flex items-center gap-1">
-      {LINKS.map(({ href, label, match, icon: Icon, hideOnMobile }) => {
+      {LINKS.map((link) => {
+        const { href, match } = link;
+        const Icon = "icon" in link ? link.icon : undefined;
+        const hideOnMobile = "hideOnMobile" in link && link.hideOnMobile;
+        const label = t.nav[link.label];
         const active = match(pathname);
         return (
           <Link

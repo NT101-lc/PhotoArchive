@@ -1,6 +1,7 @@
 "use client";
 
 import { tripDays } from "@/lib/format";
+import { useI18n } from "@/i18n/client";
 import { DateInput } from "./DateInput";
 
 /**
@@ -19,12 +20,13 @@ export function DateRangeFields({
   className?: string;
 }) {
   const days = start && end ? tripDays(start, end) : 1;
+  const { t } = useI18n();
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-ink-soft">First day</span>
+          <span className="text-xs font-semibold text-ink-soft">{t.dates.firstDay}</span>
           <DateInput
             value={start}
             required
@@ -32,20 +34,20 @@ export function DateRangeFields({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-ink-soft">Last day (optional)</span>
+          <span className="text-xs font-semibold text-ink-soft">{t.dates.lastDay}</span>
           <DateInput
             value={end}
             min={start || undefined}
-            minMessage="The last day can’t be before the first day."
+            minMessage={t.dates.lastBeforeFirst}
             onChange={(next) => onChange({ start, end: next })}
           />
         </label>
       </div>
       <p className="flex items-center gap-2 text-xs text-ink-soft" aria-live="polite">
-        {days > 1 ? `${days}-day trip` : "Day trip"}
+        {days > 1 ? t.dates.nDayTrip(days) : t.dates.dayTrip}
         {end && (
           <button type="button" onClick={() => onChange({ start, end: "" })} className="font-semibold underline hover:text-accent">
-            Make it a day trip
+            {t.dates.makeDayTrip}
           </button>
         )}
       </p>

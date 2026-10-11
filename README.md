@@ -44,7 +44,10 @@ Giao diện "Darkroom": giấy ảnh ấm + chấm lưới, viền mực, bóng 
 
 ## Tính năng
 
-Giao diện hiển thị bằng tiếng Anh (tên chuyến đi / địa danh trong dữ liệu giữ nguyên).
+Giao diện có **tiếng Anh và tiếng Việt**: nút EN / VI trên thanh trên cùng. Lựa chọn lưu trong cookie (URL không đổi, link ảnh đã
+chia sẻ vẫn dùng được); chưa chọn thì theo ngôn ngữ trình duyệt. Chữ giao diện nằm trong `src/i18n/en.ts` và `src/i18n/vi.ts`
+(thiếu khoá ở một bên là typecheck / test báo lỗi); ngày tháng định dạng theo ngôn ngữ (`20 Dec 2025` / `20 thg 12, 2025`).
+Tên chuyến đi, địa danh, mô tả, bình luận là dữ liệu nên giữ nguyên; thông báo lỗi từ API hiện vẫn bằng tiếng Anh.
 
 - **Trang chủ `/`** (landing): dải phim chạy tên các chuyến, hero + thống kê, 4 lối tắt, chuyến gần nhất,
   dòng thời gian dạng trục dọc (mỗi chuyến là một mốc có ngày + thứ, mốc năm nằm trên trục).

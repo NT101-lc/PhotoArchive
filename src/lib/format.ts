@@ -1,34 +1,47 @@
-const dateFmt = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "Asia/Ho_Chi_Minh",
-});
+import { INTL_LOCALE, type Locale } from "@/i18n/config";
 
-const dateTimeFmt = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "Asia/Ho_Chi_Minh",
-});
+// Mọi ngày giờ hiển thị theo giờ Việt Nam. Hàm nào nhận `locale` thì mặc định tiếng Anh.
+const TZ = "Asia/Ho_Chi_Minh";
 
-/** `2025-12-20` → `20 Dec 2025` */
-export function formatDate(isoDate: string) {
-  return dateFmt.format(new Date(`${isoDate.slice(0, 10)}T12:00:00+07:00`));
+/** Intl.DateTimeFormat dựng một lần cho mỗi (ngôn ngữ, kiểu) */
+const fmtCache = new Map<string, Intl.DateTimeFormat>();
+function fmt(locale: Locale, kind: string, opts: Intl.DateTimeFormatOptions) {
+  const key = `${locale}:${kind}`;
+  let f = fmtCache.get(key);
+  if (!f) fmtCache.set(key, (f = new Intl.DateTimeFormat(INTL_LOCALE[locale], { ...opts, timeZone: TZ })));
+  return f;
+}
+
+const isoNoon = (isoDate: string) => new Date(`${isoDate.slice(0, 10)}T12:00:00+07:00`);
+
+/** Ngày / tháng / năm đã định dạng của một ngày: en `20` `Dec` `2025`, vi `20` `thg 12` `2025` */
+function dateParts(isoDate: string, locale: Locale) {
+  const parts = fmt(locale, "date", { day: "numeric", month: "short", year: "numeric" }).formatToParts(isoNoon(isoDate));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return { d: get("day"), m: get("month"), y: get("year") };
+}
+
+/** Ghép lại theo thứ tự từng ngôn ngữ: en `20 Dec 2025`, vi `20 thg 12, 2025` */
+const joinDate = (locale: Locale, d: string, m: string, y?: string) =>
+  locale === "vi" ? `${d} ${m}${y ? `, ${y}` : ""}` : `${d} ${m}${y ? ` ${y}` : ""}`;
+
+/** `2025-12-20` → en `20 Dec 2025`, vi `20 thg 12, 2025` */
+export function formatDate(isoDate: string, locale: Locale = "en") {
+  const { d, m, y } = dateParts(isoDate, locale);
+  return joinDate(locale, d, m, y);
 }
 
 /**
  * Khoảng ngày của chuyến đi, gộp phần trùng:
  * `20 Dec 2025` · `20–22 Dec 2025` · `30 Nov – 2 Dec 2025` · `30 Dec 2025 – 2 Jan 2026`
+ * (tiếng Việt: `20–22 thg 12, 2025` · `30 thg 11 – 2 thg 12, 2025`)
  */
-export function formatDateRange(start: string, end: string | null | undefined) {
-  if (!end || end <= start) return formatDate(start);
-  const [a, b] = [start, end].map((d) => formatDate(d).split(" ")); // [day, month, year]
-  if (a[2] !== b[2]) return `${a.join(" ")} – ${b.join(" ")}`;
-  if (a[1] !== b[1]) return `${a[0]} ${a[1]} – ${b.join(" ")}`;
-  return `${a[0]}–${b.join(" ")}`;
+export function formatDateRange(start: string, end: string | null | undefined, locale: Locale = "en") {
+  if (!end || end <= start) return formatDate(start, locale);
+  const [a, b] = [dateParts(start, locale), dateParts(end, locale)];
+  if (a.y !== b.y) return `${joinDate(locale, a.d, a.m, a.y)} – ${joinDate(locale, b.d, b.m, b.y)}`;
+  if (a.m !== b.m) return `${joinDate(locale, a.d, a.m)} – ${joinDate(locale, b.d, b.m, b.y)}`;
+  return `${a.d}–${joinDate(locale, b.d, b.m, b.y)}`;
 }
 
 /** Số ngày của chuyến (tính cả ngày đầu và cuối). */
@@ -37,8 +50,11 @@ export function tripDays(start: string, end: string | null | undefined) {
   return Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1;
 }
 
-export function formatDateTime(iso: string) {
-  return dateTimeFmt.format(new Date(iso));
+/** en `20 Dec 2025, 14:03`, vi `14:03 20 thg 12, 2025` */
+export function formatDateTime(iso: string, locale: Locale = "en") {
+  return fmt(locale, "datetime", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(
+    new Date(iso),
+  );
 }
 
 export function yearOf(isoDate: string) {
@@ -88,7 +104,7 @@ export function formatBytes(bytes: number) {
   return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 }
 
-/** `1 photo`, `3 photos` */
+/** `1 photo`, `3 photos` (tiếng Anh; chữ giao diện dùng từ điển trong src/i18n) */
 export function plural(n: number, word: string) {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
@@ -97,23 +113,22 @@ export function pad2(n: number) {
   return String(n).padStart(2, "0");
 }
 
-const dayKeyFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
-const dayHeadingFmt = new Intl.DateTimeFormat("en-GB", {
-  weekday: "long",
-  day: "numeric",
-  month: "short",
-  timeZone: "Asia/Ho_Chi_Minh",
-});
+const dayKeyFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ });
 
 /** Khoá ngày theo giờ Việt Nam, `YYYY-MM-DD` — dùng để gom ảnh theo ngày. */
 export function dayKey(iso: string) {
   return dayKeyFmt.format(new Date(iso));
 }
 
-/** `Saturday 20 Dec` */
-export function formatDayHeading(iso: string) {
-  const s = dayHeadingFmt.format(new Date(iso));
+/** en `Saturday 20 Dec`, vi `Thứ Bảy, 20 thg 12` */
+export function formatDayHeading(iso: string, locale: Locale = "en") {
+  const s = fmt(locale, "dayHeading", { weekday: "long", day: "numeric", month: "short" }).format(new Date(iso));
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Thứ trong tuần dạng ngắn: en `Sat`, vi `Th 7` */
+export function formatWeekday(isoDate: string, locale: Locale = "en") {
+  return fmt(locale, "weekday", { weekday: "short" }).format(isoNoon(isoDate));
 }
 
 /** Thời lượng video: `0:07`, `3:05`, `1:02:09` */
@@ -154,18 +169,26 @@ export function dmyToIso(text: string) {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-/** `just now`, `5 min ago`, `yesterday`, `3 days ago`; quá một tháng → ngày tháng. */
-export function timeAgo(iso: string, now = Date.now()) {
+const rtfCache = new Map<Locale, Intl.RelativeTimeFormat>();
+const rtf = (locale: Locale) => {
+  let f = rtfCache.get(locale);
+  if (!f) rtfCache.set(locale, (f = new Intl.RelativeTimeFormat(locale, { numeric: "auto" })));
+  return f;
+};
+const sentence = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+/**
+ * en `just now`, `5 min ago`, `yesterday`, `3 days ago`; vi `vừa xong`, `5 phút trước`, `hôm qua`, `3 ngày trước`.
+ * Quá một tháng → ngày tháng. Chữ thường để ghép vào giữa câu.
+ */
+export function timeAgo(iso: string, now = Date.now(), locale: Locale = "en") {
   const s = Math.round((now - Date.parse(iso)) / 1000);
-  if (s < 45) return "just now";
+  if (s < 45) return locale === "vi" ? "vừa xong" : "just now";
   const m = Math.round(s / 60);
-  if (m < 60) return `${m} min ago`;
+  if (m < 60) return locale === "vi" ? `${m} phút trước` : `${m} min ago`;
   const h = Math.round(m / 60);
-  if (h < 24) return rtf.format(-h, "hour");
+  if (h < 24) return sentence(rtf(locale).format(-h, "hour"));
   const d = Math.round(h / 24);
-  if (d < 30) return rtf.format(-d, "day");
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(
-    new Date(iso),
-  );
+  if (d < 30) return sentence(rtf(locale).format(-d, "day"));
+  return formatDate(dayKey(iso), locale);
 }

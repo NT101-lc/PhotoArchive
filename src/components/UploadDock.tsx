@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { formatBytes, plural } from "@/lib/format";
+import { useI18n } from "@/i18n/client";
+import { formatBytes } from "@/lib/format";
 import { IconCheck, IconChevronDown, IconClose, IconImage, IconPlay, IconReset } from "./Icons";
 import { useUploads, type UploadFileState, type UploadJob } from "./UploadManager";
 
@@ -10,6 +11,7 @@ import { useUploads, type UploadFileState, type UploadJob } from "./UploadManage
 export function UploadDock() {
   const { jobs, cancel, retryFailed, dismiss, dismissFinished } = useUploads();
   const [open, setOpen] = useState(true);
+  const { t } = useI18n();
   if (jobs.length === 0) return null;
 
   const files = jobs.flatMap((j) => j.files);
@@ -20,15 +22,11 @@ export function UploadDock() {
   const active = jobs.some((j) => j.status === "queued" || j.status === "uploading");
   const pct = total ? Math.round((loaded / total) * 100) : 0;
 
-  const title = active
-    ? `Uploading ${plural(files.length - done - failed, "file")}`
-    : failed
-      ? `${plural(failed, "file")} didn’t upload`
-      : `Uploaded ${plural(done, "file")}`;
+  const title = active ? t.dock.uploading(files.length - done - failed) : failed ? t.dock.failed(failed) : t.dock.uploaded(done);
 
   return (
     <section
-      aria-label="Uploads"
+      aria-label={t.dock.label}
       className="animate-rise fixed inset-x-3 bottom-3 z-[1500] overflow-hidden rounded-xl border border-line bg-surface shadow-hard-lg sm:inset-x-auto sm:bottom-6 sm:left-6 sm:w-[380px]"
     >
       <div className="flex items-center gap-3 px-4 py-3">
@@ -51,18 +49,14 @@ export function UploadDock() {
             {title}
           </span>
           <span className="block text-xs text-ink-soft tabular-nums">
-            {active
-              ? `${pct}%, ${formatBytes(loaded)} of ${formatBytes(total)}. You can keep browsing.`
-              : failed
-                ? "Retry them from the list below."
-                : "Everything is in the album."}
+            {active ? t.dock.progress(pct, formatBytes(loaded), formatBytes(total)) : failed ? t.dock.retryBelow : t.dock.allIn}
           </span>
         </button>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           className="rounded-md p-1 text-ink-soft hover:bg-surface-2 hover:text-ink"
-          aria-label={open ? "Collapse uploads" : "Expand uploads"}
+          aria-label={open ? t.dock.collapse : t.dock.expand}
         >
           <IconChevronDown size={18} className={`transition-transform ${open ? "" : "rotate-180"}`} />
         </button>
@@ -71,7 +65,7 @@ export function UploadDock() {
             type="button"
             onClick={dismissFinished}
             className="rounded-md p-1 text-ink-soft hover:bg-surface-2 hover:text-ink"
-            aria-label="Close uploads panel"
+            aria-label={t.dock.closePanel}
           >
             <IconClose size={18} />
           </button>
@@ -106,6 +100,7 @@ function JobRow({ job, onCancel, onRetry, onDismiss }: { job: UploadJob; onCance
   const failed = job.files.filter((f) => f.status === "failed").length;
   const active = job.status === "queued" || job.status === "uploading";
   const videos = job.files.filter((f) => f.video && f.status === "done").length;
+  const { t } = useI18n();
 
   return (
     <li className="border-b border-line last:border-b-0">
@@ -114,20 +109,20 @@ function JobRow({ job, onCancel, onRetry, onDismiss }: { job: UploadJob; onCance
           {job.albumTitle}
         </Link>
         <span className="shrink-0 text-xs text-ink-soft tabular-nums">
-          {job.status === "queued" ? "Waiting" : `${done}/${job.files.length}`}
+          {job.status === "queued" ? t.dock.waiting : `${done}/${job.files.length}`}
         </span>
         {active ? (
           <button type="button" onClick={onCancel} className="text-xs font-semibold text-ink-soft underline hover:text-danger">
-            Cancel
+            {t.common.cancel}
           </button>
         ) : (
           <>
             {failed > 0 && job.status !== "cancelled" && (
               <button type="button" onClick={onRetry} className="text-xs font-semibold text-accent underline">
-                Retry {failed}
+                {t.dock.retry(failed)}
               </button>
             )}
-            <button type="button" onClick={onDismiss} className="rounded p-0.5 text-ink-soft hover:text-ink" aria-label={`Remove ${job.albumTitle} from list`}>
+            <button type="button" onClick={onDismiss} className="rounded p-0.5 text-ink-soft hover:text-ink" aria-label={t.dock.removeFromList(job.albumTitle)}>
               <IconClose size={14} />
             </button>
           </>
@@ -136,7 +131,7 @@ function JobRow({ job, onCancel, onRetry, onDismiss }: { job: UploadJob; onCance
       {job.error && <p className="px-4 pb-1.5 text-xs text-danger">{job.error}</p>}
       {!active && videos > 0 && (
         <p className="px-4 pb-1.5 text-xs text-ink-soft">
-          {plural(videos, "video")} {videos === 1 ? "is" : "are"} being processed. {videos === 1 ? "It" : "They"}’ll be playable in a few minutes.
+          {t.dock.videosProcessing(videos)}
         </p>
       )}
       <ul className="pb-2">
@@ -150,6 +145,7 @@ function JobRow({ job, onCancel, onRetry, onDismiss }: { job: UploadJob; onCance
 
 function FileRow({ file }: { file: UploadFileState }) {
   const pct = file.size ? Math.min(100, Math.round((file.loaded / file.size) * 100)) : 0;
+  const { t } = useI18n();
   return (
     <li className="flex items-center gap-2.5 px-4 py-1 text-sm" title={file.error}>
       <span className="shrink-0 text-ink-soft" aria-hidden="true">
@@ -167,7 +163,7 @@ function FileRow({ file }: { file: UploadFileState }) {
         {file.status === "done" ? (
           <IconCheck size={15} className="text-accent" />
         ) : file.status === "failed" ? (
-          file.error === "Cancelled" ? "Cancelled" : "Failed"
+          file.error === "Cancelled" ? t.dock.cancelled : t.dock.failedShort
         ) : file.status === "uploading" ? (
           `${pct}%`
         ) : (

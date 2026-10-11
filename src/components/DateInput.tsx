@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { dmyToIso, isoToDmy, maskDmy } from "@/lib/format";
+import { useI18n } from "@/i18n/client";
 import { IconCalendar } from "./Icons";
 
 type Props = {
@@ -15,16 +16,12 @@ type Props = {
   minMessage?: string;
 };
 
-const MESSAGES = {
-  format: "Type the date as dd/mm/yyyy.",
-  required: "Pick a date.",
-} as const;
-
 /**
  * Ô ngày hiển thị dd/mm/yyyy, không phụ thuộc ngôn ngữ trình duyệt (input type="date" gốc
  * luôn theo locale máy, thường là mm/dd). Gõ tay (tự chèn "/") hoặc bấm icon để mở lịch gốc.
  */
-export function DateInput({ value, onChange, min, required, minMessage = "That date is too early.", "aria-label": ariaLabel }: Props) {
+export function DateInput({ value, onChange, min, required, minMessage, "aria-label": ariaLabel }: Props) {
+  const { t } = useI18n();
   const [text, setText] = useState(isoToDmy(value));
   const [problem, setProblem] = useState<string | null>(null);
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -39,13 +36,13 @@ export function DateInput({ value, onChange, min, required, minMessage = "That d
 
   function commit(next: string) {
     if (!next) {
-      setProblem(required ? MESSAGES.required : null);
+      setProblem(required ? t.dates.required : null);
       if (!required) onChange("");
       return;
     }
     const iso = dmyToIso(next);
-    if (!iso) return setProblem(MESSAGES.format);
-    if (min && iso < min) return setProblem(minMessage);
+    if (!iso) return setProblem(t.dates.format);
+    if (min && iso < min) return setProblem(minMessage ?? t.dates.tooEarly);
     setProblem(null);
     setText(isoToDmy(iso));
     if (iso !== value) onChange(iso);
@@ -58,7 +55,7 @@ export function DateInput({ value, onChange, min, required, minMessage = "That d
           type="text"
           inputMode="numeric"
           autoComplete="off"
-          placeholder="dd/mm/yyyy"
+          placeholder={t.dates.placeholder}
           maxLength={10}
           value={text}
           required={required}
@@ -85,7 +82,7 @@ export function DateInput({ value, onChange, min, required, minMessage = "That d
             }
           }}
           className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg text-ink-soft hover:text-ink"
-          aria-label="Open calendar"
+          aria-label={t.dates.openCalendar}
           tabIndex={-1}
         >
           <IconCalendar size={17} />

@@ -7,6 +7,7 @@ import { retryVideo } from "@/lib/api-client";
 import { formatBytes, formatDateTime } from "@/lib/format";
 import { IconCheck, IconReset } from "./Icons";
 import { useToast } from "./Toast";
+import { useI18n } from "@/i18n/client";
 
 type Item = {
   id: string;
@@ -20,34 +21,36 @@ type Item = {
   uploader: string | null;
 };
 
-const STATUS = {
-  queued: { label: "Waiting", tone: "text-ink-soft" },
-  processing: { label: "Processing", tone: "text-accent" },
-  failed: { label: "Failed", tone: "text-danger" },
-  ready: { label: "Ready", tone: "text-accent" },
+/** Màu chữ theo trạng thái (nhãn trong từ điển: queue.status) */
+const TONE = {
+  queued: "text-ink-soft",
+  processing: "text-accent",
+  failed: "text-danger",
+  ready: "text-accent",
 } as const;
 
 /** Admin: video chưa xem được, có nút thử lại cho video lỗi. Tự làm mới khi còn video đang xử lý. */
 export function VideoQueue({ items, stuck }: { items: Item[]; stuck: boolean }) {
   const router = useRouter();
   const toast = useToast();
+  const { t, locale } = useI18n();
   const [busy, setBusy] = useState<string | null>(null);
   const active = items.some((i) => i.status === "queued" || i.status === "processing");
 
   useEffect(() => {
     if (!active) return;
-    const t = setInterval(() => router.refresh(), 15_000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => router.refresh(), 15_000);
+    return () => clearInterval(timer);
   }, [active, router]);
 
   async function retry(id: string) {
     setBusy(id);
     try {
       await retryVideo(id);
-      toast.show({ tone: "success", title: "Video queued again" });
+      toast.show({ tone: "success", title: t.queue.queued });
       router.refresh();
     } catch (err) {
-      toast.show({ tone: "warn", title: "Couldn’t retry", message: (err as Error).message });
+      toast.show({ tone: "warn", title: t.queue.couldntRetry, message: (err as Error).message });
     } finally {
       setBusy(null);
     }
@@ -57,7 +60,7 @@ export function VideoQueue({ items, stuck }: { items: Item[]; stuck: boolean }) 
     return (
       <p className="flex items-center gap-2 text-sm text-ink-soft">
         <IconCheck size={16} className="text-accent" />
-        Nothing waiting. Every uploaded video is playable.
+        {t.queue.allClear}
       </p>
     );
   }
@@ -66,17 +69,16 @@ export function VideoQueue({ items, stuck }: { items: Item[]; stuck: boolean }) 
     <div className="flex flex-col gap-3">
       {stuck && (
         <p role="alert" className="rounded-lg border border-danger bg-danger/10 px-4 py-3 text-sm">
-          <b>Some videos have been waiting for over an hour.</b> The transcoding worker may not be set up: check the
-          repository secrets for the “Transcode videos” workflow on GitHub (see README, section Video).
+          <b>{t.queue.stuckTitle}</b> {t.queue.stuckBody}
         </p>
       )}
       <ul className="divide-y divide-line border-y border-line">
         {items.map((v) => {
-          const s = STATUS[v.status];
+
           return (
             <li key={v.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 text-sm">
-              <span className={`w-24 shrink-0 font-semibold ${s.tone}`}>
-                {s.label}
+              <span className={`w-24 shrink-0 font-semibold ${TONE[v.status]}`}>
+                {t.queue.status[v.status]}
                 {v.status !== "queued" && v.attempts > 1 && <span className="font-normal text-ink-soft"> ({v.attempts}×)</span>}
               </span>
               <span className="min-w-0 flex-1">
@@ -85,7 +87,7 @@ export function VideoQueue({ items, stuck }: { items: Item[]; stuck: boolean }) 
                 </Link>
                 <span className="text-ink-soft">
                   {" "}
-                  by {v.uploader ?? "Unknown"}, {formatDateTime(v.createdAt)}
+                  {t.queue.by(v.uploader)}, {formatDateTime(v.createdAt, locale)}
                   {v.sizeBytes ? `, ${formatBytes(v.sizeBytes)}` : ""}
                 </span>
                 {v.error && <span className="mt-0.5 block truncate text-xs text-danger" title={v.error}>{v.error}</span>}
@@ -93,7 +95,7 @@ export function VideoQueue({ items, stuck }: { items: Item[]; stuck: boolean }) 
               {v.status === "failed" && (
                 <button type="button" className="btn h-8 px-3 text-xs" disabled={busy === v.id} onClick={() => retry(v.id)}>
                   <IconReset size={14} />
-                  Try again
+                  {t.common.tryAgain}
                 </button>
               )}
             </li>

@@ -6,6 +6,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { Avatar } from "@/components/Avatar";
 import { IconImage, IconTrash } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
+import { useI18n } from "@/i18n/client";
 import { api, updateProfile, uploadAvatar } from "@/lib/api-client";
 import { canRenameSelf } from "@/lib/permissions";
 import type { Me } from "@/lib/types";
@@ -13,6 +14,7 @@ import type { Me } from "@/lib/types";
 export function ProfileForm({ me, storageReady }: { me: Me; storageReady: boolean }) {
   const router = useRouter();
   const toast = useToast();
+  const { t } = useI18n();
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(me.name);
   const [busy, setBusy] = useState<null | "avatar" | "name" | "out">(null);
@@ -25,7 +27,7 @@ export function ProfileForm({ me, storageReady }: { me: Me; storageReady: boolea
       toast.show({ tone: "success", title: success });
       router.refresh(); // layout đọc lại danh tính → avatar / tên trên thanh trên cùng cập nhật theo
     } catch (err) {
-      toast.show({ tone: "warn", title: "Couldn’t save", message: (err as Error).message });
+      toast.show({ tone: "warn", title: t.profile.couldntSave, message: (err as Error).message });
     } finally {
       setBusy(null);
     }
@@ -33,12 +35,12 @@ export function ProfileForm({ me, storageReady }: { me: Me; storageReady: boolea
 
   function onPickAvatar(file: File | undefined) {
     if (!file) return;
-    run("avatar", async () => updateProfile({ avatarKey: await uploadAvatar(file) }), "Profile picture updated");
+    run("avatar", async () => updateProfile({ avatarKey: await uploadAvatar(file) }), t.profile.pictureUpdated);
   }
 
   function onSaveName(e: FormEvent) {
     e.preventDefault();
-    run("name", () => updateProfile({ name: name.trim() }), "Name updated");
+    run("name", () => updateProfile({ name: name.trim() }), t.profile.nameUpdated);
   }
 
   async function signOut() {
@@ -76,30 +78,30 @@ export function ProfileForm({ me, storageReady }: { me: Me; storageReady: boolea
             className="btn"
             disabled={!!busy || !storageReady}
             onClick={() => fileRef.current?.click()}
-            title={storageReady ? undefined : "Storage isn’t configured yet"}
+            title={storageReady ? undefined : t.profile.storageMissing}
           >
             <IconImage size={16} />
-            {me.avatarUrl ? "Change photo" : "Upload photo"}
+            {me.avatarUrl ? t.profile.changePhoto : t.profile.uploadPhoto}
           </button>
           {me.avatarUrl && (
             <button
               type="button"
               className="text-left text-sm font-semibold text-ink-soft underline hover:text-accent disabled:opacity-50"
               disabled={!!busy}
-              onClick={() => run("avatar", () => updateProfile({ avatarKey: null }), "Profile picture removed")}
+              onClick={() => run("avatar", () => updateProfile({ avatarKey: null }), t.profile.pictureRemoved)}
             >
               <IconTrash size={13} className="mr-1 inline" />
-              Remove photo
+              {t.profile.removePhoto}
             </button>
           )}
-          <p className="text-xs text-ink-soft">Square-cropped to 512 px. JPG, PNG or WEBP.</p>
+          <p className="text-xs text-ink-soft">{t.profile.photoHint}</p>
         </div>
       </section>
 
       {/* Tên */}
       <form onSubmit={onSaveName} className="flex flex-col gap-2">
         <label htmlFor="profile-name" className="eyebrow">
-          Display name
+          {t.profile.displayName}
         </label>
         <div className="flex gap-2">
           <input
@@ -113,23 +115,21 @@ export function ProfileForm({ me, storageReady }: { me: Me; storageReady: boolea
           />
           {canRename && (
             <button type="submit" className="btn btn-primary" disabled={!!busy || !name.trim() || name.trim() === me.name}>
-              {busy === "name" ? "Saving…" : "Save"}
+              {busy === "name" ? t.common.saving : t.common.save}
             </button>
           )}
         </div>
         <p className="text-xs text-ink-soft">
-          {canRename
-            ? "Shown on your uploads and in the people filter."
-            : "The admin account name is fixed — it’s used to sign in."}
+          {canRename ? t.profile.nameHint : t.profile.adminNameFixed}
         </p>
       </form>
 
       <div className="flex items-center justify-between border-t border-dashed border-line pt-4 text-sm font-semibold">
         <Link href="/login?next=/profile" className="text-ink-soft underline hover:text-accent">
-          Switch person
+          {t.profile.switchPerson}
         </Link>
         <button type="button" onClick={signOut} disabled={!!busy} className="text-ink-soft underline hover:text-accent">
-          Sign out
+          {t.profile.signOut}
         </button>
       </div>
     </div>

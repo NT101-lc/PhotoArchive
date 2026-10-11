@@ -10,7 +10,10 @@ import { SmartImage } from "@/components/SmartImage";
 import { VideoQueue } from "@/components/VideoQueue";
 import { ROLE_ADMIN } from "@/db";
 import { getCurrentMember } from "@/lib/auth";
-import { formatDate, plural, timeAgo } from "@/lib/format";
+import { formatDate, timeAgo } from "@/lib/format";
+import { getT } from "@/i18n/server";
+import type { Dict } from "@/i18n/dictionaries";
+import type { Locale } from "@/i18n/config";
 import { getRecentComments } from "@/lib/social";
 import {
   getCrewStats,
@@ -25,12 +28,15 @@ import {
 } from "@/lib/stats";
 import { R2_FREE_BYTES, STORAGE_CATEGORIES, type StorageCategory } from "@/lib/storage-stats";
 
-export const metadata: Metadata = { title: "Dashboard" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.dash.metaTitle };
+}
 
 const R2_PRICE_PER_GB_MONTH = 0.015;
 
 export default async function DashboardPage() {
-  const me = await getCurrentMember();
+  const [me, { t, locale }] = await Promise.all([getCurrentMember(), getT()]);
   if (!me) redirect("/login?next=/dashboard");
   const admin = me.role === ROLE_ADMIN;
 
@@ -50,52 +56,44 @@ export default async function DashboardPage() {
   return (
     <main className="mx-auto max-w-[1280px] px-4 pb-20 sm:px-6">
       <PageHero
-        eyebrow="The archive in numbers"
-        title="Dashboard"
-        description={
-          totals.years > 0
-            ? `Everything the crew has saved across ${plural(totals.years, "year")}.`
-            : "Upload the first trip and its numbers show up here."
-        }
+        eyebrow={t.dash.eyebrow}
+        title={t.dash.title}
+        description={t.dash.description(totals.years)}
         stats={[
-          { value: totals.trips, label: totals.trips === 1 ? "trip" : "trips" },
-          { value: totals.photos, label: totals.photos === 1 ? "photo" : "photos" },
-          { value: totals.videos, label: totals.videos === 1 ? "video" : "videos" },
-          { value: totals.places, label: totals.places === 1 ? "place" : "places" },
+          { value: totals.trips, label: t.dash.stat.trips(totals.trips) },
+          { value: totals.photos, label: t.dash.stat.photos(totals.photos) },
+          { value: totals.videos, label: t.dash.stat.videos(totals.videos) },
+          { value: totals.places, label: t.dash.stat.places(totals.places) },
         ]}
       />
 
-      <TheRoll trips={roll.trips} />
+      <TheRoll trips={roll.trips} t={t} locale={locale} />
 
       <div className="mb-16 grid gap-14 lg:grid-cols-2 lg:gap-16">
-        <Section title="Trips per year" note="Tap or hover a year to see how many photos came back.">
+        <Section title={t.dash.tripsPerYear} note={t.dash.tripsPerYearNote}>
           <TripsByYear data={crew.byYear} />
         </Section>
-        <Section title="Places" note="Where the crew has been, most visited first.">
-          <Places rows={places} />
+        <Section title={t.dash.places} note={t.dash.placesNote}>
+          <Places rows={places} t={t} locale={locale} />
         </Section>
-        <Section title="Who uploads the most" note="Photos and videos each person has added.">
+        <Section title={t.dash.topUploaders} note={t.dash.topUploadersNote}>
           <TopUploaders data={crew.uploaders} />
-          <QuietMembers members={quiet} />
+          <QuietMembers members={quiet} t={t} />
         </Section>
-        <Section title="Recent activity" note="New uploads and comments, newest first.">
-          <RecentActivity uploads={uploads} comments={comments} />
+        <Section title={t.dash.recent} note={t.dash.recentNote}>
+          <RecentActivity uploads={uploads} comments={comments} t={t} locale={locale} />
         </Section>
       </div>
 
       <Section
-        title={onThisDay.length > 0 ? "On this day" : "From the archive"}
-        note={
-          onThisDay.length > 0
-            ? `Shot within a few days of ${formatDate(new Date().toISOString())} in earlier years.`
-            : "Nothing was shot around this date in earlier years, so here are a few frames picked at random. They change every day."
-        }
+        title={onThisDay.length > 0 ? t.dash.onThisDay : t.dash.fromArchive}
+        note={onThisDay.length > 0 ? t.dash.onThisDayNote(formatDate(new Date().toISOString(), locale)) : t.dash.randomNote}
         className="mb-16"
       >
-        <OnThisDay items={memories} />
+        <OnThisDay items={memories} t={t} />
       </Section>
 
-      {admin && <AdminSection />}
+      {admin && <AdminSection t={t} locale={locale} />}
     </main>
   );
 }
@@ -116,42 +114,42 @@ type Roll = Awaited<ReturnType<typeof getRoll>>;
  * Điểm nhấn của trang: các chuyến gần đây như những dải contact sheet. Mỗi chuyến vài khung đầu
  * (bấm để mở), khung cuối là "+N" dẫn vào album. Tên chuyến in màu hổ phách như chữ trên phim.
  */
-function TheRoll({ trips }: Roll) {
+function TheRoll({ trips, t, locale }: Roll & { t: Dict; locale: Locale }) {
   if (trips.length === 0) return null;
   return (
     <section aria-labelledby="roll-heading" className="mb-16">
       <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
         <h2 id="roll-heading" className="font-display text-2xl font-extrabold tracking-[-0.02em]">
-          The roll so far
+          {t.dash.roll}
         </h2>
-        <p className="text-sm text-ink-soft">The first frames of the latest trips. Amber edge marks a video.</p>
+        <p className="text-sm text-ink-soft">{t.dash.rollNote}</p>
       </div>
       <div className="overflow-hidden rounded-[3px] bg-film text-white">
         <div className="sprockets h-3" aria-hidden="true" />
         <ol className="flex flex-col gap-4 px-3 py-3 sm:px-4">
-          {trips.map((t, i) => {
-            const more = t.total - t.frames.length;
+          {trips.map((trip, i) => {
+            const more = trip.total - trip.frames.length;
             return (
               <li
-                key={t.slug}
+                key={trip.slug}
                 className="animate-develop grid gap-2 md:grid-cols-[12rem_1fr] md:items-center md:gap-5"
                 style={{ animationDelay: `${120 + i * 120}ms` }}
               >
-                <Link href={`/albums/${t.slug}`} className="group min-w-0">
-                  <span className="frame-no block truncate text-xs group-hover:underline">{t.title}</span>
+                <Link href={`/albums/${trip.slug}`} className="group min-w-0">
+                  <span className="frame-no block truncate text-xs group-hover:underline">{trip.title}</span>
                   <span className="block text-xs text-white/55 tabular-nums">
-                    {formatDate(t.tripDate)}, {plural(t.total, "frame")}
+                    {formatDate(trip.tripDate, locale)}, {t.count.frames(trip.total)}
                   </span>
                 </Link>
                 <ul className="grid grid-cols-6 gap-1 sm:gap-1.5">
-                  {t.frames.map((f, j) => {
-                    const last = j === t.frames.length - 1 && more > 0;
+                  {trip.frames.map((f, j) => {
+                    const last = j === trip.frames.length - 1 && more > 0;
                     return (
                       <li key={f.id}>
                         <Link
-                          href={last ? `/albums/${t.slug}` : `/albums/${t.slug}?photo=${f.id}`}
+                          href={last ? `/albums/${trip.slug}` : `/albums/${trip.slug}?photo=${f.id}`}
                           aria-label={
-                            last ? `Open all ${t.total} frames of ${t.title}` : `${f.kind === "video" ? "Video" : "Photo"} from ${t.title}`
+                            last ? t.dash.openAllFrames(trip.total, trip.title) : t.dash.mediaFrom(f.kind === "video", trip.title)
                           }
                           className="relative block aspect-[3/2] overflow-hidden rounded-[1px] bg-white/10 transition-[filter] hover:brightness-125"
                         >
@@ -177,16 +175,16 @@ function TheRoll({ trips }: Roll) {
   );
 }
 
-function Places({ rows }: { rows: Awaited<ReturnType<typeof getPlaces>> }) {
-  if (rows.length === 0) return <p className="text-sm text-ink-soft">No places yet.</p>;
+function Places({ rows, t, locale }: { rows: Awaited<ReturnType<typeof getPlaces>>; t: Dict; locale: Locale }) {
+  if (rows.length === 0) return <p className="text-sm text-ink-soft">{t.dash.noPlaces}</p>;
   return (
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-line text-left text-xs text-ink-soft">
-          <th className="py-2 font-medium">Place</th>
-          <th className="py-2 text-right font-medium">Trips</th>
-          <th className="py-2 text-right font-medium">Photos</th>
-          <th className="py-2 pl-4 text-right font-medium">Last trip</th>
+          <th className="py-2 font-medium">{t.dash.place}</th>
+          <th className="py-2 text-right font-medium">{t.dash.trips}</th>
+          <th className="py-2 text-right font-medium">{t.dash.photos}</th>
+          <th className="py-2 pl-4 text-right font-medium">{t.dash.lastTrip}</th>
         </tr>
       </thead>
       <tbody>
@@ -195,7 +193,7 @@ function Places({ rows }: { rows: Awaited<ReturnType<typeof getPlaces>> }) {
             <td className="py-2.5 font-semibold">{p.location}</td>
             <td className="py-2.5 text-right tabular-nums">{p.trips}</td>
             <td className="py-2.5 text-right tabular-nums">{p.photos}</td>
-            <td className="py-2.5 pl-4 text-right text-ink-soft tabular-nums">{formatDate(p.lastTrip)}</td>
+            <td className="py-2.5 pl-4 text-right text-ink-soft tabular-nums">{formatDate(p.lastTrip, locale)}</td>
           </tr>
         ))}
       </tbody>
@@ -204,10 +202,9 @@ function Places({ rows }: { rows: Awaited<ReturnType<typeof getPlaces>> }) {
 }
 
 /** Ai chưa upload gì — chỗ trống thành lời mời. */
-function QuietMembers({ members }: { members: Awaited<ReturnType<typeof getQuietMembers>> }) {
+function QuietMembers({ members, t }: { members: Awaited<ReturnType<typeof getQuietMembers>>; t: Dict }) {
   if (members.length === 0) return null;
   const names = members.map((m) => m.name);
-  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
   return (
     <div className="mt-6 flex items-center gap-3 border-t border-line pt-4">
       <span className="flex shrink-0 -space-x-2">
@@ -218,9 +215,9 @@ function QuietMembers({ members }: { members: Awaited<ReturnType<typeof getQuiet
         ))}
       </span>
       <p className="text-sm text-ink-soft">
-        <span className="text-ink">{list}</span> {names.length === 1 ? "hasn’t" : "haven’t"} added anything yet.{" "}
+        {t.dash.quiet(names)}{" "}
         <Link href="/albums" className="font-semibold text-ink underline hover:text-accent">
-          Open an album to upload
+          {t.dash.openToUpload}
         </Link>
       </p>
     </div>
@@ -232,14 +229,14 @@ type Upload = Awaited<ReturnType<typeof getRecentUploads>>[number];
 type Comment = Awaited<ReturnType<typeof getRecentComments>>[number];
 
 /** Upload và bình luận gần đây trộn theo thời gian. Bình luận dẫn thẳng tới ảnh (mở lightbox). */
-function RecentActivity({ uploads, comments }: { uploads: Upload[]; comments: Comment[] }) {
+function RecentActivity({ uploads, comments, t, locale }: { uploads: Upload[]; comments: Comment[]; t: Dict; locale: Locale }) {
   const items = [
     ...uploads.map((u) => ({ kind: "upload" as const, at: u.at, u })),
     ...comments.map((c) => ({ kind: "comment" as const, at: c.at, c })),
   ]
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, 8);
-  if (items.length === 0) return <p className="text-sm text-ink-soft">Nothing yet.</p>;
+  if (items.length === 0) return <p className="text-sm text-ink-soft">{t.dash.nothingYet}</p>;
 
   return (
     <ol className="flex flex-col">
@@ -252,24 +249,25 @@ function RecentActivity({ uploads, comments }: { uploads: Upload[]; comments: Co
             <>
               <Avatar name={it.u.name ?? "?"} url={it.u.avatarUrl} size={30} />
               <p className="min-w-0 flex-1 text-sm leading-snug">
-                <b className="font-semibold">{it.u.name ?? "Someone"}</b> added{" "}
-                {[it.u.photos && plural(it.u.photos, "photo"), it.u.videos && plural(it.u.videos, "video")].filter(Boolean).join(" and ")} to{" "}
+                <b className="font-semibold">{it.u.name ?? t.common.someone}</b> {t.dash.added}{" "}
+                {[it.u.photos && t.count.photos(it.u.photos), it.u.videos && t.count.videos(it.u.videos)].filter(Boolean).join(t.upload.joinAnd)}{" "}
+                {t.dash.to}{" "}
                 <Link href={`/albums/${it.u.albumSlug}`} className="font-semibold hover:text-accent">
                   {it.u.albumTitle}
                 </Link>
-                <span className="block text-xs text-ink-soft">{timeAgo(it.at)}</span>
+                <span className="block text-xs text-ink-soft">{timeAgo(it.at, undefined, locale)}</span>
               </p>
             </>
           ) : (
             <>
               <Avatar name={it.c.name} url={it.c.avatarUrl} size={30} />
               <p className="min-w-0 flex-1 text-sm leading-snug">
-                <b className="font-semibold">{it.c.name}</b> commented on{" "}
+                <b className="font-semibold">{it.c.name}</b> {t.dash.commentedOn}{" "}
                 <Link href={`/albums/${it.c.albumSlug}?photo=${it.c.photoId}`} className="font-semibold hover:text-accent">
-                  a photo in {it.c.albumTitle}
+                  {t.dash.photoIn(it.c.albumTitle)}
                 </Link>
                 <span className="mt-1 line-clamp-2 border-l-2 border-line pl-2 text-ink-soft">{it.c.body}</span>
-                <span className="mt-1 block text-xs text-ink-soft">{timeAgo(it.at)}</span>
+                <span className="mt-1 block text-xs text-ink-soft">{timeAgo(it.at, undefined, locale)}</span>
               </p>
             </>
           )}
@@ -282,11 +280,11 @@ function RecentActivity({ uploads, comments }: { uploads: Upload[]; comments: Co
 type Memory = Awaited<ReturnType<typeof getOnThisDay>>[number];
 
 /** Dải phim các ảnh chụp quanh ngày này những năm trước; số trên mép là năm. */
-function OnThisDay({ items }: { items: Memory[] }) {
+function OnThisDay({ items, t }: { items: Memory[]; t: Dict }) {
   if (items.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-ink-soft/50 px-5 py-8 text-center text-sm text-ink-soft">
-        Nothing from this week in earlier years yet. Come back on another day, or after the next trip.
+        {t.dash.nothingThisWeek}
       </p>
     );
   }
@@ -303,7 +301,7 @@ function OnThisDay({ items }: { items: Memory[] }) {
             <Link
               href={`/albums/${m.albumSlug}?photo=${m.id}`}
               className="group relative block aspect-[3/2] overflow-hidden rounded-[2px] bg-white/5"
-              aria-label={`${m.kind === "video" ? "Video" : "Photo"} from ${m.albumTitle}, ${m.year}`}
+              aria-label={t.dash.mediaFromYear(m.kind === "video", m.albumTitle, m.year)}
             >
               <SmartImage src={m.thumbUrl} alt="" fill sizes="208px" className="object-cover group-hover:brightness-110" />
               {m.kind === "video" && (
@@ -320,26 +318,26 @@ function OnThisDay({ items }: { items: Memory[] }) {
   );
 }
 
-async function AdminSection() {
+async function AdminSection({ t, locale }: { t: Dict; locale: Locale }) {
   const [storage, queue] = await Promise.all([getStorageStats().catch((err: Error) => err), getVideoQueue()]);
 
   return (
     <section aria-labelledby="admin-heading" className="border-t border-line pt-10">
-      <p className="eyebrow">Only the admin sees this part</p>
+      <p className="eyebrow">{t.dash.adminOnly}</p>
       <h2 id="admin-heading" className="mb-8 font-display text-3xl font-extrabold tracking-[-0.02em]">
-        Storage and videos
+        {t.dash.storageAndVideos}
       </h2>
       <div className="grid gap-14 lg:grid-cols-[5fr_6fr] lg:gap-16">
-        <Section title="Storage on R2" note="Measured from the bucket itself, so it includes every copy and poster.">
+        <Section title={t.dash.storage} note={t.dash.storageNote}>
           {storage instanceof Error ? (
             <p role="alert" className="text-sm text-danger">
-              Couldn’t read the bucket: {storage.message}
+              {t.dash.couldntReadBucket(storage.message)}
             </p>
           ) : (
-            <StorageBlock stats={storage} />
+            <StorageBlock stats={storage} t={t} locale={locale} />
           )}
         </Section>
-        <Section title="Video processing" note="Videos that aren’t playable yet. This list refreshes by itself.">
+        <Section title={t.dash.videoProcessing} note={t.dash.videoProcessingNote}>
           <VideoQueue items={queue.items} stuck={queue.stuck} />
         </Section>
       </div>
@@ -351,7 +349,7 @@ const gb = (bytes: number) => bytes / 1000 ** 3;
 const fmtGB = (bytes: number) => `${gb(bytes) < 10 ? gb(bytes).toFixed(2) : gb(bytes).toFixed(1)} GB`;
 const fmtSize = (bytes: number) => (bytes >= 1000 ** 3 ? fmtGB(bytes) : `${Math.round(bytes / 1000 ** 2)} MB`);
 
-function StorageBlock({ stats }: { stats: Awaited<ReturnType<typeof getStorageStats>> }) {
+function StorageBlock({ stats, t, locale }: { stats: Awaited<ReturnType<typeof getStorageStats>>; t: Dict; locale: Locale }) {
   const share = stats.total / R2_FREE_BYTES;
   const pct = Math.min(100, share * 100);
   // Mức độ: dưới 70% bình thường, 70–90% cảnh báo, trên 90% nguy hiểm
@@ -362,14 +360,14 @@ function StorageBlock({ stats }: { stats: Awaited<ReturnType<typeof getStorageSt
     <div>
       <p className="flex flex-wrap items-baseline gap-x-2">
         <span className="font-display text-5xl font-extrabold tracking-[-0.03em]">{fmtGB(stats.total)}</span>
-        <span className="text-ink-soft">of the free 10 GB</span>
+        <span className="text-ink-soft">{t.dash.ofFree}</span>
       </p>
       <div
         role="meter"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(pct)}
-        aria-label="Share of the free storage used"
+        aria-label={t.dash.freeShare}
         className="mt-4 h-2.5 overflow-hidden rounded-full"
         style={{ background: `color-mix(in oklab, ${fill} 18%, transparent)` }}
       >
@@ -377,25 +375,25 @@ function StorageBlock({ stats }: { stats: Awaited<ReturnType<typeof getStorageSt
       </div>
       <p className="mt-3 text-sm text-ink-soft">
         {forecast.over
-          ? `Over the free tier: the extra ${fmtGB(stats.total - R2_FREE_BYTES)} costs about $${(gb(stats.total - R2_FREE_BYTES) * R2_PRICE_PER_GB_MONTH).toFixed(2)} a month.`
+          ? t.dash.over(fmtGB(stats.total - R2_FREE_BYTES), (gb(stats.total - R2_FREE_BYTES) * R2_PRICE_PER_GB_MONTH).toFixed(2))
           : forecast.daysLeft === null
-            ? `No uploads in the last ${stats.windowDays} days, so there’s nothing to forecast.`
-            : `At the pace of the last ${stats.windowDays} days (about ${fmtSize(forecast.bytesPerDay)} a day), the free tier lasts until ${formatDate(forecast.date!.toISOString())}.`}
+            ? t.dash.noForecast(stats.windowDays)
+            : t.dash.forecast(stats.windowDays, fmtSize(forecast.bytesPerDay), formatDate(forecast.date!.toISOString(), locale))}
       </p>
 
       <table className="mt-6 w-full text-sm">
-        <caption className="sr-only">Storage by type</caption>
+        <caption className="sr-only">{t.dash.storageByType}</caption>
         <thead>
           <tr className="border-b border-line text-left text-xs text-ink-soft">
-            <th className="py-2 font-medium">Type</th>
-            <th className="py-2 text-right font-medium">Size</th>
-            <th className="py-2 text-right font-medium">Share</th>
+            <th className="py-2 font-medium">{t.dash.type}</th>
+            <th className="py-2 text-right font-medium">{t.dash.size}</th>
+            <th className="py-2 text-right font-medium">{t.dash.share}</th>
           </tr>
         </thead>
         <tbody>
           {(Object.keys(STORAGE_CATEGORIES) as StorageCategory[]).map((k) => (
             <tr key={k} className="border-b border-line">
-              <td className="py-2">{STORAGE_CATEGORIES[k]}</td>
+              <td className="py-2">{t.dash.categories[k]}</td>
               <td className="py-2 text-right tabular-nums">{fmtSize(stats.bytes[k])}</td>
               <td className="py-2 text-right text-ink-soft tabular-nums">
                 {stats.total ? `${Math.round((stats.bytes[k] / stats.total) * 100)}%` : "0%"}
@@ -404,7 +402,7 @@ function StorageBlock({ stats }: { stats: Awaited<ReturnType<typeof getStorageSt
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-xs text-ink-soft">{plural(stats.objectCount, "file")} in the bucket.</p>
+      <p className="mt-2 text-xs text-ink-soft">{t.dash.filesInBucket(stats.objectCount)}</p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { useI18n } from "@/i18n/client";
 import { IconClose } from "./Icons";
 
 /** Khoá scroll của body khi overlay đang mở. */
@@ -28,6 +29,7 @@ type Props = {
 /** Modal: bottom sheet trên mobile, hộp giữa màn hình trên desktop. */
 export function Modal({ open, onClose, title, eyebrow, children, footer, maxWidth = "max-w-[560px]" }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const { t } = useI18n();
   const onCloseRef = useRef(onClose);
   useBodyScrollLock(open);
 
@@ -69,7 +71,7 @@ export function Modal({ open, onClose, title, eyebrow, children, footer, maxWidt
             {eyebrow && <p className="eyebrow mb-0.5">{eyebrow}</p>}
             <h2 className="font-display text-xl leading-tight font-extrabold tracking-tight">{title}</h2>
           </div>
-          <button ref={closeRef} type="button" onClick={onClose} className="btn btn-icon h-9 w-9 shrink-0" aria-label="Close">
+          <button ref={closeRef} type="button" onClick={onClose} className="btn btn-icon h-9 w-9 shrink-0" aria-label={t.common.close}>
             <IconClose size={16} />
           </button>
         </div>

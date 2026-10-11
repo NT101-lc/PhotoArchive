@@ -4,6 +4,8 @@ import { AppBar } from "@/components/AppBar";
 import { IdentityProvider } from "@/components/Identity";
 import { ToastProvider } from "@/components/Toast";
 import { UploadManagerProvider } from "@/components/UploadManager";
+import { I18nProvider } from "@/i18n/client";
+import { getT } from "@/i18n/server";
 import { getCurrentMember } from "@/lib/auth";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -21,14 +23,17 @@ const beVietnam = Be_Vietnam_Pro({
   weight: ["400", "500", "600", "700"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: "thesix",
-    template: "%s · thesix",
-  },
-  description: "thesix — the crew's private photo archive. Store and relive every trip.",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return {
+    title: {
+      default: "thesix",
+      template: "%s · thesix",
+    },
+    description: t.meta.description,
+    robots: { index: false, follow: false },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: [
@@ -38,10 +43,10 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const member = await getCurrentMember();
+  const [member, { locale }] = await Promise.all([getCurrentMember(), getT()]);
   return (
     <html
-      lang="en"
+      lang={locale}
       data-theme="light"
       suppressHydrationWarning
       className={`${archivo.variable} ${beVietnam.variable}`}
@@ -51,14 +56,16 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body>
-        <IdentityProvider member={member}>
-          <ToastProvider>
-            <UploadManagerProvider>
-              <AppBar />
-              {children}
-            </UploadManagerProvider>
-          </ToastProvider>
-        </IdentityProvider>
+        <I18nProvider locale={locale}>
+          <IdentityProvider member={member}>
+            <ToastProvider>
+              <UploadManagerProvider>
+                <AppBar />
+                {children}
+              </UploadManagerProvider>
+            </ToastProvider>
+          </IdentityProvider>
+        </I18nProvider>
       </body>
     </html>
   );

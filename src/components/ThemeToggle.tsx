@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useI18n } from "@/i18n/client";
 import { THEME_STORAGE_KEY, type Theme } from "@/lib/theme";
 import { IconMoon, IconSun } from "./Icons";
 
@@ -13,6 +14,7 @@ function applyTheme(theme: Theme) {
  * Chưa chọn thủ công thì đi theo theme hệ điều hành, kể cả khi hệ điều hành đổi.
  */
 export function ThemeToggle() {
+  const { t } = useI18n();
   useEffect(() => {
     const mq = matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
@@ -34,7 +36,7 @@ export function ThemeToggle() {
   }
 
   return (
-    <button type="button" onClick={toggle} className="btn btn-icon" title="Toggle light / dark" aria-label="Toggle light / dark mode">
+    <button type="button" onClick={toggle} className="btn btn-icon" title={t.theme.toggle} aria-label={t.theme.toggle}>
       <IconMoon className="dark:hidden" />
       <IconSun className="hidden dark:block" />
     </button>

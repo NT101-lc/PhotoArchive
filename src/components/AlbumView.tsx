@@ -12,6 +12,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { EmptyState } from "./EmptyState";
 import { useIdentity } from "./Identity";
 import { useToast } from "./Toast";
+import { useI18n } from "@/i18n/client";
 import { ContactSheet } from "./ContactSheet";
 import { IconFilm, IconGrid, IconHeart } from "./Icons";
 import { Lightbox } from "./Lightbox";
@@ -33,6 +34,7 @@ export function AlbumView({ album, photos: serverPhotos, initialPhotoId }: Props
   const me = useIdentity();
   const router = useRouter();
   const toast = useToast();
+  const { t } = useI18n();
   const [toDelete, setToDelete] = useState<Photo | null>(null);
   // Số bình luận / cảm xúc vừa đổi trong lightbox, đè lên số từ server để ô ảnh cập nhật ngay
   const [socialCounts, setSocialCounts] = useState<ReadonlyMap<string, SocialCounts>>(new Map());
@@ -118,10 +120,10 @@ export function AlbumView({ album, photos: serverPhotos, initialPhotoId }: Props
   async function retry(photo: Photo) {
     try {
       await retryVideo(photo.id);
-      toast.show({ tone: "success", title: "Video queued again", message: "It’ll be ready in a few minutes." });
+      toast.show({ tone: "success", title: t.album.videoQueued, message: t.album.videoQueuedBody });
       router.refresh();
     } catch (err) {
-      toast.show({ tone: "warn", title: "Couldn’t retry", message: (err as Error).message });
+      toast.show({ tone: "warn", title: t.album.couldntRetry, message: (err as Error).message });
     }
   }
 
@@ -129,10 +131,10 @@ export function AlbumView({ album, photos: serverPhotos, initialPhotoId }: Props
     if (photo.id === coverId) return;
     try {
       await updateAlbum(album.id, { coverPhotoId: photo.id });
-      toast.show({ tone: "success", title: "Album cover updated" });
+      toast.show({ tone: "success", title: t.album.coverUpdated });
       router.refresh();
     } catch (err) {
-      toast.show({ tone: "warn", title: "Couldn’t change cover", message: (err as Error).message });
+      toast.show({ tone: "warn", title: t.album.couldntChangeCover, message: (err as Error).message });
     }
   }
 
@@ -146,11 +148,11 @@ export function AlbumView({ album, photos: serverPhotos, initialPhotoId }: Props
       const rest = lightboxList.filter((p) => p.id !== photo.id);
       setLightboxList(rest);
       setOpenId(rest.length ? rest[Math.min(i, rest.length - 1)].id : null);
-      toast.show({ tone: "success", title: "Photo deleted" });
+      toast.show({ tone: "success", title: t.album.photoDeleted });
       setToDelete(null);
       router.refresh();
     } catch (err) {
-      toast.show({ tone: "warn", title: "Couldn’t delete photo", message: (err as Error).message });
+      toast.show({ tone: "warn", title: t.album.couldntDeletePhoto, message: (err as Error).message });
     }
   }
 
@@ -162,10 +164,10 @@ export function AlbumView({ album, photos: serverPhotos, initialPhotoId }: Props
     <>
       <div className="-mt-4 mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="eyebrow shrink-0">Taken by</span>
+          <span className="eyebrow shrink-0">{t.album.takenBy}</span>
           <div className="scrollbar-none -my-1 flex min-w-0 gap-1.5 overflow-x-auto py-1 pr-1">
             <button type="button" className="chip" aria-pressed={person === ALL} onClick={() => setPerson(ALL)}>
-              All <span className="opacity-60 tabular-nums">{photos.length}</span>
+              {t.album.all} <span className="opacity-60 tabular-nums">{photos.length}</span>
             </button>
             {people.map(([name, count]) => (
               <button key={name} type="button" className="chip" aria-pressed={person === name} onClick={() => setPerson(name)}>
@@ -181,16 +183,16 @@ export function AlbumView({ album, photos: serverPhotos, initialPhotoId }: Props
             className="chip"
             aria-pressed={favOnly}
             onClick={() => setFavOnly((v) => !v)}
-            title="Only show hearted photos (saved on this device)"
+            title={t.album.favoritesHint}
           >
             <IconHeart size={14} filled={favOnly} />
-            Favorites <span className="opacity-60 tabular-nums">{photos.filter((p) => favorites.ids.has(p.id)).length}</span>
+            {t.album.favorites} <span className="opacity-60 tabular-nums">{photos.filter((p) => favorites.ids.has(p.id)).length}</span>
           </button>
-          <div className="ml-auto flex rounded-full border border-line bg-surface p-0.5 lg:ml-0" role="group" aria-label="View mode">
-            <ViewButton active={view === "grid"} onClick={() => setView("grid")} label="Grid">
+          <div className="ml-auto flex rounded-full border border-line bg-surface p-0.5 lg:ml-0" role="group" aria-label={t.album.viewMode}>
+            <ViewButton active={view === "grid"} onClick={() => setView("grid")} label={t.album.grid}>
               <IconGrid size={16} />
             </ViewButton>
-            <ViewButton active={view === "days"} onClick={() => setView("days")} label="Contact sheet">
+            <ViewButton active={view === "days"} onClick={() => setView("days")} label={t.album.contactSheet}>
               <IconFilm size={16} />
             </ViewButton>
           </div>
@@ -200,7 +202,7 @@ export function AlbumView({ album, photos: serverPhotos, initialPhotoId }: Props
       {visible.length === 0 ? (
         <EmptyState
           icon={<IconHeart size={26} />}
-          title={favOnly ? "No favorites yet" : "No matching photos"}
+          title={favOnly ? t.album.noFavorites : t.album.noMatching}
           action={
             <button
               type="button"
@@ -210,13 +212,11 @@ export function AlbumView({ album, photos: serverPhotos, initialPhotoId }: Props
                 setFavOnly(false);
               }}
             >
-              Show all photos
+              {t.album.showAll}
             </button>
           }
         >
-          {favOnly
-            ? "Tap the heart on a photo (or press F while viewing) to collect your favorites here."
-            : "This person has no photos in the current filter."}
+          {favOnly ? t.album.favoritesEmpty : t.album.personEmpty}
         </EmptyState>
       ) : view === "grid" ? (
         <PhotoGrid photos={visible} eagerCount={4} {...tileProps} />
@@ -248,13 +248,12 @@ export function AlbumView({ album, photos: serverPhotos, initialPhotoId }: Props
 
       <ConfirmDialog
         open={!!toDelete}
-        title="Delete this photo?"
-        confirmLabel="Delete photo"
+        title={t.album.deletePhotoTitle}
+        confirmLabel={t.album.deletePhoto}
         onConfirm={confirmDelete}
         onClose={() => setToDelete(null)}
       >
-        The photo{toDelete?.uploadedBy ? ` uploaded by ${toDelete.uploadedBy}` : ""} will be removed from the album and
-        from storage.
+        {t.album.deletePhotoBody(toDelete?.uploadedBy ?? null)}
       </ConfirmDialog>
     </>
   );

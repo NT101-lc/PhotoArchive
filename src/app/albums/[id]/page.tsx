@@ -8,16 +8,17 @@ import { CoverPrint } from "@/components/CoverPrint";
 import { PageHero } from "@/components/PageHero";
 import { UploadButton } from "@/components/UploadModal";
 import { getAlbum, getAlbums, getPhotos } from "@/lib/data";
-import { formatDateRange, plural, tripDays } from "@/lib/format";
+import { formatDateRange, tripDays } from "@/lib/format";
+import { getT } from "@/i18n/server";
 
 export async function generateMetadata({ params }: PageProps<"/albums/[id]">): Promise<Metadata> {
-  const { id } = await params;
+  const [{ id }, { t }] = await Promise.all([params, getT()]);
   const album = await getAlbum(id);
-  return { title: album?.title ?? "Album not found" };
+  return { title: album?.title ?? t.notFound.title };
 }
 
 export default async function AlbumPage({ params, searchParams }: PageProps<"/albums/[id]">) {
-  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const [{ id }, sp, { t, locale }] = await Promise.all([params, searchParams, getT()]);
   const [album, photos, albums] = await Promise.all([getAlbum(id), getPhotos(id), getAlbums()]);
   if (!album) notFound();
 
@@ -28,7 +29,7 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
     <main className="mx-auto max-w-[1280px] px-4 pb-20 sm:px-6">
       <PageHero
         backHref="/albums"
-        eyebrow="All albums"
+        eyebrow={t.album.allAlbums}
         title={album.title}
         description={
           <>
@@ -39,8 +40,8 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
               </span>
               <span className="flex items-center gap-1.5">
                 <IconCalendar size={15} />
-                {formatDateRange(album.tripDate, album.endDate)}
-                {album.endDate && <span>({plural(tripDays(album.tripDate, album.endDate), "day")})</span>}
+                {formatDateRange(album.tripDate, album.endDate, locale)}
+                {album.endDate && <span>({t.count.days(tripDays(album.tripDate, album.endDate))})</span>}
               </span>
             </span>
             {album.description && (
@@ -49,8 +50,8 @@ export default async function AlbumPage({ params, searchParams }: PageProps<"/al
           </>
         }
         stats={[
-          { value: photos.length, label: "photos" },
-          { value: contributors, label: "people" },
+          { value: photos.length, label: t.album.statPhotos },
+          { value: contributors, label: t.album.statPeople },
         ]}
         media={
           // Ảnh bìa in, đặt hơi lệch như vừa thả lên bàn soi

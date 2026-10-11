@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { useI18n } from "@/i18n/client";
 import { IconClose } from "./Icons";
 
 type ToastTone = "info" | "warn" | "success";
@@ -19,6 +20,7 @@ const TONE_DOT: Record<ToastTone, string> = {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(1);
+  const { t: tr } = useI18n();
 
   const dismiss = useCallback((id: number) => {
     setToasts((list) => list.filter((t) => t.id !== id));
@@ -51,7 +53,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <p className="font-display font-bold">{t.title}</p>
               {t.message && <p className="mt-0.5 text-sm opacity-75">{t.message}</p>}
             </div>
-            <button type="button" onClick={() => dismiss(t.id)} aria-label="Dismiss" className="rounded-md p-1 opacity-70 hover:opacity-100">
+            <button type="button" onClick={() => dismiss(t.id)} aria-label={tr.common.dismiss} className="rounded-md p-1 opacity-70 hover:opacity-100">
               <IconClose size={14} />
             </button>
           </div>

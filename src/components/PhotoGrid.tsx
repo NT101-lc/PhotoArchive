@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/i18n/client";
 import { formatDuration } from "@/lib/format";
 import type { Photo } from "@/lib/types";
 import { IconHeart, IconPlay, IconReset } from "./Icons";
@@ -28,6 +29,7 @@ const clampRatio = (p: Photo) => Math.min(2.4, Math.max(0.6, p.width / p.height)
  * Video hiện poster + thời lượng; đang chuyển mã thì hiện trạng thái.
  */
 export function PhotoGrid({ photos, onOpen, onOpenComments, isFavorite, onToggleFavorite, onRetry, eagerCount = 0 }: Props) {
+  const { t } = useI18n();
   return (
     <ul className="justified">
       {photos.map((photo, i) => {
@@ -44,7 +46,7 @@ export function PhotoGrid({ photos, onOpen, onOpenComments, isFavorite, onToggle
             <button
               type="button"
               onClick={() => onOpen(photo)}
-              aria-label={`${video ? "Play video" : "View photo"} by ${photo.uploadedBy}`}
+              aria-label={video ? t.tile.playVideoBy(photo.uploadedBy) : t.tile.viewPhotoBy(photo.uploadedBy)}
               className={`relative block w-full overflow-hidden rounded-[3px] transition-[filter] duration-150 hover:brightness-[1.06] ${
                 pending ? "bg-film" : "bg-surface-2"
               }`}
@@ -53,7 +55,7 @@ export function PhotoGrid({ photos, onOpen, onOpenComments, isFavorite, onToggle
               {!pending && (
                 <SmartImage
                   src={photo.thumbUrl}
-                  alt={`${video ? "Video" : "Photo"} by ${photo.uploadedBy}`}
+                  alt={video ? t.tile.videoBy(photo.uploadedBy) : t.tile.photoBy(photo.uploadedBy)}
                   fill
                   loading={i < eagerCount ? "eager" : "lazy"}
                   sizes="(max-width: 640px) 60vw, 420px"
@@ -64,7 +66,7 @@ export function PhotoGrid({ photos, onOpen, onOpenComments, isFavorite, onToggle
               {video && !pending && (
                 <span className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-black/60 py-0.5 pr-2 pl-1 text-xs font-semibold text-white tabular-nums backdrop-blur-sm">
                   <IconPlay size={14} />
-                  {photo.durationMs ? formatDuration(photo.durationMs) : "Video"}
+                  {photo.durationMs ? formatDuration(photo.durationMs) : t.tile.video}
                 </span>
               )}
               <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2.5 pt-6 pb-2 text-right text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
@@ -84,14 +86,14 @@ export function PhotoGrid({ photos, onOpen, onOpenComments, isFavorite, onToggle
                 className="btn absolute bottom-2 left-1/2 h-8 -translate-x-1/2 px-3 text-xs"
               >
                 <IconReset size={14} />
-                Try again
+                {t.common.tryAgain}
               </button>
             )}
             <button
               type="button"
               onClick={() => onToggleFavorite(photo.id)}
               aria-pressed={fav}
-              aria-label={fav ? "Remove favorite" : "Favorite"}
+              aria-label={fav ? t.tile.removeFavorite : t.tile.favorite}
               className={`absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border transition-all ${
                 fav
                   ? "border-transparent bg-accent text-on-accent opacity-100"
@@ -110,15 +112,16 @@ export function PhotoGrid({ photos, onOpen, onOpenComments, isFavorite, onToggle
 /** Ô video chưa xem được: đang chờ / đang chuyển mã / lỗi. */
 function ProcessingState({ photo }: { photo: Photo }) {
   const failed = photo.status === "failed";
+  const { t } = useI18n();
   return (
     <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center text-white">
       {failed ? (
-        <span className="text-sm font-semibold text-[#f0907c]">Couldn’t process this video</span>
+        <span className="text-sm font-semibold text-[#f0907c]">{t.tile.couldntProcess}</span>
       ) : (
         <>
           <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-[#6cc79c]" aria-hidden="true" />
-          <span className="text-sm font-semibold">{photo.status === "processing" ? "Processing video…" : "Waiting to process…"}</span>
-          <span className="text-xs text-white/60">Usually ready in a few minutes</span>
+          <span className="text-sm font-semibold">{photo.status === "processing" ? t.tile.processing : t.tile.waiting}</span>
+          <span className="text-xs text-white/60">{t.tile.usuallyReady}</span>
         </>
       )}
     </span>

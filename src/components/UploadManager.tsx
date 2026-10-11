@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { plural } from "@/lib/format";
+import { useI18n } from "@/i18n/client";
 import { isVideoFile, uploadFiles } from "@/lib/upload-client";
 import { UploadDock } from "./UploadDock";
 import { useToast } from "./Toast";
@@ -50,6 +50,12 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const toast = useToast();
+  // Upload chạy bất đồng bộ (có khi vài phút) → đọc chữ qua ref để thông báo theo ngôn ngữ lúc xong
+  const { t } = useI18n();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   // Tiến độ đổi liên tục → giữ ở ref, vẽ lại tối đa mỗi 250 ms
   const jobsRef = useRef<UploadJob[]>([]);
@@ -125,7 +131,7 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
             meta.abort.signal,
           );
         } catch (err) {
-          job.error = err instanceof Error ? err.message : "Upload failed";
+          job.error = err instanceof Error ? err.message : tRef.current.dock.uploadFailed;
         }
         // cancel() có thể đã đổi trạng thái trong lúc đang upload
         const cancelled = (job.status as UploadJob["status"]) === "cancelled";
@@ -138,8 +144,8 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           toast.show({
             tone: failed || job.error ? "warn" : "success",
-            title: `Uploaded ${plural(ok, "file")} to ${job.albumTitle}`,
-            message: job.error ?? (failed ? `${plural(failed, "file")} failed. Open the uploads panel to retry.` : undefined),
+            title: tRef.current.dock.uploadedTo(ok, job.albumTitle),
+            message: job.error ?? (failed ? tRef.current.dock.someFailed(failed) : undefined),
           });
         }
         // Giữ File của các file lỗi để thử lại; file đã xong thì bỏ cho nhẹ bộ nhớ

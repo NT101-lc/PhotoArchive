@@ -1,6 +1,7 @@
 "use client";
 
-import { formatDayHeading, plural } from "@/lib/format";
+import { useI18n } from "@/i18n/client";
+import { formatDayHeading } from "@/lib/format";
 import type { Photo } from "@/lib/types";
 import { IconPlay, IconReset } from "./Icons";
 import { SocialBadge } from "./PhotoSocial";
@@ -24,14 +25,15 @@ type Props = {
  * như chữ in trên phim. Khung cắt 3:2 như phim 35mm; bấm vào để xem cả ảnh.
  */
 export function ContactSheet({ days, frameNo, onOpen, onOpenComments, onRetry }: Props) {
+  const { t, locale } = useI18n();
   return (
     <div className="flex flex-col gap-10">
       {days.map(([key, list], i) => (
-        <section key={key} aria-label={`Day ${i + 1}`}>
+        <section key={key} aria-label={t.tile.day(i + 1)}>
           <h3 className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="frame-no text-sm">Day {i + 1}</span>
-            <span className="font-display text-xl font-bold tracking-tight">{formatDayHeading(list[0].takenAt)}</span>
-            <span className="text-sm text-ink-soft">{plural(list.length, "frame")}</span>
+            <span className="frame-no text-sm">{t.tile.day(i + 1)}</span>
+            <span className="font-display text-xl font-bold tracking-tight">{formatDayHeading(list[0].takenAt, locale)}</span>
+            <span className="text-sm text-ink-soft">{t.count.frames(list.length)}</span>
           </h3>
           <div className="flex flex-col gap-2">
             {chunk(list, FRAMES_PER_STRIP).map((strip) => (
@@ -89,6 +91,7 @@ function Frame({
   const video = photo.kind === "video";
   const pending = video && photo.status !== "ready";
   const failed = video && photo.status === "failed";
+  const { t } = useI18n();
 
   return (
     <li className="relative w-[44vw] shrink-0 snap-start sm:w-[28vw] md:w-auto">
@@ -99,7 +102,7 @@ function Frame({
       <button
         type="button"
         onClick={() => onOpen(photo)}
-        aria-label={`${video ? "Play video" : "View photo"} ${n} by ${photo.uploadedBy}`}
+        aria-label={video ? t.tile.playVideoNBy(n, photo.uploadedBy) : t.tile.viewPhotoNBy(n, photo.uploadedBy)}
         className="group relative block aspect-[3/2] w-full overflow-hidden rounded-[2px] bg-white/5"
       >
         {!pending && photo.thumbUrl && (
@@ -118,7 +121,7 @@ function Frame({
         )}
         {failed && (
           <span className="absolute inset-0 flex items-center justify-center px-2 text-center text-xs font-semibold text-[#f0907c]">
-            Couldn’t process
+            {t.tile.couldntProcessShort}
           </span>
         )}
         {video && !pending && (
@@ -139,7 +142,7 @@ function Frame({
           onClick={() => onRetry(photo)}
           className="mt-1 flex w-full items-center justify-center gap-1 text-xs font-semibold text-white/80 underline hover:text-white"
         >
-          <IconReset size={12} /> Try again
+          <IconReset size={12} /> {t.common.tryAgain}
         </button>
       )}
     </li>

@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
-import { formatBytes, plural } from "@/lib/format";
+import { useI18n } from "@/i18n/client";
+import { formatBytes } from "@/lib/format";
 import { api, createAlbum } from "@/lib/api-client";
 import { canSetCover } from "@/lib/permissions";
 import type { Album, Member } from "@/lib/types";
@@ -74,6 +75,7 @@ export function UploadButton({
   children,
 }: Props & { className?: string; children?: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const { t } = useI18n();
 
   return (
     <>
@@ -81,7 +83,7 @@ export function UploadButton({
         {children ?? (
           <>
             <IconUpload size={16} />
-            Upload photos
+            {t.upload.button}
           </>
         )}
       </button>
@@ -136,6 +138,7 @@ async function walkEntry(entry: FileSystemEntry): Promise<Array<{ file: File; pa
 
 function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { onClose: () => void }) {
   const toast = useToast();
+  const { t } = useI18n();
   const router = useRouter();
   const [items, setItems] = useState<Picked[]>([]);
   const [target, setTarget] = useState<Target>(() =>
@@ -189,7 +192,7 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
     if (!members) {
       api<{ members: Member[] }>("/api/members")
         .then((r) => setMembers(r.members))
-        .catch(() => toast.show({ tone: "warn", title: "Couldn’t load the crew list" }));
+        .catch(() => toast.show({ tone: "warn", title: t.upload.couldntLoadCrew }));
     }
   }
 
@@ -220,10 +223,10 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
     if (skippedType || skippedSize) {
       toast.show({
         tone: "warn",
-        title: `Skipped ${plural(skippedType + skippedSize, "file")}`,
+        title: t.upload.skipped(skippedType + skippedSize),
         message: [
-          skippedType && `${plural(skippedType, "file")} not a photo or video`,
-          skippedSize && `${plural(skippedSize, "photo")} over ${formatBytes(MAX_PHOTO_BYTES)}`,
+          skippedType && t.upload.notMedia(skippedType),
+          skippedSize && t.upload.tooBig(skippedSize, formatBytes(MAX_PHOTO_BYTES)),
         ]
           .filter(Boolean)
           .join(" · "),
@@ -267,7 +270,7 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
     try {
       addFiles((await Promise.all(entries.map(walkEntry))).flat());
     } catch {
-      toast.show({ tone: "warn", title: "Couldn't read the folder", message: "Try the “Choose folder” button instead." });
+      toast.show({ tone: "warn", title: t.upload.couldntReadFolder, message: t.upload.tryChooseFolder });
     } finally {
       setReading(false);
     }
@@ -307,9 +310,9 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
 
   const videoCount = items.filter((i) => i.video).length;
   const photoCount = items.length - videoCount;
-  const countLabel = [photoCount && plural(photoCount, "photo"), videoCount && plural(videoCount, "video")]
+  const countLabel = [photoCount && t.count.photos(photoCount), videoCount && t.count.videos(videoCount)]
     .filter(Boolean)
-    .join(" and ");
+    .join(t.upload.joinAnd);
 
   // Album mới được tạo rỗng (thêm ảnh sau); album có sẵn thì phải chọn ít nhất một file
   const emptyAlbum = items.length === 0 && target.mode === "new";
@@ -351,7 +354,7 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
         router.refresh();
       }
     } catch (err) {
-      toast.show({ tone: "warn", title: "Couldn’t create the album", message: err instanceof Error ? err.message : undefined });
+      toast.show({ tone: "warn", title: t.upload.couldntCreate, message: err instanceof Error ? err.message : undefined });
       setSaving(false);
     }
   }
@@ -363,19 +366,19 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
         if (!saving) onClose();
       }}
       maxWidth="max-w-[720px]"
-      eyebrow="Add to the archive"
-      title={startNew ? "Start a new trip album" : "Upload photos, videos or folders"}
+      eyebrow={t.upload.eyebrow}
+      title={startNew ? t.upload.titleNew : t.upload.title}
       footer={
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <p className="font-mono text-xs text-ink-soft sm:flex-1">
             {items.length > 0
-              ? `${countLabel} · ${formatBytes(totalSize)}${folderCount ? ` · ${plural(folderCount, "folder")}` : ""}`
+              ? t.upload.summary(countLabel, formatBytes(totalSize), folderCount)
               : emptyAlbum
-                ? "No files yet: the album starts empty, add photos any time"
-                : "Nothing selected yet"}
+                ? t.upload.emptyAlbumNote
+                : t.upload.nothingSelected}
             {items.length > 0 && canPickCover && (
               <span className="block">
-                Cover: {coverItem ? coverItem.path.split("/").pop() : "first photo (default)"}
+                {t.upload.cover(coverItem ? (coverItem.path.split("/").pop() ?? null) : null)}
               </span>
             )}
           </p>
@@ -388,17 +391,17 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
             {saving ? (
               <>
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-on-accent/25 border-t-on-accent" />
-                Creating album…
+                {t.upload.creating}
               </>
             ) : emptyAlbum ? (
               <>
                 <IconPlus size={16} />
-                Create empty album
+                {t.upload.createEmpty}
               </>
             ) : (
               <>
                 <IconUpload size={16} />
-                Upload {items.length > 0 ? plural(items.length, "file") : ""}
+                {t.upload.uploadN(items.length)}
               </>
             )}
           </button>
@@ -408,14 +411,13 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
       <div className="flex flex-col gap-5 p-5">
         {storageReady === false && (
           <p role="alert" className="rounded-lg border border-danger bg-danger/10 px-4 py-3 text-sm">
-            <b>Storage isn’t configured yet.</b> Set <code className="font-mono">R2_BUCKET</code> (and the other R2
-            variables) in <code className="font-mono">.env</code>, then restart the server to enable uploads.
+            <b>{t.upload.storageMissingTitle}</b> {t.upload.storageMissingBody}
           </p>
         )}
 
         {/* Album đích */}
         <fieldset className="flex flex-col gap-2">
-          <legend className="eyebrow mb-2">Save to</legend>
+          <legend className="eyebrow mb-2">{t.upload.saveTo}</legend>
           <div className="flex gap-1.5">
             <button
               type="button"
@@ -426,7 +428,7 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
                 setTarget({ mode: "existing", albumId: defaultAlbumId ?? albums[0]?.id ?? "" });
               }}
             >
-              Existing album
+              {t.upload.existingAlbum}
             </button>
             <button
               type="button"
@@ -438,7 +440,7 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
               }}
             >
               <IconPlus size={13} />
-              New album
+              {t.upload.newAlbum}
             </button>
           </div>
           {target.mode === "existing" ? (
@@ -449,7 +451,7 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
                 setTarget({ mode: "existing", albumId: e.target.value });
               }}
               className="field"
-              aria-label="Choose album"
+              aria-label={t.upload.chooseAlbum}
             >
               {albums.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -465,9 +467,9 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
                   setTargetTouched(true);
                   setTarget({ ...target, title: e.target.value });
                 }}
-                placeholder="Trip name, e.g. Sapa in March"
+                placeholder={t.upload.tripNamePlaceholder}
                 className="field sm:col-span-2"
-                aria-label="New album name"
+                aria-label={t.upload.newAlbumName}
               />
               <PlacesInput
                 className="sm:col-span-2"
@@ -478,9 +480,9 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
                   setTarget({ ...target, places, placeDraft });
                 }}
                 suggestions={photoPlaces}
-                suggestionsLabel="From your photos"
-                placeholder="Places, e.g. Đà Lạt, Nha Trang"
-                aria-label="Places"
+                suggestionsLabel={t.upload.fromPhotos}
+                placeholder={t.upload.placesPlaceholder}
+                aria-label={t.upload.places}
               />
               <DateRangeFields
                 className="sm:col-span-2"
@@ -498,8 +500,8 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
                     setTargetTouched(true);
                     setTarget({ ...target, description });
                   }}
-                  aria-label="Trip description (optional)"
-                  placeholder="Description (optional): who came, where you stayed, the moment you’ll remember."
+                  aria-label={t.upload.descriptionLabel}
+                  placeholder={t.upload.descriptionPlaceholder}
                   rows={2}
                   className="min-h-[72px]"
                 />
@@ -509,14 +511,14 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
         </fieldset>
 
         {picking ? (
-          <section className="rounded-xl border border-line bg-surface-2/40 p-4" aria-label="Choose who you are">
+          <section className="rounded-xl border border-line bg-surface-2/40 p-4" aria-label={t.upload.chooseWho}>
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className="text-sm">
-                <b>Who’s uploading?</b> <span className="text-ink-soft">Your photos and album details stay as they are.</span>
+                <b>{t.upload.whoUploading}</b> <span className="text-ink-soft">{t.upload.detailsStay}</span>
               </p>
               {me && (
                 <button type="button" onClick={() => setPicking(false)} className="shrink-0 text-sm font-semibold underline hover:text-accent">
-                  Cancel
+                  {t.common.cancel}
                 </button>
               )}
             </div>
@@ -530,28 +532,28 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
                 }}
               />
             ) : (
-              <p className="text-sm text-ink-soft">Loading the crew…</p>
+              <p className="text-sm text-ink-soft">{t.upload.loadingCrew}</p>
             )}
           </section>
         ) : switching ? (
           <p className="flex items-center gap-2 text-sm text-ink-soft" aria-live="polite">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-accent" />
-            Switching to <b className="text-ink">{pickedName}</b>…
+            {t.upload.switchingTo} <b className="text-ink">{pickedName}</b>…
           </p>
         ) : me ? (
           <p className="flex items-center gap-2 text-sm text-ink-soft">
             <IconUser size={15} />
-            Uploading as <b className="text-ink">{me.name}</b>
+            {t.upload.uploadingAs} <b className="text-ink">{me.name}</b>
             <button type="button" onClick={openPicker} disabled={saving} className="ml-auto font-semibold underline hover:text-accent">
-              Not you?
+              {t.upload.notYou}
             </button>
           </p>
         ) : (
           <p role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-danger bg-danger/10 px-4 py-3 text-sm">
-            <b>Pick your name before uploading.</b>
-            <span className="text-ink-soft">You won’t lose anything you’ve added.</span>
+            <b>{t.upload.pickNameFirst}</b>
+            <span className="text-ink-soft">{t.upload.wontLose}</span>
             <button type="button" onClick={openPicker} className="btn btn-primary ml-auto h-9">
-              Choose who you are
+              {t.upload.chooseWho}
             </button>
           </p>
         )}
@@ -580,22 +582,22 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
           </span>
           <div>
             <p className="font-display text-lg font-bold">
-              {reading ? "Reading folder…" : dragging ? "Drop it here" : "Drag photos, videos or folders here"}
+              {reading ? t.upload.readingFolder : dragging ? t.upload.dropHere : t.upload.dragHere}
             </p>
             <p className="text-sm text-ink-soft">
-              Subfolders included. Photos up to 50 MB each; videos any size. You can keep browsing while they upload.
+              {t.upload.dropHint}
             </p>
           </div>
           <div className="flex flex-wrap justify-center gap-2">
             <label className="btn cursor-pointer">
-              <IconImage size={16} /> Choose files
+              <IconImage size={16} /> {t.upload.chooseFiles}
               <input type="file" accept={ACCEPT} multiple className="sr-only" onChange={(e) => {
                 onPick(e.target.files);
                 e.target.value = "";
               }} />
             </label>
             <label className="btn cursor-pointer">
-              <IconFolder size={16} /> Choose folder
+              <IconFolder size={16} /> {t.upload.chooseFolder}
               <input
                 type="file"
                 multiple
@@ -626,7 +628,7 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
             ))}
             {items.length > 1 && (
               <button type="button" onClick={() => removeWhere(() => true)} className="self-end text-sm font-semibold text-ink-soft underline hover:text-accent">
-                Remove all
+                {t.upload.removeAll}
               </button>
             )}
           </div>
@@ -653,6 +655,7 @@ function FolderGroup({
 }) {
   const [open, setOpen] = useState(true);
   const [showAll, setShowAll] = useState(false);
+  const { t } = useI18n();
   const size = items.reduce((s, f) => s + f.file.size, 0);
   const shown = showAll ? items : items.slice(0, PREVIEW_LIMIT);
 
@@ -662,12 +665,12 @@ function FolderGroup({
         <button type="button" onClick={() => setOpen((v) => !v)} className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={open}>
           <IconChevronDown size={16} className={`shrink-0 transition-transform ${open ? "" : "-rotate-90"}`} />
           {folder ? <IconFolder size={16} className="shrink-0 text-accent" /> : <IconImage size={16} className="shrink-0" />}
-          <span className="truncate font-semibold">{folder || "Loose photos"}</span>
+          <span className="truncate font-semibold">{folder || t.upload.loosePhotos}</span>
           <span className="shrink-0 font-mono text-xs text-ink-soft">
             {items.length} · {formatBytes(size)}
           </span>
         </button>
-        <button type="button" onClick={onRemoveGroup} className="rounded-md p-1 text-ink-soft hover:bg-surface-2 hover:text-danger" aria-label={`Remove ${folder || "loose photos"}`}>
+        <button type="button" onClick={onRemoveGroup} className="rounded-md p-1 text-ink-soft hover:bg-surface-2 hover:text-danger" aria-label={t.upload.remove(folder || t.upload.loosePhotos)}>
           <IconClose size={15} />
         </button>
       </div>
@@ -686,7 +689,7 @@ function FolderGroup({
           </ul>
           {items.length > PREVIEW_LIMIT && (
             <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-2 text-sm font-semibold underline">
-              {showAll ? "Show less" : `Show ${items.length - PREVIEW_LIMIT} more`}
+              {showAll ? t.upload.showLess : t.upload.showMore(items.length - PREVIEW_LIMIT)}
             </button>
           )}
         </div>
@@ -707,7 +710,8 @@ function PreviewTile({
   onToggleCover?: () => void;
 }) {
   const [broken, setBroken] = useState(false); // vd HEIC: đa số trình duyệt không hiển thị được
-  const name = item.path.split("/").pop();
+  const name = item.path.split("/").pop() ?? "";
+  const { t } = useI18n();
 
   return (
     <li className="group relative" title={`${item.path} · ${formatBytes(item.file.size)}`}>
@@ -745,13 +749,13 @@ function PreviewTile({
         type="button"
         onClick={onRemove}
         className="absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-line bg-surface opacity-100 shadow-hard-sm sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-        aria-label={`Remove ${name}`}
+        aria-label={t.upload.remove(name)}
       >
         <IconClose size={11} />
       </button>
       {isCover && (
         <span className="absolute inset-x-1 bottom-1 rounded bg-accent px-1 text-center font-mono text-[0.55rem] font-bold text-on-accent">
-          COVER
+          {t.upload.coverBadge}
         </span>
       )}
       {onToggleCover && (
@@ -759,8 +763,8 @@ function PreviewTile({
           type="button"
           onClick={onToggleCover}
           aria-pressed={isCover}
-          title={isCover ? "Unset cover (use first photo)" : "Use as album cover"}
-          aria-label={isCover ? `Unset ${name} as cover` : `Use ${name} as cover`}
+          title={isCover ? t.upload.unsetCover : t.upload.useAsCover}
+          aria-label={isCover ? t.upload.unsetCoverOf(name) : t.upload.useCoverOf(name)}
           className={`absolute -top-1.5 -left-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-line shadow-hard-sm ${
             isCover
               ? "bg-accent text-on-accent"

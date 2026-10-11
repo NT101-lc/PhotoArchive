@@ -20,11 +20,11 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { IconCheck, IconClose, IconPlus, IconTrash } from "./Icons";
 import { useIdentity } from "./Identity";
 import { useToast } from "./Toast";
+import { useI18n } from "@/i18n/client";
+import { INTL_LOCALE } from "@/i18n/config";
 
 /** Hỏi lại server định kỳ để thấy người khác sửa. */
 const POLL_MS = 8000;
-
-const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 
@@ -38,6 +38,9 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }) {
   const me = useIdentity();
   const toast = useToast();
+  const { t, locale } = useI18n();
+  // Tiêu đề cột ngày: en "Sat 20 Dec", vi "Th 7, 20 thg 12"
+  const dayFmt = new Intl.DateTimeFormat(INTL_LOCALE[locale], { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
   const router = useRouter();
   const [plan, setPlan] = useState(initial);
   const [save, setSave] = useState<SaveState>("idle");
@@ -62,12 +65,12 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
         setSave("saved");
       } catch (err) {
         setSave("error");
-        toast.show({ tone: "warn", title: "Couldn’t save", message: (err as Error).message });
+        toast.show({ tone: "warn", title: t.sheet.couldntSave, message: (err as Error).message });
       } finally {
         pending.current--;
       }
     },
-    [plan.slug, toast],
+    [plan.slug, toast, t],
   );
 
   // Hỏi lại định kỳ; bỏ qua khi đang gõ trong bảng hoặc còn thao tác chưa lưu xong
@@ -128,7 +131,7 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
       <section aria-labelledby="going-title" className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-3">
           <h2 id="going-title" className="font-display text-xl font-extrabold tracking-[-0.02em]">
-            Who’s going <span className="text-ink-soft tabular-nums">{going.length}</span>
+            {t.sheet.whosGoing} <span className="text-ink-soft tabular-nums">{going.length}</span>
           </h2>
           {going.length > 0 ? (
             <ul className="flex flex-wrap gap-2">
@@ -140,7 +143,7 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-ink-soft">Nobody yet.</p>
+            <p className="text-sm text-ink-soft">{t.sheet.nobodyYet}</p>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -149,12 +152,12 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
             (imGoing ? (
               <button type="button" className="btn" onClick={() => send({ op: "leave" }, true)}>
                 <IconClose size={15} />
-                Can’t make it
+                {t.sheet.cantMakeIt}
               </button>
             ) : (
               <button type="button" className="btn btn-primary" onClick={() => send({ op: "join" }, true)}>
                 <IconCheck size={15} />
-                I’m in
+                {t.sheet.imIn}
               </button>
             ))}
         </div>
@@ -164,9 +167,9 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
       <section aria-labelledby="itinerary-title" className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-3">
           <h2 id="itinerary-title" className="font-display text-xl font-extrabold tracking-[-0.02em]">
-            Itinerary
+            {t.sheet.itinerary}
           </h2>
-          <span className="text-sm text-ink-soft max-sm:hidden">Click a cell to type. Enter moves down, Shift+Enter adds a line.</span>
+          <span className="text-sm text-ink-soft max-sm:hidden">{t.sheet.itineraryHint}</span>
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-line bg-surface shadow-[var(--shadow-hard-sm)]">
@@ -174,11 +177,11 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
             <thead>
               <tr>
                 <th scope="col" className="sticky left-0 z-10 w-36 bg-film px-3 py-2 text-left font-semibold text-white/70">
-                  Time
+                  {t.sheet.time}
                 </th>
                 {days.map((d, i) => (
                   <th key={d} scope="col" className="min-w-[190px] bg-film px-3 py-2 text-left font-semibold text-white">
-                    <span className="frame-no mr-2 text-[0.7rem]">Day {i + 1}</span>
+                    <span className="frame-no mr-2 text-[0.7rem]">{t.sheet.day(i + 1)}</span>
                     {dayFmt.format(new Date(`${d}T00:00:00Z`))}
                   </th>
                 ))}
@@ -203,7 +206,7 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
                         <Cell
                           value={plan.cells[key] ?? ""}
                           disabled={!canEdit}
-                          label={`${slot.label || "Slot"}, day ${c + 1}`}
+                          label={t.sheet.cellLabel(slot.label, c + 1)}
                           row={r}
                           col={c}
                           onCommit={(v) => setCell(key, v)}
@@ -223,7 +226,7 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
             onClick={() => setSlots([...plan.slots, { id: newId(), label: "", time: "" }])}
           >
             <IconPlus size={15} />
-            Add a row
+            {t.sheet.addRow}
           </button>
         )}
       </section>
@@ -231,21 +234,21 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
       {/* ---------- Việc cần làm & chi phí ---------- */}
       <section aria-labelledby="items-title" className="flex flex-col gap-3">
         <h2 id="items-title" className="font-display text-xl font-extrabold tracking-[-0.02em]">
-          To do &amp; costs
+          {t.sheet.todoCosts}
         </h2>
         <div className="overflow-x-auto rounded-lg border border-line bg-surface shadow-[var(--shadow-hard-sm)]">
           <table className="sheet w-full min-w-[720px] border-collapse text-sm">
             <thead>
               <tr className="bg-film text-left text-white">
                 <th scope="col" className="w-11 px-3 py-2 font-semibold">
-                  <span className="sr-only">Done</span>
+                  <span className="sr-only">{t.sheet.done}</span>
                 </th>
-                <th scope="col" className="px-3 py-2 font-semibold">Item</th>
-                <th scope="col" className="w-40 px-3 py-2 font-semibold">Who</th>
-                <th scope="col" className="w-36 px-3 py-2 text-right font-semibold">Cost</th>
-                <th scope="col" className="px-3 py-2 font-semibold">Note</th>
+                <th scope="col" className="px-3 py-2 font-semibold">{t.sheet.item}</th>
+                <th scope="col" className="w-40 px-3 py-2 font-semibold">{t.sheet.who}</th>
+                <th scope="col" className="w-36 px-3 py-2 text-right font-semibold">{t.sheet.cost}</th>
+                <th scope="col" className="px-3 py-2 font-semibold">{t.sheet.note}</th>
                 <th scope="col" className="w-11">
-                  <span className="sr-only">Remove</span>
+                  <span className="sr-only">{t.sheet.remove}</span>
                 </th>
               </tr>
             </thead>
@@ -263,7 +266,7 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
               {plan.items.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-3 py-6 text-center text-ink-soft">
-                    Bookings, tickets, things to bring. Add the first row below.
+                    {t.sheet.itemsEmpty}
                   </td>
                 </tr>
               )}
@@ -272,10 +275,10 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
               <tr className="bg-surface-2 font-semibold">
                 <td />
                 <td className="px-3 py-2.5" colSpan={2}>
-                  Total
+                  {t.sheet.total}
                   {totals.perPerson !== null && (
                     <span className="ml-2 font-normal text-ink-soft">
-                      {formatVnd(totals.perPerson)} each for {going.length} {going.length === 1 ? "person" : "people"}
+                      {t.sheet.perPerson(formatVnd(totals.perPerson), going.length)}
                     </span>
                   )}
                 </td>
@@ -294,7 +297,7 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
             }
           >
             <IconPlus size={15} />
-            Add a row
+            {t.sheet.addRow}
           </button>
         )}
       </section>
@@ -303,25 +306,25 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
         <div className="border-t border-dashed border-line pt-6">
           <button type="button" className="btn text-danger" onClick={() => setConfirmDelete(true)}>
             <IconTrash size={15} />
-            Delete plan
+            {t.sheet.deletePlan}
           </button>
           <ConfirmDialog
             open={confirmDelete}
-            title={`Delete “${plan.title}”?`}
-            confirmLabel="Delete plan"
+            title={t.sheet.deleteTitle(plan.title)}
+            confirmLabel={t.sheet.deletePlan}
             onClose={() => setConfirmDelete(false)}
             onConfirm={async () => {
               try {
                 await deletePlan(plan.slug);
-                toast.show({ tone: "success", title: "Plan deleted" });
+                toast.show({ tone: "success", title: t.sheet.deleted });
                 router.push("/plans");
                 router.refresh();
               } catch (err) {
-                toast.show({ tone: "warn", title: "Couldn’t delete the plan", message: (err as Error).message });
+                toast.show({ tone: "warn", title: t.sheet.couldntDelete, message: (err as Error).message });
               }
             }}
           >
-            The itinerary and the to-do list go with it. This can’t be undone.
+            {t.sheet.deleteBody}
           </ConfirmDialog>
         </div>
       )}
@@ -330,8 +333,9 @@ export function PlanSheet({ initial, crew }: { initial: Plan; crew: Crewmate[] }
 }
 
 function SaveIndicator({ state }: { state: SaveState }) {
+  const { t } = useI18n();
   if (state === "idle") return null;
-  const text = { saving: "Saving…", saved: "All changes saved", error: "Not saved" }[state];
+  const text = { saving: t.sheet.saving, saved: t.sheet.saved, error: t.sheet.notSaved }[state];
   return (
     <span className={`text-sm ${state === "error" ? "text-danger" : "text-ink-soft"}`} aria-live="polite">
       {text}
@@ -422,6 +426,7 @@ function SlotHeader({
 }) {
   const [label, setLabel] = useState(slot.label);
   const [time, setTime] = useState(slot.time);
+  const { t } = useI18n();
   const [last, setLast] = useState(slot);
   if (slot !== last) {
     setLast(slot);
@@ -440,8 +445,8 @@ function SlotHeader({
         onChange={(e) => setLabel(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-        placeholder="Slot"
-        aria-label="Slot name"
+        placeholder={t.sheet.slot}
+        aria-label={t.sheet.slotName}
         maxLength={40}
         className="w-full bg-transparent font-semibold outline-none placeholder:text-ink-soft/50 focus:text-accent"
       />
@@ -451,8 +456,8 @@ function SlotHeader({
         onChange={(e) => setTime(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-        placeholder="Time"
-        aria-label="Time"
+        placeholder={t.sheet.time}
+        aria-label={t.sheet.time}
         maxLength={20}
         className="w-full bg-transparent text-xs text-ink-soft tabular-nums outline-none placeholder:text-ink-soft/50 focus:text-accent"
       />
@@ -461,8 +466,8 @@ function SlotHeader({
           type="button"
           onClick={onRemove}
           className="absolute top-1.5 right-1.5 rounded p-1 text-ink-soft opacity-0 group-hover:opacity-100 hover:text-danger focus-visible:opacity-100"
-          aria-label={`Remove ${slot.label || "this row"}`}
-          title="Remove row"
+          aria-label={t.sheet.removeRowOf(slot.label)}
+          title={t.sheet.removeRow}
         >
           <IconTrash size={14} />
         </button>
@@ -486,6 +491,7 @@ function ItemRow({
   onRemove: () => void;
 }) {
   const [costText, setCostText] = useState(item.cost === null ? "" : formatVnd(item.cost));
+  const { t } = useI18n();
   const [lastCost, setLastCost] = useState(item.cost);
   if (item.cost !== lastCost) {
     setLastCost(item.cost);
@@ -501,7 +507,7 @@ function ItemRow({
           checked={item.done}
           disabled={disabled}
           onChange={(e) => onChange({ ...item, done: e.target.checked }, true)}
-          aria-label={`Mark “${item.text || "item"}” done`}
+          aria-label={t.sheet.markDone(item.text)}
           className="h-4 w-4 accent-[var(--accent)]"
         />
       </td>
@@ -510,8 +516,8 @@ function ItemRow({
           value={item.text}
           disabled={disabled}
           onChange={(e) => onChange({ ...item, text: e.target.value })}
-          placeholder="e.g. Book the homestay"
-          aria-label="Item"
+          placeholder={t.sheet.itemPlaceholder}
+          aria-label={t.sheet.item}
           maxLength={PLAN_LIMITS.textLength}
           className={`${field} ${item.done ? "line-through" : ""}`}
         />
@@ -521,10 +527,10 @@ function ItemRow({
           value={item.who ?? ""}
           disabled={disabled}
           onChange={(e) => onChange({ ...item, who: e.target.value || null }, true)}
-          aria-label="Who handles it"
+          aria-label={t.sheet.whoHandles}
           className={`${field} cursor-pointer`}
         >
-          <option value="">Anyone</option>
+          <option value="">{t.sheet.anyone}</option>
           {crew.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -546,7 +552,7 @@ function ItemRow({
           }}
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
           placeholder="200k"
-          aria-label="Cost"
+          aria-label={t.sheet.cost}
           className={`${field} text-right tabular-nums`}
         />
       </td>
@@ -556,7 +562,7 @@ function ItemRow({
           disabled={disabled}
           onChange={(e) => onChange({ ...item, note: e.target.value })}
           placeholder="—"
-          aria-label="Note"
+          aria-label={t.sheet.note}
           maxLength={PLAN_LIMITS.textLength}
           className={field}
         />
@@ -567,7 +573,7 @@ function ItemRow({
             type="button"
             onClick={onRemove}
             className="rounded p-1.5 text-ink-soft opacity-0 group-hover:opacity-100 hover:text-danger focus-visible:opacity-100 max-sm:opacity-100"
-            aria-label={`Remove “${item.text || "row"}”`}
+            aria-label={t.sheet.removeItem(item.text)}
           >
             <IconTrash size={15} />
           </button>

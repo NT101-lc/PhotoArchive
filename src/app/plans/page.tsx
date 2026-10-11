@@ -5,38 +5,50 @@ import { EmptyState } from "@/components/EmptyState";
 import { IconCalendar, IconPin } from "@/components/Icons";
 import { NewPlanButton } from "@/components/NewPlanButton";
 import { PageHero } from "@/components/PageHero";
-import { formatDateRange, plural } from "@/lib/format";
+import { getT } from "@/i18n/server";
+import type { Dict } from "@/i18n/dictionaries";
+import type { Locale } from "@/i18n/config";
+import { formatDateRange } from "@/lib/format";
 import { daysUntil, formatVnd, planDays, planTotals } from "@/lib/plan-utils";
 import { getCrew, getPlans, type Crewmate, type Plan } from "@/lib/plans";
 
-export const metadata: Metadata = { title: "Plans" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t.plans.metaTitle };
+}
 
 export default async function PlansPage() {
-  const [plans, crew] = await Promise.all([getPlans(), getCrew()]);
+  const [plans, crew, { t, locale }] = await Promise.all([getPlans(), getCrew(), getT()]);
   const byId = new Map(crew.map((c) => [c.id, c]));
   const upcoming = plans.filter((p) => daysUntil(p.endDate) >= 0).length;
 
   return (
     <main className="mx-auto max-w-[1280px] px-4 pb-20 sm:px-6">
       <PageHero
-        eyebrow="Planner"
-        title="Trips we’re planning"
-        description="One sheet per trip: who’s in, what happens each day, what to book and what it costs."
+        eyebrow={t.plans.eyebrow}
+        title={t.plans.title}
+        description={t.plans.description}
         stats={[
-          { value: upcoming, label: "coming up" },
-          { value: plans.length - upcoming, label: "done" },
+          { value: upcoming, label: t.plans.comingUp },
+          { value: plans.length - upcoming, label: t.plans.done },
         ]}
         actions={<NewPlanButton />}
       />
 
       {plans.length === 0 ? (
-        <EmptyState icon={<IconCalendar size={26} />} title="No plans yet" action={<NewPlanButton />}>
-          Start a plan for the next trip. You get a sheet with one column per day that the whole crew can fill in.
+        <EmptyState icon={<IconCalendar size={26} />} title={t.plans.noPlans} action={<NewPlanButton />}>
+          {t.plans.noPlansBody}
         </EmptyState>
       ) : (
         <ul className="flex flex-col gap-3">
           {plans.map((p) => (
-            <PlanRow key={p.id} plan={p} going={p.going.map((id) => byId.get(id)).filter((c): c is Crewmate => !!c)} />
+            <PlanRow
+              key={p.id}
+              plan={p}
+              going={p.going.map((id) => byId.get(id)).filter((c): c is Crewmate => !!c)}
+              t={t}
+              locale={locale}
+            />
           ))}
         </ul>
       )}
@@ -44,16 +56,16 @@ export default async function PlansPage() {
   );
 }
 
-function countdown(plan: Plan) {
+function countdown(plan: Plan, t: Dict) {
   const start = daysUntil(plan.startDate);
-  if (start > 1) return `in ${start} days`;
-  if (start === 1) return "tomorrow";
-  if (daysUntil(plan.endDate) >= 0) return "happening now";
-  return "done";
+  if (start > 1) return t.plans.inDays(start);
+  if (start === 1) return t.plans.tomorrow;
+  if (daysUntil(plan.endDate) >= 0) return t.plans.happeningNow;
+  return t.plans.finished;
 }
 
 /** Một kế hoạch trong danh sách: còn bao lâu, tên, nơi, ngày, mức độ đã lên lịch, ai đi. */
-function PlanRow({ plan, going }: { plan: Plan; going: Crewmate[] }) {
+function PlanRow({ plan, going, t, locale }: { plan: Plan; going: Crewmate[]; t: Dict; locale: Locale }) {
   const days = planDays(plan.startDate, plan.endDate).length;
   const filled = Object.keys(plan.cells).length;
   const { total } = planTotals(plan.items, going.length);
@@ -68,7 +80,7 @@ function PlanRow({ plan, going }: { plan: Plan; going: Crewmate[] }) {
         }`}
       >
         <span className="font-display text-lg leading-none font-extrabold text-edge tabular-nums" style={{ fontStretch: "125%" }}>
-          {countdown(plan)}
+          {countdown(plan, t)}
         </span>
         <span className="min-w-0">
           <span className="block truncate font-display text-xl font-bold tracking-[-0.015em] group-hover:text-accent">
@@ -80,9 +92,9 @@ function PlanRow({ plan, going }: { plan: Plan; going: Crewmate[] }) {
               {plan.location}
             </span>
             <span>
-              {formatDateRange(plan.startDate, plan.endDate)}, {plural(days, "day")}
+              {formatDateRange(plan.startDate, plan.endDate, locale)}, {t.count.days(days)}
             </span>
-            <span>{plural(filled, "slot")} planned</span>
+            <span>{t.plans.slotsPlanned(filled)}</span>
             {total > 0 && <span>{formatVnd(total)}</span>}
           </span>
         </span>
@@ -92,7 +104,7 @@ function PlanRow({ plan, going }: { plan: Plan; going: Crewmate[] }) {
               <Avatar name={c.name} url={c.avatarUrl} size={30} />
             </span>
           ))}
-          {going.length === 0 && <span className="text-sm text-ink-soft">Nobody in yet</span>}
+          {going.length === 0 && <span className="text-sm text-ink-soft">{t.plans.nobodyIn}</span>}
         </span>
       </Link>
     </li>

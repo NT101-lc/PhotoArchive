@@ -6,6 +6,7 @@ import type { Me, Member } from "@/lib/types";
 import { Avatar } from "./Avatar";
 import { IconCheck, IconLock } from "./Icons";
 import { useToast } from "./Toast";
+import { useI18n } from "@/i18n/client";
 
 async function post(url: string, body?: unknown, method = "POST") {
   const res = await fetch(url, {
@@ -37,6 +38,7 @@ export function IdentityForm({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const { t } = useI18n();
   const [busy, setBusy] = useState<string | null>(null);
   const [adminOpen, setAdminOpen] = useState(current?.role === 0);
   const [password, setPassword] = useState("");
@@ -54,9 +56,9 @@ export function IdentityForm({
     setBusy(m.id);
     try {
       await post("/api/session", { memberId: m.id });
-      done(`Hi ${m.name}!`, m.name);
+      done(t.login.hi(m.name), m.name);
     } catch (err) {
-      toast.show({ tone: "warn", title: "Couldn’t switch", message: (err as Error).message });
+      toast.show({ tone: "warn", title: t.login.couldntSwitch, message: (err as Error).message });
       setBusy(null);
     }
   }
@@ -66,9 +68,9 @@ export function IdentityForm({
     setBusy("admin");
     try {
       await post("/api/session/admin", { name: "ADMIN", password });
-      done("Signed in as admin", "ADMIN");
+      done(t.login.signedInAdmin, "ADMIN");
     } catch (err) {
-      toast.show({ tone: "warn", title: "Admin sign-in failed", message: (err as Error).message });
+      toast.show({ tone: "warn", title: t.login.adminFailed, message: (err as Error).message });
       setBusy(null);
     }
   }
@@ -76,7 +78,7 @@ export function IdentityForm({
   async function signOut() {
     setBusy("out");
     await post("/api/session", undefined, "DELETE").catch(() => {});
-    toast.show({ tone: "info", title: "Signed out" });
+    toast.show({ tone: "info", title: t.login.signedOut });
     router.refresh();
     setBusy(null);
   }
@@ -120,25 +122,25 @@ export function IdentityForm({
           aria-expanded={adminOpen}
         >
           <span className="flex items-center gap-2">
-            <IconLock size={15} /> Admin sign-in
+            <IconLock size={15} /> {t.login.adminSignIn}
           </span>
           <span className="text-ink-soft">{adminOpen ? "−" : "+"}</span>
         </button>
         {adminOpen && (
           <form onSubmit={adminLogin} className="flex flex-col gap-2.5 border-t border-dashed border-line p-4">
-            <input value="ADMIN" readOnly aria-label="Admin account" className="field bg-surface-2 text-ink-soft" />
+            <input value="ADMIN" readOnly aria-label={t.login.adminAccount} className="field bg-surface-2 text-ink-soft" />
             <input
               type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              aria-label="Admin password"
+              placeholder={t.login.password}
+              aria-label={t.login.adminPassword}
               className="field"
               required
             />
             <button type="submit" disabled={!!busy || !password} className="btn btn-primary">
-              {busy === "admin" ? "Signing in…" : "Sign in as admin"}
+              {busy === "admin" ? t.login.signingIn : t.login.signInAdmin}
             </button>
           </form>
         )}
@@ -146,7 +148,7 @@ export function IdentityForm({
 
       {current && !onDone && (
         <button type="button" onClick={signOut} disabled={!!busy} className="text-sm font-semibold text-ink-soft underline hover:text-accent">
-          Sign out ({current.name})
+          {t.login.signOutAs(current.name)}
         </button>
       )}
     </div>

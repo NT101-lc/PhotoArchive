@@ -9,6 +9,7 @@ import { canEditAbout } from "@/lib/permissions";
 import { IconEdit, IconPlus, IconTrash } from "./Icons";
 import { useIdentity } from "./Identity";
 import { useToast } from "./Toast";
+import { useI18n } from "@/i18n/client";
 
 type Props = { paragraphs: string[]; updatedAt: string | null; updatedBy: string | null };
 
@@ -22,6 +23,7 @@ export function AboutText({ paragraphs, updatedAt, updatedBy }: Props) {
   const me = useIdentity();
   const toast = useToast();
   const router = useRouter();
+  const { t, locale } = useI18n();
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [saving, setSaving] = useState(false);
   const nextId = useRef(0);
@@ -53,11 +55,11 @@ export function AboutText({ paragraphs, updatedAt, updatedBy }: Props) {
     setSaving(true);
     try {
       await updateAbout(next);
-      toast.show({ tone: "success", title: "About page saved" });
+      toast.show({ tone: "success", title: t.about.saved });
       setDrafts(null);
       router.refresh();
     } catch (err) {
-      toast.show({ tone: "warn", title: "Couldn’t save the About page", message: (err as Error).message });
+      toast.show({ tone: "warn", title: t.about.couldntSave, message: (err as Error).message });
     } finally {
       setSaving(false);
     }
@@ -92,16 +94,16 @@ export function AboutText({ paragraphs, updatedAt, updatedBy }: Props) {
           <span>
             {updatedBy && updatedAt ? (
               <>
-                Last edited by <b className="font-semibold text-ink">{updatedBy}</b>, {formatDate(updatedAt)}
+                {t.about.lastEdited} <b className="font-semibold text-ink">{updatedBy}</b>, {formatDate(updatedAt, locale)}
               </>
             ) : (
-              "Written by the crew. Anyone in it can edit this."
+              t.about.writtenByCrew
             )}
           </span>
           {canEdit && (
             <button type="button" onClick={startEditing} className="btn ml-auto h-9">
               <IconEdit size={15} />
-              Edit text
+              {t.about.editText}
             </button>
           )}
         </div>
@@ -119,7 +121,7 @@ export function AboutText({ paragraphs, updatedAt, updatedBy }: Props) {
         e.preventDefault();
         save();
       }}
-      aria-label="Edit the About text"
+      aria-label={t.about.editForm}
     >
       <ol className="flex flex-col gap-3">
         {drafts.map((d, i) => (
@@ -131,15 +133,15 @@ export function AboutText({ paragraphs, updatedAt, updatedBy }: Props) {
               value={d.text}
               autoFocus={focusId === d.id}
               lead={i === 0}
-              aria-label={`Paragraph ${i + 1}`}
+              aria-label={t.about.paragraph(i + 1)}
               onChange={(text) => setDrafts((list) => list!.map((x) => (x.id === d.id ? { ...x, text } : x)))}
             />
             <button
               type="button"
               onClick={() => setDrafts((list) => list!.filter((x) => x.id !== d.id))}
               className="mt-1.5 rounded-md p-2 text-ink-soft hover:bg-surface-2 hover:text-danger"
-              aria-label={`Remove paragraph ${i + 1}`}
-              title="Remove paragraph"
+              aria-label={t.about.removeParagraph(i + 1)}
+              title={t.about.removeParagraphTitle}
             >
               <IconTrash size={17} />
             </button>
@@ -154,17 +156,17 @@ export function AboutText({ paragraphs, updatedAt, updatedBy }: Props) {
         className="ml-10 flex h-11 items-center justify-center gap-1.5 rounded-lg border border-dashed border-ink-soft/50 text-sm font-semibold text-ink-soft hover:border-accent hover:text-accent disabled:opacity-45"
       >
         <IconPlus size={16} />
-        {full ? `Up to ${ABOUT_LIMITS.paragraphs} paragraphs` : "Add paragraph"}
+        {full ? t.about.upTo(ABOUT_LIMITS.paragraphs) : t.about.addParagraph}
       </button>
 
       <div className="sticky bottom-3 z-10 ml-10 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface/95 p-2 pl-4 shadow-[var(--shadow-hard)] backdrop-blur">
-        <span className="text-sm text-ink-soft max-sm:hidden">Ctrl+Enter to save, Esc to cancel. Empty paragraphs are dropped.</span>
+        <span className="text-sm text-ink-soft max-sm:hidden">{t.about.hint}</span>
         <div className="ml-auto flex gap-2">
           <button type="button" onClick={() => setDrafts(null)} disabled={saving} className="btn">
-            Cancel
+            {t.common.cancel}
           </button>
           <button type="submit" disabled={saving} className="btn btn-primary">
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? t.common.saving : t.about.saveChanges}
           </button>
         </div>
       </div>
@@ -187,6 +189,7 @@ function AutoGrowArea({
   "aria-label": string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const { t } = useI18n();
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -204,13 +207,13 @@ function AutoGrowArea({
         autoFocus={autoFocus}
         maxLength={ABOUT_LIMITS.paragraphLength}
         aria-label={ariaLabel}
-        placeholder="Write a paragraph…"
+        placeholder={t.about.placeholder}
         onChange={(e) => onChange(e.target.value)}
         className={`field h-auto resize-none overflow-hidden py-2.5 ${
           lead ? "text-[1.15rem] leading-[1.55] font-medium sm:text-[1.25rem]" : "text-[1.02rem] leading-relaxed"
         }`}
       />
-      {left <= 150 && <span className="self-end text-xs text-ink-soft tabular-nums">{left} characters left</span>}
+      {left <= 150 && <span className="self-end text-xs text-ink-soft tabular-nums">{t.description.left(left)}</span>}
     </span>
   );
 }

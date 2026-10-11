@@ -27,6 +27,7 @@ import { useIdentity } from "./Identity";
 import { useBodyScrollLock } from "./Modal";
 import { CommentsPanel, ReactionBar, usePhotoSocial, type SocialCounts } from "./PhotoSocial";
 import { useToast } from "./Toast";
+import { useI18n } from "@/i18n/client";
 
 type Props = {
   photos: Photo[];
@@ -71,6 +72,7 @@ export function Lightbox({
 }: Props) {
   const toast = useToast();
   const me = useIdentity();
+  const { t, locale } = useI18n();
   // Bảng bên phải: chi tiết ảnh hoặc bình luận (một lúc chỉ mở một)
   const [panel, setPanel] = useState<"info" | "comments" | null>(startWithComments ? "comments" : null);
   const showInfo = panel === "info";
@@ -104,8 +106,8 @@ export function Lightbox({
   // Slideshow: tự chuyển ảnh; dừng khi đang phóng to
   useEffect(() => {
     if (!playing || zoomed || paused || total < 2 || playable) return;
-    const t = setTimeout(() => go(1), SLIDESHOW_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => go(1), SLIDESHOW_MS);
+    return () => clearTimeout(timer);
   }, [playing, zoomed, paused, go, total, index, playable]);
 
   useEffect(() => {
@@ -208,9 +210,9 @@ export function Lightbox({
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
-      toast.show({ tone: "success", title: "Photo link copied", message: "Opening it jumps straight to this photo." });
+      toast.show({ tone: "success", title: t.lightbox.linkCopied, message: t.lightbox.linkCopiedBody });
     } catch {
-      toast.show({ tone: "warn", title: "Couldn't copy", message: "The browser blocked clipboard access." });
+      toast.show({ tone: "warn", title: t.lightbox.couldntCopy, message: t.lightbox.clipboardBlocked });
     }
   }
 
@@ -220,7 +222,7 @@ export function Lightbox({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`${isVideo ? "Video" : "Photo"} ${index + 1} of ${total}`}
+      aria-label={t.lightbox.dialog(isVideo, index + 1, total)}
       className="animate-fade fixed inset-0 z-[1100] flex flex-col bg-[#0b0e0d] text-[#e4e9e5]"
     >
       {/* Thanh tiến trình slideshow */}
@@ -236,10 +238,10 @@ export function Lightbox({
           {pad2(index + 1)} <span className="opacity-50">/ {pad2(total)}</span>
         </span>
         <div className="flex items-center gap-1 sm:gap-1.5">
-          <LbButton onClick={() => onToggleFavorite(photo.id)} label={fav ? "Remove favorite (F)" : "Favorite (F)"} active={fav} accent>
+          <LbButton onClick={() => onToggleFavorite(photo.id)} label={fav ? t.lightbox.removeFavorite : t.lightbox.favorite} active={fav} accent>
             <IconHeart size={18} filled={fav} />
           </LbButton>
-          <LbButton onClick={() => setPlaying((v) => !v)} label={playing ? "Pause slideshow (Space)" : "Slideshow (Space)"} active={playing}>
+          <LbButton onClick={() => setPlaying((v) => !v)} label={playing ? t.lightbox.pauseSlideshow : t.lightbox.slideshow} active={playing}>
             {playing ? <IconPause size={18} /> : <IconPlay size={16} />}
           </LbButton>
           {isVideo ? (
@@ -249,38 +251,38 @@ export function Lightbox({
               <button
                 type="button"
                 onClick={() => quality.set(quality.value === "1080" ? "720" : "1080")}
-                title="Switch video quality"
+                title={t.lightbox.switchQuality}
                 className="h-9 rounded-full border border-white/20 px-3 text-xs font-semibold tabular-nums hover:bg-white/10 sm:h-10"
               >
                 {quality.value}p
               </button>
             )
           ) : (
-            <LbButton onClick={() => setZoomed((v) => !v)} label={zoomed ? "Zoom out (Z)" : "Zoom in (Z)"} active={zoomed} className="max-sm:hidden">
+            <LbButton onClick={() => setZoomed((v) => !v)} label={zoomed ? t.lightbox.zoomOut : t.lightbox.zoomIn} active={zoomed} className="max-sm:hidden">
               {zoomed ? <IconZoomOut size={18} /> : <IconZoomIn size={18} />}
             </LbButton>
           )}
-          <LbButton onClick={download} label={isVideo ? "Download video" : "Download original"} className="max-sm:hidden">
+          <LbButton onClick={download} label={isVideo ? t.lightbox.downloadVideo : t.lightbox.downloadOriginal} className="max-sm:hidden">
             <IconDownload size={18} />
           </LbButton>
-          <LbButton onClick={copyLink} label="Copy photo link" className="max-sm:hidden">
+          <LbButton onClick={copyLink} label={t.lightbox.copyPhotoLink} className="max-sm:hidden">
             <IconLink size={18} />
           </LbButton>
           {cover && (!isVideo || playable) && (
             <LbButton
               onClick={() => cover.onSet(photo)}
-              label={cover.isCover(photo.id) ? "This is the album cover" : "Set as album cover"}
+              label={cover.isCover(photo.id) ? t.lightbox.isCover : t.lightbox.setCover}
               active={cover.isCover(photo.id)}
             >
               <IconStar size={18} filled={cover.isCover(photo.id)} />
             </LbButton>
           )}
           {remove?.canDelete(photo) && (
-            <LbButton onClick={() => remove.onDelete(photo)} label={isVideo ? "Delete video" : "Delete photo"}>
+            <LbButton onClick={() => remove.onDelete(photo)} label={isVideo ? t.lightbox.deleteVideo : t.lightbox.deletePhoto}>
               <IconTrash size={18} />
             </LbButton>
           )}
-          <LbButton onClick={() => togglePanel("comments")} label="Comments (C)" active={showComments}>
+          <LbButton onClick={() => togglePanel("comments")} label={t.lightbox.comments} active={showComments}>
             <span className="relative">
               <IconComment size={18} />
               {commentCount > 0 && (
@@ -290,11 +292,11 @@ export function Lightbox({
               )}
             </span>
           </LbButton>
-          <LbButton onClick={() => togglePanel("info")} label="Info (I)" active={showInfo}>
+          <LbButton onClick={() => togglePanel("info")} label={t.lightbox.info} active={showInfo}>
             <IconInfo size={18} />
           </LbButton>
           <span className="mx-0.5 h-6 w-px bg-white/15" aria-hidden="true" />
-          <LbButton onClick={onClose} label="Close (Esc)">
+          <LbButton onClick={onClose} label={t.lightbox.close}>
             <IconClose size={18} />
           </LbButton>
         </div>
@@ -350,10 +352,10 @@ export function Lightbox({
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 pt-2 sm:px-5">
           <span className="min-w-0 truncate font-mono text-[0.7rem]">
             <span className="text-[#6cc79c]">{photo.uploadedBy}</span>
-            <span className="opacity-60"> · {formatDateTime(photo.takenAt)}</span>
+            <span className="opacity-60"> · {formatDateTime(photo.takenAt, locale)}</span>
           </span>
           <ReactionBar social={social.social} canReact={canComment(me)} onReact={social.react} />
-          <span className="hidden font-mono text-[0.7rem] opacity-40 xl:inline">← → navigate · Space slideshow · F favorite · C comments · Esc close</span>
+          <span className="hidden font-mono text-[0.7rem] opacity-40 xl:inline">{t.lightbox.shortcuts}</span>
         </div>
         <div ref={stripRef} className="scrollbar-none flex gap-1.5 overflow-x-auto px-3 py-2.5 sm:px-5">
           {photos.map((p, i) => (
@@ -365,7 +367,7 @@ export function Lightbox({
                 setZoomed(false);
                 onIndexChange(i);
               }}
-              aria-label={`${p.kind === "video" ? "Video" : "Photo"} ${i + 1}`}
+              aria-label={t.lightbox.thumb(p.kind === "video", i + 1)}
               aria-current={i === index}
               className={`relative h-12 shrink-0 overflow-hidden rounded-md border transition-all sm:h-14 ${
                 i === index ? "border-[#6cc79c] opacity-100" : "border-transparent opacity-45 hover:opacity-80"
@@ -416,6 +418,7 @@ function VideoStage({
   onEnded: () => void;
 }) {
   const resumeAt = useRef(0);
+  const { t } = useI18n();
   const sources = photo.status === "ready" ? photo.sources : null;
   const src = sources ? (sources[quality] ?? sources["720"] ?? sources["1080"]) : undefined;
 
@@ -425,17 +428,16 @@ function VideoStage({
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
         {failed ? (
           <>
-            <p className="font-display text-xl font-bold">This video couldn’t be processed</p>
+            <p className="font-display text-xl font-bold">{t.lightbox.videoFailed}</p>
             <p className="max-w-sm text-sm text-white/60">
-              {photo.processingError ?? "Something went wrong while converting it."} Use “Try again” on the album page, or download
-              the original.
+              {photo.processingError ?? t.lightbox.videoFailedGeneric} {t.lightbox.videoFailedHint}
             </p>
           </>
         ) : (
           <>
             <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-white/15 border-t-[#6cc79c]" aria-hidden="true" />
-            <p className="font-display text-xl font-bold">{photo.status === "processing" ? "Processing video…" : "Waiting to process…"}</p>
-            <p className="max-w-sm text-sm text-white/60">It’s being converted so it plays on every device. This page updates by itself.</p>
+            <p className="font-display text-xl font-bold">{photo.status === "processing" ? t.lightbox.processing : t.lightbox.waiting}</p>
+            <p className="max-w-sm text-sm text-white/60">{t.lightbox.processingHint}</p>
           </>
         )}
       </div>
@@ -468,13 +470,14 @@ function VideoStage({
 
 function FittedImage({ photo, onDoubleClick }: { photo: Photo; onDoubleClick: () => void }) {
   const [loaded, setLoaded] = useState(false);
+  const { t } = useI18n();
   return (
     <div className="absolute inset-2 sm:inset-x-20 sm:inset-y-2" onDoubleClick={onDoubleClick}>
       {!loaded && <Spinner />}
       {/* unoptimized: hiển thị đúng ảnh gốc, không qua bộ resize của Next */}
       <Image
         src={photo.url}
-        alt={`Photo by ${photo.uploadedBy}`}
+        alt={t.lightbox.photoBy(photo.uploadedBy)}
         fill
         unoptimized
         sizes="100vw"
@@ -490,6 +493,7 @@ function FittedImage({ photo, onDoubleClick }: { photo: Photo; onDoubleClick: ()
 /** Ảnh ở kích thước thật trong khung cuộn được — kéo / cuộn để xem chi tiết. */
 function ZoomedImage({ photo, onExit }: { photo: Photo; onExit: () => void }) {
   const boxRef = useRef<HTMLDivElement>(null);
+  const { t } = useI18n();
 
   // Mở ra ở giữa ảnh
   useEffect(() => {
@@ -510,7 +514,7 @@ function ZoomedImage({ photo, onExit }: { photo: Photo; onExit: () => void }) {
         {/* eslint-disable-next-line @next/next/no-img-element -- cần kích thước thật để cuộn, đã được tải sẵn ở chế độ thường */}
         <img
           src={photo.url}
-          alt={`Photo by ${photo.uploadedBy} (zoomed)`}
+          alt={t.lightbox.photoByZoomed(photo.uploadedBy)}
           width={photo.width}
           height={photo.height}
           draggable={false}
@@ -523,11 +527,12 @@ function ZoomedImage({ photo, onExit }: { photo: Photo; onExit: () => void }) {
 
 function NavButton({ side, onClick }: { side: "left" | "right"; onClick: () => void }) {
   const Icon = side === "left" ? IconChevronLeft : IconChevronRight;
+  const { t } = useI18n();
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={side === "left" ? "Previous photo (←)" : "Next photo (→)"}
+      aria-label={side === "left" ? t.lightbox.previous : t.lightbox.next}
       className={`absolute top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/5 backdrop-blur-sm transition-colors hover:bg-[#6cc79c] hover:text-[#0b1a14] sm:flex ${
         side === "left" ? "left-4" : "right-4"
       }`}
@@ -580,20 +585,21 @@ function InfoPanel({
   onDownload: () => void;
   onCopyLink: () => void;
 }) {
+  const { t, locale } = useI18n();
   const rows: Array<[string, string]> = [
-    ["Taken by", photo.uploadedBy],
-    ["Taken at", formatDateTime(photo.takenAt)],
-    ["Size", `${photo.width} × ${photo.height}`],
+    [t.lightbox.takenBy, photo.uploadedBy],
+    [t.lightbox.takenAt, formatDateTime(photo.takenAt, locale)],
+    [t.lightbox.size, `${photo.width} × ${photo.height}`],
     photo.kind === "video" && photo.durationMs
-      ? ["Length", formatDuration(photo.durationMs)]
-      : ["Orientation", photo.width >= photo.height ? "Landscape" : "Portrait"],
+      ? [t.lightbox.length, formatDuration(photo.durationMs)]
+      : [t.lightbox.orientation, photo.width >= photo.height ? t.lightbox.landscape : t.lightbox.portrait],
   ];
 
   return (
     <aside className="animate-rise absolute inset-x-2 bottom-2 z-10 rounded-2xl border border-white/15 bg-[#171c1b]/95 p-4 shadow-2xl backdrop-blur-md sm:inset-x-auto sm:top-2 sm:right-4 sm:bottom-auto sm:w-[300px]">
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-[#97a29e]">{photo.kind === "video" ? "Video details" : "Photo details"}</span>
-        <button type="button" onClick={onClose} className="rounded-full p-1 hover:bg-white/10" aria-label="Close details">
+        <span className="text-xs font-medium text-[#97a29e]">{photo.kind === "video" ? t.lightbox.videoDetails : t.lightbox.photoDetails}</span>
+        <button type="button" onClick={onClose} className="rounded-full p-1 hover:bg-white/10" aria-label={t.lightbox.closeDetails}>
           <IconClose size={14} />
         </button>
       </div>
@@ -610,15 +616,15 @@ function InfoPanel({
         </div>
       </dl>
       <div className="mt-4 grid grid-cols-3 gap-2">
-        <PanelAction onClick={onDownload} icon={<IconDownload size={16} />} label="Download" />
-        <PanelAction onClick={onCopyLink} icon={<IconLink size={16} />} label="Copy link" />
+        <PanelAction onClick={onDownload} icon={<IconDownload size={16} />} label={t.lightbox.download} />
+        <PanelAction onClick={onCopyLink} icon={<IconLink size={16} />} label={t.lightbox.copyLink} />
         <a
           href={photo.url}
           target="_blank"
           rel="noopener noreferrer"
           className="flex flex-col items-center gap-1 rounded-xl border border-white/15 py-2 text-xs font-semibold hover:bg-white/10"
         >
-          <IconExternal size={16} /> {photo.kind === "video" ? "Open file" : "Original"}
+          <IconExternal size={16} /> {photo.kind === "video" ? t.lightbox.openFile : t.lightbox.original}
         </a>
       </div>
     </aside>
