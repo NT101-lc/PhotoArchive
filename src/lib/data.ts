@@ -5,6 +5,7 @@ import { cache } from "react";
 import { albums, db, members, photos, ROLE_USER, type AlbumRow, type PhotoRow } from "@/db";
 import { getSocialCounts } from "./social";
 import { resolveObjectUrl, resolvePhotoUrl } from "./storage";
+import { tripPlace } from "./places-format";
 import type { Album, Member, Photo } from "./types";
 
 // Data Access Layer: nơi duy nhất UI đọc dữ liệu. Chỉ chạy phía server,
@@ -55,7 +56,8 @@ function toAlbum(row: AlbumRow & { photoCount: number }, coverUrl: string): Albu
     id: row.slug,
     title: row.title,
     location: row.location,
-    coords: row.latitude !== null && row.longitude !== null ? { lat: row.latitude, lng: row.longitude } : null,
+    // Album tạo bằng bản cũ (chưa có danh sách nơi) → một nơi = location
+    places: row.places.length ? row.places : [tripPlace({ name: row.location })],
     tripDate: row.tripDate,
     endDate: row.endDate,
     description: row.description,

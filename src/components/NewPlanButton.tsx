@@ -6,8 +6,8 @@ import { createPlan } from "@/lib/api-client";
 import { canEditPlan } from "@/lib/permissions";
 import { DateRangeFields } from "./DateRangeFields";
 import { IconPlus } from "./Icons";
-import { LocationInput } from "./LocationInput";
-import type { Coords } from "@/lib/places-format";
+import { PlacesInput } from "./PlacesInput";
+import { joinPlaces, withDraft, type TripPlace } from "@/lib/places-format";
 import { useIdentity } from "./Identity";
 import { Modal } from "./Modal";
 import { useToast } from "./Toast";
@@ -18,12 +18,12 @@ export function NewPlanButton({ className = "btn btn-primary" }: { className?: s
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
-  // Kế hoạch chỉ lưu tên nơi; toạ độ chỉ để ô nhập biết nơi đã được chọn từ gợi ý
-  const [form, setForm] = useState({ title: "", location: "", coords: null as Coords | null, start: "", end: "" });
+  // Kế hoạch chỉ lưu tên các nơi ghép thành một chuỗi ("Đà Lạt, Nha Trang"), không lưu toạ độ
+  const [form, setForm] = useState({ title: "", places: [] as TripPlace[], placeDraft: "", start: "", end: "" });
   const [saving, setSaving] = useState(false);
 
   if (!canEditPlan(me)) return null;
-  const valid = form.title.trim() && form.location.trim() && form.start;
+  const valid = form.title.trim() && (form.places.length > 0 || form.placeDraft.trim()) && form.start;
 
   async function submit() {
     if (!valid || saving) return;
@@ -31,7 +31,7 @@ export function NewPlanButton({ className = "btn btn-primary" }: { className?: s
     try {
       const { slug } = await createPlan({
         title: form.title.trim(),
-        location: form.location.trim(),
+        location: joinPlaces(withDraft(form.places, form.placeDraft)),
         startDate: form.start,
         endDate: form.end || form.start,
       });
@@ -66,7 +66,7 @@ export function NewPlanButton({ className = "btn btn-primary" }: { className?: s
       >
         <form
           id="new-plan"
-          className="grid gap-3 p-5 sm:grid-cols-[3fr_2fr]"
+          className="grid gap-3 p-5 sm:grid-cols-2"
           onSubmit={(e) => {
             e.preventDefault();
             submit();
@@ -76,16 +76,17 @@ export function NewPlanButton({ className = "btn btn-primary" }: { className?: s
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             placeholder="Trip name, e.g. Đà Lạt for Tết"
-            className="field"
+            className="field sm:col-span-2"
             aria-label="Trip name"
             autoFocus
           />
-          <LocationInput
-            value={form.location}
-            coords={form.coords}
-            onChange={(location, coords) => setForm({ ...form, location, coords })}
-            placeholder="Place, e.g. Đà Lạt"
-            aria-label="Place"
+          <PlacesInput
+            className="sm:col-span-2"
+            places={form.places}
+            draft={form.placeDraft}
+            onChange={(places, placeDraft) => setForm({ ...form, places, placeDraft })}
+            placeholder="Places, e.g. Đà Lạt, Nha Trang"
+            aria-label="Places"
           />
           <DateRangeFields
             className="sm:col-span-2"

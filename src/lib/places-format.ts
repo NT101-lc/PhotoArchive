@@ -23,6 +23,44 @@ export type PhotonFeature = {
 };
 
 export const MAX_PLACE_LENGTH = 120;
+/** Một chuyến đi qua tối đa chừng này nơi */
+export const MAX_PLACES = 8;
+
+/** Một nơi của chuyến đi (lưu trong albums.places): toạ độ null khi nơi được gõ tay */
+export type TripPlace = { name: string; lat: number | null; lng: number | null };
+
+export function tripPlace(p: { name: string; lat?: number | null; lng?: number | null }): TripPlace {
+  return { name: p.name.trim().slice(0, MAX_PLACE_LENGTH), lat: p.lat ?? null, lng: p.lng ?? null };
+}
+
+/** Chuỗi hiển thị / tìm kiếm của cả chuyến: "Đà Lạt, Nha Trang" (lưu vào albums.location, plans.location) */
+export function joinPlaces(places: Array<{ name: string }>) {
+  return places.map((p) => p.name).join(", ");
+}
+
+/** Cùng một nơi khi tên giống nhau không kể hoa thường ("Đà Lạt" = "đà lạt") */
+const placeKey = (name: string) => name.trim().toLocaleLowerCase("vi");
+export const sameName = (a: string, b: string) => placeKey(a) === placeKey(b);
+
+/** Tên các nơi khác nhau qua mọi chuyến (không phân biệt hoa thường) — "Đà Lạt, Nha Trang" là 2 nơi */
+export function distinctPlaceNames(albums: Array<{ places: Array<{ name: string }> }>) {
+  const byKey = new Map<string, string>();
+  for (const a of albums) for (const p of a.places) if (!byKey.has(placeKey(p.name))) byKey.set(placeKey(p.name), p.name);
+  return [...byKey.values()];
+}
+
+/** Thêm một nơi vào danh sách: bỏ chữ trống, bỏ trùng tên (không phân biệt hoa thường), tối đa MAX_PLACES. */
+export function addPlace(places: TripPlace[], place: TripPlace) {
+  const name = place.name.trim();
+  if (!name || places.length >= MAX_PLACES) return places;
+  if (places.some((p) => sameName(p.name, name))) return places;
+  return [...places, { ...place, name }];
+}
+
+/** Danh sách nơi kèm chữ đang gõ dở trong ô (chưa bấm Enter) — để bấm lưu ngay cũng không mất chữ đó. */
+export function withDraft(places: TripPlace[], draft: string) {
+  return addPlace(places, tripPlace({ name: draft }));
+}
 
 /** Đường, trạm xe buýt, ranh giới hành chính cũ (trước khi sáp nhập tỉnh 2025) → không phải nơi để đặt tên chuyến. */
 function isNoise(p: NonNullable<PhotonFeature["properties"]>) {

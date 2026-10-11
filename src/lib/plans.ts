@@ -86,7 +86,8 @@ const text = (max: number) => z.string().trim().max(max);
 const infoInput = z
   .object({
     title: text(120).min(1),
-    location: text(120).min(1),
+    // Các nơi ghép lại ("Đà Lạt, Nha Trang"), tối đa 8 nơi
+    location: text(400).min(1),
     startDate: z.iso.date(),
     endDate: z.iso.date(),
   })

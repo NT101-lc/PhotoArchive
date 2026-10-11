@@ -6,6 +6,7 @@ import type { Album } from "@/lib/types";
 import { AlbumCard } from "./AlbumCard";
 import { EmptyState } from "./EmptyState";
 import { IconClose, IconReset, IconSearch } from "./Icons";
+import { distinctPlaceNames, sameName } from "@/lib/places-format";
 
 export const SORTS = {
   newest: "Newest",
@@ -30,17 +31,15 @@ export function AlbumBrowser({ albums, initial }: Props) {
     () => [...new Set(albums.map((a) => yearOf(a.tripDate)))].sort((a, b) => b.localeCompare(a)),
     [albums],
   );
-  const places = useMemo(
-    () => [...new Set(albums.map((a) => a.location))].sort((a, b) => a.localeCompare(b, "vi")),
-    [albums],
-  );
+  // Mỗi nơi của từng chuyến là một lựa chọn lọc ("Đà Lạt, Nha Trang" hiện ở cả Đà Lạt lẫn Nha Trang)
+  const places = useMemo(() => distinctPlaceNames(albums).sort((a, b) => a.localeCompare(b, "vi")), [albums]);
 
   const filtered = useMemo(() => {
     const q = normalizeText(query);
     const list = albums.filter(
       (a) =>
         (year.length === 0 || year.includes(yearOf(a.tripDate))) &&
-        (place.length === 0 || place.includes(a.location)) &&
+        (place.length === 0 || a.places.some((p) => place.some((name) => sameName(name, p.name)))) &&
         (!q || normalizeText(`${a.title} ${a.location} ${a.description ?? ""}`).includes(q)),
     );
     return list.sort((a, b) =>

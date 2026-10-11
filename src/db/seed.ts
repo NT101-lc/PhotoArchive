@@ -4,6 +4,7 @@ import { inArray, sql } from "drizzle-orm";
 import { createDb } from "./client";
 import { albums, members, photos, ROLE_USER } from "./schema";
 import { MEMBERS, MOCK_ALBUMS, MOCK_PHOTOS } from "./seed-data";
+import { tripPlace } from "../lib/places-format";
 
 loadEnvConfig(process.cwd());
 
@@ -41,6 +42,7 @@ async function main() {
         slug: a.id,
         title: a.title,
         location: a.location,
+        places: [tripPlace({ name: a.location })],
         tripDate: a.tripDate,
         endDate: a.endDate ?? null,
         description: a.description ?? null,

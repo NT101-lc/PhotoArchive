@@ -1,9 +1,12 @@
+import type { TripPlace } from "./places-format";
+
 export type Album = {
   id: string;
   title: string;
+  /** Chuỗi hiển thị của cả chuyến: "Đà Lạt, Nha Trang" */
   location: string;
-  /** Toạ độ của nơi (chọn từ gợi ý); null nếu nơi được gõ tay */
-  coords: { lat: number; lng: number } | null;
+  /** Các nơi của chuyến theo thứ tự đi (luôn có ít nhất một) */
+  places: TripPlace[];
   /** Ngày đi, định dạng ISO `YYYY-MM-DD` */
   tripDate: string;
   /** Ngày về (chuyến nhiều ngày), null nếu đi trong ngày */

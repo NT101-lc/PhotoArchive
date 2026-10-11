@@ -8,6 +8,7 @@ import { getAbout } from "@/lib/about";
 import { getAlbums, getMembers } from "@/lib/data";
 import { yearOf } from "@/lib/format";
 import groupPhoto from "../../../public/about/ninh-binh.jpg";
+import { distinctPlaceNames } from "@/lib/places-format";
 
 export const metadata: Metadata = { title: "About" };
 
@@ -22,7 +23,7 @@ export default async function AboutPage() {
   const [about, crew, albums] = await Promise.all([getAbout(), getMembers(), getAlbums()]);
 
   const photos = albums.reduce((s, a) => s + a.photoCount, 0);
-  const places = new Set(albums.map((a) => a.location)).size;
+  const places = distinctPlaceNames(albums).length;
   const since = albums.length ? yearOf(albums[albums.length - 1].tripDate) : null;
   const facts = [
     { value: crew.length, label: crew.length === 1 ? "person" : "people" },

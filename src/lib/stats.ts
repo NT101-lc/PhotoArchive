@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, countDistinct, desc, eq, inArray, isNotNull, lt, lte, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lt, lte, ne, sql } from "drizzle-orm";
 import { connection } from "next/server";
 import { albums, db, members, photos } from "@/db";
 import { displayUrl } from "./data";
@@ -24,7 +24,13 @@ export async function getCrewStats() {
         videos: sql<number>`count(*) filter (where ${photos.kind} = 'video')::int`,
       })
       .from(photos),
-    db.select({ trips: sql<number>`count(*)::int`, places: countDistinct(albums.location) }).from(albums),
+    db
+      .select({
+        trips: sql<number>`count(*)::int`,
+        // Mỗi nơi của từng chuyến tính riêng ("Đà Lạt, Nha Trang" = 2 nơi), không phân biệt hoa thường
+        places: sql<number>`(select count(distinct lower(e->>'name'))::int from ${albums}, jsonb_array_elements(${albums.places}) e)`,
+      })
+      .from(albums),
     db
       .select({
         year,
@@ -212,16 +218,19 @@ export async function getRoll() {
 /** Những nơi đã đến: số chuyến, số ảnh, lần gần nhất. */
 export async function getPlaces() {
   await connection();
+  // Tách danh sách nơi của từng chuyến thành từng dòng; chuyến qua 2 nơi được đếm ở cả hai
+  const place = sql<string>`min(e->>'name')`;
   return db
     .select({
-      location: albums.location,
+      location: place,
       trips: sql<number>`count(distinct ${albums.id})::int`,
       photos: sql<number>`count(${photos.id})::int`,
       lastTrip: sql<string>`max(${albums.tripDate})::text`,
     })
     .from(albums)
+    .innerJoin(sql`jsonb_array_elements(${albums.places}) e`, sql`true`)
     .leftJoin(photos, eq(photos.albumId, albums.id))
-    .groupBy(albums.location)
+    .groupBy(sql`lower(e->>'name')`)
     .orderBy(desc(sql`count(distinct ${albums.id})`), desc(sql`max(${albums.tripDate})`))
     .limit(8);
 }

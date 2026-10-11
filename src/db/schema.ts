@@ -16,6 +16,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { REACTIONS } from "../lib/photo-social";
+import type { TripPlace } from "../lib/places-format";
 
 // Tên cột viết camelCase ở đây, drizzle tự đổi sang snake_case trong DB (casing: "snake_case").
 
@@ -60,8 +61,12 @@ export const albums = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     slug: text().notNull().unique(),
     title: text().notNull(),
+    // Chuỗi hiển thị / tìm kiếm của cả chuyến, ghép từ `places`: "Đà Lạt, Nha Trang"
     location: text().notNull(),
-    // Toạ độ của nơi đã chọn trong ô gợi ý (lib/places.ts); null → gõ tay hoặc album có từ trước
+    // Các nơi của chuyến (theo thứ tự đi), mỗi nơi có toạ độ nếu chọn từ gợi ý (lib/places.ts)
+    places: jsonb().$type<TripPlace[]>().notNull().default(sql`'[]'::jsonb`),
+    // KHÔNG DÙNG NỮA (toạ độ giờ nằm trong `places`). Bản đang chạy trên Vercel trước thay đổi này vẫn đọc / ghi
+    // hai cột này, nên chỉ xoá (migration sau) khi bản mới đã deploy xong.
     latitude: doublePrecision(),
     longitude: doublePrecision(),
     tripDate: date({ mode: "string" }).notNull(),

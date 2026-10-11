@@ -10,7 +10,8 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { DateRangeFields } from "./DateRangeFields";
 import { DescriptionInput } from "./DescriptionInput";
 import { IconEdit, IconTrash } from "./Icons";
-import { LocationInput } from "./LocationInput";
+import { PlacesInput } from "./PlacesInput";
+import { withDraft } from "@/lib/places-format";
 import { useIdentity } from "./Identity";
 import { Modal } from "./Modal";
 import { useToast } from "./Toast";
@@ -22,7 +23,7 @@ import { useToast } from "./Toast";
 export function AlbumAdminActions({
   album,
 }: {
-  album: Pick<Album, "id" | "title" | "location" | "coords" | "tripDate" | "endDate" | "description" | "photoCount">;
+  album: Pick<Album, "id" | "title" | "places" | "tripDate" | "endDate" | "description" | "photoCount">;
 }) {
   const me = useIdentity();
   const router = useRouter();
@@ -31,8 +32,8 @@ export function AlbumAdminActions({
   const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState({
     title: album.title,
-    location: album.location,
-    coords: album.coords,
+    places: album.places,
+    placeDraft: "",
     tripDate: album.tripDate,
     endDate: album.endDate ?? "",
     description: album.description ?? "",
@@ -50,7 +51,7 @@ export function AlbumAdminActions({
       const shared = { tripDate: form.tripDate, endDate: form.endDate || null, description: form.description };
       const { slug } = await updateAlbum(
         album.id,
-        fullEdit ? { title: form.title.trim(), location: form.location.trim(), coords: form.coords, ...shared } : shared,
+        fullEdit ? { title: form.title.trim(), places: withDraft(form.places, form.placeDraft), ...shared } : shared,
       );
       toast.show({ tone: "success", title: "Album updated" });
       setEditing(false);
@@ -110,15 +111,17 @@ export function AlbumAdminActions({
               disabled={!fullEdit}
             />
           </Field>
-          <Field label="Place">
-            <LocationInput
-              value={form.location}
-              coords={form.coords}
-              onChange={(location, coords) => setForm({ ...form, location, coords })}
-              required
+          {/* Không bọc <label> như các ô khác: bấm vào chữ của label sẽ "bấm" luôn nút × đầu tiên trong ô */}
+          <div className="flex flex-col gap-1.5">
+            <span className="eyebrow">Places</span>
+            <PlacesInput
+              places={form.places}
+              draft={form.placeDraft}
+              onChange={(places, placeDraft) => setForm({ ...form, places, placeDraft })}
               disabled={!fullEdit}
+              aria-label="Places"
             />
-          </Field>
+          </div>
           <fieldset className="flex flex-col gap-1.5">
             <legend className="eyebrow mb-1.5">Trip dates</legend>
             <DateRangeFields

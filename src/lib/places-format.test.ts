@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { gpsClusters, placeFromReverse, placesFromSearch, type PhotonFeature } from "./places-format";
+import {
+  addPlace,
+  gpsClusters,
+  joinPlaces,
+  MAX_PLACES,
+  placeFromReverse,
+  placesFromSearch,
+  tripPlace,
+  withDraft,
+  type PhotonFeature,
+} from "./places-format";
 
 const f = (lng: number, lat: number, properties: PhotonFeature["properties"]): PhotonFeature => ({
   geometry: { coordinates: [lng, lat] },
@@ -76,5 +86,29 @@ describe("places", () => {
       [5, 2],
     );
     assert.equal(clusters[0].lat, 11.942);
+  });
+});
+
+describe("trip places", () => {
+  const daLat = tripPlace({ name: " Đà Lạt ", lat: 11.94, lng: 108.44 });
+
+  it("joins names for display and keeps coordinates only when picked", () => {
+    assert.deepEqual(daLat, { name: "Đà Lạt", lat: 11.94, lng: 108.44 });
+    assert.deepEqual(tripPlace({ name: "Nhà bà ngoại" }), { name: "Nhà bà ngoại", lat: null, lng: null });
+    assert.equal(joinPlaces([daLat, tripPlace({ name: "Nha Trang" })]), "Đà Lạt, Nha Trang");
+  });
+
+  it("adds places without blanks, duplicates (any case) or going past the limit", () => {
+    let list = addPlace([], daLat);
+    list = addPlace(list, tripPlace({ name: "đà lạt" }));
+    list = addPlace(list, tripPlace({ name: "   " }));
+    assert.equal(list.length, 1);
+    const full = Array.from({ length: MAX_PLACES }, (_, i) => tripPlace({ name: `P${i}` }));
+    assert.equal(addPlace(full, tripPlace({ name: "One more" })), full);
+  });
+
+  it("keeps a half-typed place when saving", () => {
+    assert.deepEqual(withDraft([daLat], " Mũi Né "), [daLat, { name: "Mũi Né", lat: null, lng: null }]);
+    assert.deepEqual(withDraft([daLat], ""), [daLat]);
   });
 });

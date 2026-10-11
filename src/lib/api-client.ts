@@ -1,6 +1,6 @@
 // Gọi API từ trình duyệt. Lỗi trả về `{ error }` được ném ra thành Error với đúng thông báo.
 
-import type { Coords, Place } from "./places-format";
+import type { Coords, Place, TripPlace } from "./places-format";
 
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -14,8 +14,7 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 export function createAlbum(input: {
   title: string;
-  location: string;
-  coords?: Coords | null;
+  places: TripPlace[];
   tripDate: string;
   endDate?: string | null;
   description?: string | null;
@@ -27,8 +26,7 @@ export function updateAlbum(
   slug: string,
   patch: {
     title?: string;
-    location?: string;
-    coords?: Coords | null;
+    places?: TripPlace[];
     tripDate?: string;
     endDate?: string | null;
     description?: string | null;

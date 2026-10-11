@@ -4,6 +4,7 @@ import { PageHero } from "@/components/PageHero";
 import { IconPlus } from "@/components/Icons";
 import { UploadButton } from "@/components/UploadModal";
 import { getAlbums } from "@/lib/data";
+import { distinctPlaceNames } from "@/lib/places-format";
 
 export const metadata: Metadata = { title: "All albums" };
 
@@ -20,7 +21,7 @@ export default async function AlbumsPage({ searchParams }: PageProps<"/albums">)
   const [albums, sp] = await Promise.all([getAlbums(), searchParams]);
   const totalPhotos = albums.reduce((sum, a) => sum + a.photoCount, 0);
   const albumOptions = albums.map(({ id, title, createdById }) => ({ id, title, createdById }));
-  const places = new Set(albums.map((a) => a.location)).size;
+  const places = distinctPlaceNames(albums).length;
 
   const sort = first(sp.sort);
   const initial = {

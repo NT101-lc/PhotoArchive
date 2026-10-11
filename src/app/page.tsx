@@ -9,6 +9,7 @@ import { UploadButton } from "@/components/UploadModal";
 import { getAlbums, getPhotos } from "@/lib/data";
 import { dayKey, formatDateRange, plural, tripDays, yearOf } from "@/lib/format";
 import type { Album, Photo } from "@/lib/types";
+import { distinctPlaceNames } from "@/lib/places-format";
 
 const SHEET_FRAMES = 6;
 
@@ -19,7 +20,7 @@ export default async function HomePage() {
   const latestPhotos = latest ? await getPhotos(latest.id) : [];
 
   const totalPhotos = albums.reduce((s, a) => s + a.photoCount, 0);
-  const places = new Set(albums.map((a) => a.location)).size;
+  const places = distinctPlaceNames(albums).length;
   const years = [...new Set(albums.map((a) => yearOf(a.tripDate)))];
   const albumOptions = albums.map(({ id, title, createdById }) => ({ id, title, createdById }));
 
