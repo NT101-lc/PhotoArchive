@@ -1,7 +1,7 @@
 import type { Album, Photo } from "../lib/types";
 
 // Kiểu dữ liệu mẫu: chỉ các trường cần để seed (không có các id sinh ra trong DB)
-type SeedAlbum = Omit<Album, "coverPhotoId" | "createdById" | "endDate" | "description"> & {
+type SeedAlbum = Omit<Album, "coverPhotoId" | "createdById" | "endDate" | "description" | "coords"> & {
   endDate?: string | null;
   description?: string | null;
 };

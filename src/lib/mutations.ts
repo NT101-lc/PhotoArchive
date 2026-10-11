@@ -80,9 +80,13 @@ const descriptionInput = z
   .nullable()
   .transform(cleanDescription);
 
+/** Toạ độ của nơi chọn từ gợi ý; null / bỏ trống = nơi gõ tay */
+const coordsInput = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).nullable();
+
 export const createAlbumInput = z.object({
   title: z.string().trim().min(1).max(120),
   location: z.string().trim().min(1).max(120),
+  coords: coordsInput.optional(),
   tripDate: z.iso.date(),
   endDate: endDateInput.optional(),
   description: descriptionInput.optional(),
@@ -92,9 +96,10 @@ export const createAlbumInput = z.object({
 export async function createAlbum(actor: Actor, input: z.infer<typeof createAlbumInput>) {
   const slug = await uniqueSlug(input.title, input.tripDate);
   const endDate = normalizeEndDate(input.tripDate, input.endDate);
+  const { coords, ...rest } = input;
   const [row] = await db
     .insert(albums)
-    .values({ ...input, endDate, slug, createdById: actor.id })
+    .values({ ...rest, latitude: coords?.lat ?? null, longitude: coords?.lng ?? null, endDate, slug, createdById: actor.id })
     .returning({ id: albums.id, slug: albums.slug });
   return row;
 }
@@ -103,6 +108,8 @@ export const updateAlbumInput = z
   .object({
     title: z.string().trim().min(1).max(120),
     location: z.string().trim().min(1).max(120),
+    // Đi kèm location: toạ độ của nơi mới (null = gõ tay)
+    coords: coordsInput,
     tripDate: z.iso.date(),
     endDate: endDateInput,
     description: descriptionInput,
@@ -114,7 +121,7 @@ export const updateAlbumInput = z
 /** Sửa album. Tên / nơi: chỉ admin. Ngày đi / về, mô tả: mọi thành viên. Ảnh bìa: admin hoặc người tạo album. */
 export async function updateAlbum(actor: Actor, slug: string, input: z.infer<typeof updateAlbumInput>) {
   const album = await findAlbum(slug);
-  const { coverPhotoId, ...info } = input;
+  const { coverPhotoId, coords, ...info } = input;
 
   if ((info.title !== undefined || info.location !== undefined) && !canEditAlbum(actor)) {
     throw new ForbiddenError("Only the admin can rename an album or change its place.");
@@ -138,6 +145,11 @@ export async function updateAlbum(actor: Actor, slug: string, input: z.infer<typ
   }
 
   const patch: Partial<typeof albums.$inferInsert> = { ...info };
+  // Đổi nơi → toạ độ đi theo nơi mới (gõ tay thì xoá toạ độ cũ cho khỏi lệch)
+  if (info.location !== undefined) {
+    patch.latitude = coords?.lat ?? null;
+    patch.longitude = coords?.lng ?? null;
+  }
   if (coverPhotoId !== undefined) patch.coverPhotoId = coverPhotoId;
   if (info.title || info.tripDate || info.endDate !== undefined) {
     const [cur] = await db.select().from(albums).where(eq(albums.id, album.id));

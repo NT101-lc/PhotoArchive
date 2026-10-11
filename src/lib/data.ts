@@ -55,6 +55,7 @@ function toAlbum(row: AlbumRow & { photoCount: number }, coverUrl: string): Albu
     id: row.slug,
     title: row.title,
     location: row.location,
+    coords: row.latitude !== null && row.longitude !== null ? { lat: row.latitude, lng: row.longitude } : null,
     tripDate: row.tripDate,
     endDate: row.endDate,
     description: row.description,

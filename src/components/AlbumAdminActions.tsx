@@ -10,6 +10,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { DateRangeFields } from "./DateRangeFields";
 import { DescriptionInput } from "./DescriptionInput";
 import { IconEdit, IconTrash } from "./Icons";
+import { LocationInput } from "./LocationInput";
 import { useIdentity } from "./Identity";
 import { Modal } from "./Modal";
 import { useToast } from "./Toast";
@@ -18,7 +19,11 @@ import { useToast } from "./Toast";
  * Nút sửa / xoá album. Admin: sửa tên, nơi, ngày, mô tả + xoá. Thành viên thường: sửa ngày và mô tả.
  * (API cũng kiểm tra lại quyền.)
  */
-export function AlbumAdminActions({ album }: { album: Pick<Album, "id" | "title" | "location" | "tripDate" | "endDate" | "description" | "photoCount"> }) {
+export function AlbumAdminActions({
+  album,
+}: {
+  album: Pick<Album, "id" | "title" | "location" | "coords" | "tripDate" | "endDate" | "description" | "photoCount">;
+}) {
   const me = useIdentity();
   const router = useRouter();
   const toast = useToast();
@@ -27,6 +32,7 @@ export function AlbumAdminActions({ album }: { album: Pick<Album, "id" | "title"
   const [form, setForm] = useState({
     title: album.title,
     location: album.location,
+    coords: album.coords,
     tripDate: album.tripDate,
     endDate: album.endDate ?? "",
     description: album.description ?? "",
@@ -44,7 +50,7 @@ export function AlbumAdminActions({ album }: { album: Pick<Album, "id" | "title"
       const shared = { tripDate: form.tripDate, endDate: form.endDate || null, description: form.description };
       const { slug } = await updateAlbum(
         album.id,
-        fullEdit ? { title: form.title.trim(), location: form.location.trim(), ...shared } : shared,
+        fullEdit ? { title: form.title.trim(), location: form.location.trim(), coords: form.coords, ...shared } : shared,
       );
       toast.show({ tone: "success", title: "Album updated" });
       setEditing(false);
@@ -105,12 +111,11 @@ export function AlbumAdminActions({ album }: { album: Pick<Album, "id" | "title"
             />
           </Field>
           <Field label="Place">
-            <input
-              className="field disabled:bg-surface-2 disabled:text-ink-soft"
+            <LocationInput
               value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              coords={form.coords}
+              onChange={(location, coords) => setForm({ ...form, location, coords })}
               required
-              maxLength={120}
               disabled={!fullEdit}
             />
           </Field>

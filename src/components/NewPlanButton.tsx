@@ -6,6 +6,8 @@ import { createPlan } from "@/lib/api-client";
 import { canEditPlan } from "@/lib/permissions";
 import { DateRangeFields } from "./DateRangeFields";
 import { IconPlus } from "./Icons";
+import { LocationInput } from "./LocationInput";
+import type { Coords } from "@/lib/places-format";
 import { useIdentity } from "./Identity";
 import { Modal } from "./Modal";
 import { useToast } from "./Toast";
@@ -16,7 +18,8 @@ export function NewPlanButton({ className = "btn btn-primary" }: { className?: s
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", location: "", start: "", end: "" });
+  // Kế hoạch chỉ lưu tên nơi; toạ độ chỉ để ô nhập biết nơi đã được chọn từ gợi ý
+  const [form, setForm] = useState({ title: "", location: "", coords: null as Coords | null, start: "", end: "" });
   const [saving, setSaving] = useState(false);
 
   if (!canEditPlan(me)) return null;
@@ -77,11 +80,11 @@ export function NewPlanButton({ className = "btn btn-primary" }: { className?: s
             aria-label="Trip name"
             autoFocus
           />
-          <input
+          <LocationInput
             value={form.location}
-            onChange={(e) => setForm({ ...form, location: e.target.value })}
+            coords={form.coords}
+            onChange={(location, coords) => setForm({ ...form, location, coords })}
             placeholder="Place, e.g. Đà Lạt"
-            className="field"
             aria-label="Place"
           />
           <DateRangeFields

@@ -16,6 +16,9 @@ import { useToast } from "./Toast";
 import { DateRangeFields } from "./DateRangeFields";
 import { DescriptionInput } from "./DescriptionInput";
 import { useUploads } from "./UploadManager";
+import { LocationInput } from "./LocationInput";
+import { usePhotoPlaces } from "@/lib/photo-places";
+import type { Coords, Place } from "@/lib/places-format";
 
 const PREVIEW_LIMIT = 24; // số ảnh preview mỗi thư mục trước khi bấm "xem thêm"
 const LOOSE = ""; // nhóm ảnh lẻ (không nằm trong thư mục)
@@ -39,7 +42,16 @@ type Picked = {
 
 type Target =
   | { mode: "existing"; albumId: string }
-  | { mode: "new"; title: string; location: string; tripDate: string; endDate: string; description: string };
+  | {
+      mode: "new";
+      title: string;
+      location: string;
+      /** Toạ độ khi nơi được chọn từ gợi ý; null = gõ tay */
+      coords: Coords | null;
+      tripDate: string;
+      endDate: string;
+      description: string;
+    };
 
 type Props = {
   albums: Pick<Album, "id" | "title" | "createdById">[];
@@ -83,7 +95,7 @@ function isAccepted(file: File) {
 }
 
 function newTarget(title = "", tripDate = localDate(Date.now()), endDate = ""): Target {
-  return { mode: "new", title, location: "", tripDate, endDate, description: "" };
+  return { mode: "new", title, location: "", coords: null, tripDate, endDate, description: "" };
 }
 
 function dirname(path: string) {
@@ -144,6 +156,21 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
   const [coverKey, setCoverKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const uploads = useUploads();
+
+  // Album mới: gợi ý nơi chụp từ GPS của ảnh; ô "Place" còn trống (và chưa tự gõ) thì điền luôn gợi ý đầu
+  const photoPlaces = usePhotoPlaces(
+    items.map((i) => i.file),
+    target.mode === "new",
+  );
+  const [placeTouched, setPlaceTouched] = useState(false);
+  const top = photoPlaces[0];
+  const [filledFrom, setFilledFrom] = useState<Place | undefined>(undefined);
+  if (top && top !== filledFrom && !placeTouched) {
+    setFilledFrom(top);
+    if (target.mode === "new" && !target.location.trim()) {
+      setTarget({ ...target, location: top.name, coords: { lat: top.lat, lng: top.lng } });
+    }
+  }
 
   // Kiểm tra R2 đã cấu hình chưa
   useEffect(() => {
@@ -301,6 +328,7 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
           await createAlbum({
             title,
             location: target.location.trim(),
+            coords: target.coords,
             tripDate: target.tripDate,
             endDate: target.endDate || null,
             description: target.description,
@@ -441,11 +469,16 @@ function UploadModal({ albums, defaultAlbumId, startNew, onClose }: Props & { on
                 className="field"
                 aria-label="New album name"
               />
-              <input
+              <LocationInput
                 value={target.location}
-                onChange={(e) => setTarget({ ...target, location: e.target.value })}
+                coords={target.coords}
+                onChange={(location, coords) => {
+                  setPlaceTouched(true);
+                  setTarget({ ...target, location, coords });
+                }}
+                suggestions={photoPlaces}
+                suggestionsLabel="From your photos"
                 placeholder="Place, e.g. Sapa"
-                className="field"
                 aria-label="Place"
               />
               <DateRangeFields

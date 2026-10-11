@@ -43,8 +43,9 @@ There is no Prettier config: don't run Prettier (it would rewrap files to 80 col
   - `api-client.ts`: browser fetch helpers.
   - `auth.ts`: `getCurrentMember`, `requireMember`, `requireAdmin`.
   - `storage.ts`: R2 via aws4fetch (presign, multipart, delete, list).
+  - `places.ts` (server) + `places-format.ts` (pure): place search through Photon / OpenStreetMap (free, no key). It is proxied and cached in memory. `LocationInput` is the combobox used by the album and plan forms. `photo-places.ts` suggests a place from photo GPS, read by `exif.ts`.
   - `format.ts`: dates (dd/mm/yyyy input, `Asia/Ho_Chi_Minh`), bytes, plurals.
-  - Pure helpers that the client can import too: `plan-utils.ts`, `about-text.ts`, `transcode-plan.ts`, `media.ts`.
+  - Pure helpers that the client can import too: `plan-utils.ts`, `about-text.ts`, `transcode-plan.ts`, `media.ts`, `places-format.ts`, `exif.ts`.
 - `scripts/transcode-worker.ts` + `.github/workflows/transcode.yml`: the video pipeline (below).
 - `docs/plans/next-features.md`: feature plan notes.
 

@@ -60,6 +60,11 @@ Giao diện hiển thị bằng tiếng Anh (tên chuyến đi / địa danh tro
   Trình duyệt upload thẳng lên R2 qua URL đã ký, rồi server ghi thông tin ảnh vào DB.
   Người upload = người đang dùng (chọn ở trang "Who are you?").
   **Ảnh bìa**: bấm ★ trên ảnh xem trước để chọn bìa; không chọn gì thì bìa là ảnh đầu tiên (chụp sớm nhất) của album.
+- **Chọn nơi đến** (tạo / sửa album, tạo kế hoạch): gõ là có gợi ý (gõ không dấu cũng được), chọn bằng chuột hoặc ↑ ↓ Enter;
+  không có thì cứ gõ tay. Nguồn: [Photon](https://photon.komoot.io) (OpenStreetMap) — miễn phí, không cần key; server gọi
+  thay trình duyệt và nhớ kết quả 1 ngày (`src/lib/places.ts`). Nơi chọn từ gợi ý lưu kèm toạ độ (`albums.latitude/longitude`).
+  Album mới có ảnh mang **GPS** thì app tự gợi ý nơi chụp ("From your photos"), ô còn trống thì điền luôn: đọc GPS
+  của tối đa 60 ảnh, gom thành vài khu vực, tìm ra thành phố / thị trấn gần nhất. Ảnh qua Zalo / Messenger thường đã mất GPS.
 - **Dashboard `/dashboard`** (cần chọn tên): số chuyến / ảnh / video / nơi, số chuyến theo năm, ai upload nhiều nhất,
   "On this day" (ảnh chụp quanh ngày này những năm trước). Riêng admin thấy thêm dung lượng thật trên R2
   (đọc thẳng từ bucket, chia theo loại, dự đoán ngày vượt 10 GB miễn phí) và hàng đợi chuyển mã video (thử lại video lỗi).
@@ -119,9 +124,9 @@ Xoá album sẽ xoá luôn ảnh (cascade). Số ảnh của album được đ�
 | Method & path                      | Việc làm                                                                 |
 | ---------------------------------- | ------------------------------------------------------------------------ |
 | `GET /api/albums`                  | Danh sách album                                                          |
-| `POST /api/albums`                 | Tạo album `{ title, location, tripDate, endDate? }` → `{ id, slug }` (cần đã chọn tên; `endDate` = ngày về, bỏ trống nếu đi trong ngày) |
+| `POST /api/albums`                 | Tạo album `{ title, location, coords?, tripDate, endDate? }` → `{ id, slug }` (cần đã chọn tên; `endDate` = ngày về, bỏ trống nếu đi trong ngày) |
 | `GET /api/albums/:slug`            | Album + danh sách ảnh                                                    |
-| `PATCH /api/albums/:slug`          | `{ title?, location?, tripDate?, endDate?, coverPhotoId? }` — tên/nơi: admin; ngày đi/về: mọi thành viên; bìa: admin / người tạo |
+| `PATCH /api/albums/:slug`          | `{ title?, location?, coords?, tripDate?, endDate?, coverPhotoId? }` — tên/nơi: admin; ngày đi/về: mọi thành viên; bìa: admin / người tạo |
 | `DELETE /api/albums/:slug`         | Xoá album + ảnh (DB và R2) — admin                                       |
 | `POST /api/albums/:slug/photos`    | Ghi ảnh đã upload `{ photos: [{ key, width, height, sizeBytes, mimeType, takenAt? }], coverKey? }` |
 | `DELETE /api/photos/:id`           | Xoá ảnh (DB và R2) — admin / người upload                                |
@@ -133,6 +138,8 @@ Xoá album sẽ xoá luôn ảnh (cascade). Số ảnh của album được đ�
 | `POST /api/uploads`                | Xin URL ký để PUT lên R2 `{ albumSlug, files: [{ name, type, size }] }` (tối đa 100 file, 50 MB/file) |
 | `GET /api/members`                 | Thành viên thường (để chọn tên)                                          |
 | `GET /api/photos/:id/raw`          | Link cố định tới ảnh gốc: chuyển hướng sang URL đọc tạm thời trên R2      |
+| `GET /api/places?q=`               | Gợi ý địa điểm `{ places: [{ name, detail, lat, lng }] }` (≥ 2 ký tự; cần đã chọn tên) |
+| `GET /api/places/reverse?lat=&lng=` | Thành phố / thị trấn gần toạ độ (GPS của ảnh) `{ place | null }` (cần đã chọn tên) |
 
 Lỗi trả về `{ error }` với mã 400 (input sai), 401 (chưa chọn tên / sai mật khẩu), 403 (không đủ quyền), 404, 503 (chưa cấu hình R2), 500.
 

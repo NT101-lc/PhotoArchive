@@ -2,6 +2,8 @@ export type Album = {
   id: string;
   title: string;
   location: string;
+  /** Toạ độ của nơi (chọn từ gợi ý); null nếu nơi được gõ tay */
+  coords: { lat: number; lng: number } | null;
   /** Ngày đi, định dạng ISO `YYYY-MM-DD` */
   tripDate: string;
   /** Ngày về (chuyến nhiều ngày), null nếu đi trong ngày */

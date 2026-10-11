@@ -2,6 +2,7 @@ import {
   bigint,
   check,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -60,6 +61,9 @@ export const albums = pgTable(
     slug: text().notNull().unique(),
     title: text().notNull(),
     location: text().notNull(),
+    // Toạ độ của nơi đã chọn trong ô gợi ý (lib/places.ts); null → gõ tay hoặc album có từ trước
+    latitude: doublePrecision(),
+    longitude: doublePrecision(),
     tripDate: date({ mode: "string" }).notNull(),
     // Ngày về (chuyến nhiều ngày); null → đi trong một ngày
     endDate: date({ mode: "string" }),

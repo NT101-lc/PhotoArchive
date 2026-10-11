@@ -1,5 +1,7 @@
 // Gọi API từ trình duyệt. Lỗi trả về `{ error }` được ném ra thành Error với đúng thông báo.
 
+import type { Coords, Place } from "./places-format";
+
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
@@ -13,6 +15,7 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
 export function createAlbum(input: {
   title: string;
   location: string;
+  coords?: Coords | null;
   tripDate: string;
   endDate?: string | null;
   description?: string | null;
@@ -25,6 +28,7 @@ export function updateAlbum(
   patch: {
     title?: string;
     location?: string;
+    coords?: Coords | null;
     tripDate?: string;
     endDate?: string | null;
     description?: string | null;
@@ -35,6 +39,14 @@ export function updateAlbum(
     method: "PATCH",
     body: JSON.stringify(patch),
   });
+}
+
+export function searchPlaces(q: string, signal?: AbortSignal) {
+  return api<{ places: Place[] }>(`/api/places?${new URLSearchParams({ q })}`, { signal });
+}
+
+export function reversePlace(at: Coords) {
+  return api<{ place: Place | null }>(`/api/places/reverse?${new URLSearchParams({ lat: String(at.lat), lng: String(at.lng) })}`);
 }
 
 export function deleteAlbum(slug: string) {
