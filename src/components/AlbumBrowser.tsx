@@ -106,29 +106,31 @@ export function AlbumBrowser({ albums, initial }: Props) {
               <kbd className="hidden rounded-md border border-line px-1.5 font-mono text-xs text-ink-soft sm:inline">/</kbd>
             )}
           </label>
-          <label className="flex items-center gap-2">
-            <span className="eyebrow shrink-0">{t.albums.sort}</span>
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortKey)}
-              className="field h-11 pr-9 sm:w-[170px]"
-            >
-              {(Object.keys(SORTS) as SortKey[]).map((k) => (
-                <option key={k} value={k}>
-                  {t.albums.sorts[k]}
-                </option>
-              ))}
-            </select>
-          </label>
+          {/* Cách xếp: 3 lựa chọn ngắn nên dùng nút chọn một thay vì dropdown */}
+          <div
+            role="group"
+            aria-label={t.albums.sort}
+            className="flex h-11 shrink-0 items-center gap-1 rounded-lg border border-line bg-surface p-1"
+          >
+            {(Object.keys(SORTS) as SortKey[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={sort === k}
+                onClick={() => setSort(k)}
+                className="h-full flex-1 whitespace-nowrap rounded-md px-3 text-sm font-semibold text-ink-soft transition-colors hover:text-ink aria-pressed:bg-ink aria-pressed:text-bg sm:flex-none"
+              >
+                {t.albums.sorts[k]}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-6">
+        <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface/50 p-3.5 sm:p-4">
           <ChipRow label={t.albums.year} value={year} onChange={setYear} options={years} />
           <ChipRow label={t.albums.place} value={place} onChange={setPlace} options={places} />
-          <div className="flex items-center gap-3 lg:ml-auto">
-            <span className="font-mono text-xs text-ink-soft">
-              {t.albums.shown(filtered.length, albums.length)}
-            </span>
+          <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
+            <span className="text-sm text-ink-soft tabular-nums">{t.albums.shown(filtered.length, albums.length)}</span>
             {isFiltering && (
               <button type="button" onClick={resetFilters} className="chip border-accent text-accent">
                 <IconReset size={13} />
@@ -182,13 +184,13 @@ function ChipRow({
     onChange(value.includes(opt) ? value.filter((v) => v !== opt) : [...value, opt]);
 
   return (
-    <div className="flex min-w-0 items-center gap-2.5">
-      <span className="eyebrow w-11 shrink-0">{label}</span>
+    <div className="grid min-w-0 grid-cols-[auto_1fr_auto] items-start gap-x-3 gap-y-1.5 sm:grid-cols-[4rem_1fr_auto]">
+      <span className="eyebrow col-span-2 pt-1.5 sm:col-span-1">{label}</span>
       {/* Mobile: cuộn ngang thay vì xuống nhiều dòng */}
       <div
         role="group"
         aria-label={t.albums.filterBy(label)}
-        className="scrollbar-none -my-1 flex min-w-0 gap-1.5 overflow-x-auto py-1 pr-1 lg:flex-wrap lg:overflow-visible"
+        className="scrollbar-none order-last col-span-3 -my-1 flex min-w-0 gap-1.5 overflow-x-auto py-1 sm:order-none sm:col-span-1 sm:flex-wrap sm:overflow-visible"
       >
         <button type="button" className="chip" aria-pressed={value.length === 0} onClick={() => onChange([])}>
           {t.albums.all}
@@ -205,7 +207,7 @@ function ChipRow({
         disabled={value.length === 0}
         title={t.albums.resetFilter(label)}
         aria-label={t.albums.resetFilter(label)}
-        className="flex h-8 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-semibold text-ink-soft transition-colors hover:text-ink disabled:opacity-35"
+        className="flex h-8 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-semibold text-ink-soft transition-colors hover:text-ink disabled:invisible"
       >
         <IconReset size={13} />
         {value.length > 0 && <span className="tabular-nums">{value.length}</span>}

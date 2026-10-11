@@ -508,6 +508,7 @@ export const vi: Dict = {
     randomNote: "Những năm trước chưa chụp gì quanh ngày này, nên đây là vài khung chọn ngẫu nhiên. Mỗi ngày một khác.",
     roll: "Cuộn phim đến giờ",
     rollNote: "Những khung đầu của các chuyến gần nhất. Mép màu hổ phách là video.",
+    allTrips: "Xem tất cả chuyến",
     openAllFrames: (n, title) => `Xem cả ${n} khung của ${title}`,
     mediaFrom: (video, title) => `${video ? "Video" : "Ảnh"} từ ${title}`,
     mediaFromYear: (video, title, year) => `${video ? "Video" : "Ảnh"} từ ${title}, ${year}`,

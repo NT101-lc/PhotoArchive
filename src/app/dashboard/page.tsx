@@ -59,28 +59,36 @@ export default async function DashboardPage() {
         eyebrow={t.dash.eyebrow}
         title={t.dash.title}
         description={t.dash.description(totals.years)}
-        stats={[
+      />
+
+      <dl className="-mt-3 mb-14 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
           { value: totals.trips, label: t.dash.stat.trips(totals.trips) },
           { value: totals.photos, label: t.dash.stat.photos(totals.photos) },
           { value: totals.videos, label: t.dash.stat.videos(totals.videos) },
           { value: totals.places, label: t.dash.stat.places(totals.places) },
-        ]}
-      />
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl border border-line bg-surface px-4 py-3.5 sm:px-5 sm:py-4">
+            <dd className="font-display text-3xl font-extrabold tabular-nums sm:text-4xl">{s.value.toLocaleString(locale === "vi" ? "vi-VN" : "en-US")}</dd>
+            <dt className="mt-0.5 text-sm text-ink-soft">{s.label}</dt>
+          </div>
+        ))}
+      </dl>
 
       <TheRoll trips={roll.trips} t={t} locale={locale} />
 
-      <div className="mb-16 grid gap-14 lg:grid-cols-2 lg:gap-16">
-        <Section title={t.dash.tripsPerYear} note={t.dash.tripsPerYearNote}>
+      <div className="mb-16 grid gap-5 lg:grid-cols-2 lg:gap-6">
+        <Section title={t.dash.tripsPerYear} note={t.dash.tripsPerYearNote} card>
           <TripsByYear data={crew.byYear} />
         </Section>
-        <Section title={t.dash.places} note={t.dash.placesNote}>
+        <Section title={t.dash.places} note={t.dash.placesNote} card>
           <Places rows={places} t={t} locale={locale} />
         </Section>
-        <Section title={t.dash.topUploaders} note={t.dash.topUploadersNote}>
+        <Section title={t.dash.topUploaders} note={t.dash.topUploadersNote} card>
           <TopUploaders data={crew.uploaders} />
           <QuietMembers members={quiet} t={t} />
         </Section>
-        <Section title={t.dash.recent} note={t.dash.recentNote}>
+        <Section title={t.dash.recent} note={t.dash.recentNote} card>
           <RecentActivity uploads={uploads} comments={comments} t={t} locale={locale} />
         </Section>
       </div>
@@ -98,15 +106,31 @@ export default async function DashboardPage() {
   );
 }
 
-function Section({ title, note, children, className = "" }: { title: string; note: string; children: ReactNode; className?: string }) {
+function Section({
+  title,
+  note,
+  children,
+  className = "",
+  card = false,
+}: {
+  title: string;
+  note: string;
+  children: ReactNode;
+  className?: string;
+  /** Đóng khung thành thẻ (các ô biểu đồ cạnh nhau) */
+  card?: boolean;
+}) {
   return (
-    <section className={className}>
+    <section className={`${card ? "min-w-0 rounded-xl border border-line bg-surface p-5 sm:p-6" : ""} ${className}`}>
       <h2 className="font-display text-2xl font-extrabold tracking-[-0.02em]">{title}</h2>
-      <p className="mt-1 mb-6 text-sm text-ink-soft">{note}</p>
+      <p className="mt-1 mb-5 text-sm text-ink-soft">{note}</p>
       {children}
     </section>
   );
 }
+
+/** Dải phim ở đầu trang chỉ hiện vài chuyến mới nhất; muốn xem hết thì sang /albums */
+const ROLL_SHOWN = 4;
 
 type Roll = Awaited<ReturnType<typeof getRoll>>;
 
@@ -127,7 +151,7 @@ function TheRoll({ trips, t, locale }: Roll & { t: Dict; locale: Locale }) {
       <div className="overflow-hidden rounded-[3px] bg-film text-white">
         <div className="sprockets h-3" aria-hidden="true" />
         <ol className="flex flex-col gap-4 px-3 py-3 sm:px-4">
-          {trips.map((trip, i) => {
+          {trips.slice(0, ROLL_SHOWN).map((trip, i) => {
             const more = trip.total - trip.frames.length;
             return (
               <li
@@ -169,6 +193,12 @@ function TheRoll({ trips, t, locale }: Roll & { t: Dict; locale: Locale }) {
             );
           })}
         </ol>
+        <Link
+          href="/albums"
+          className="block border-t border-white/10 px-4 py-2.5 text-center text-sm font-semibold text-white/80 hover:bg-white/5 hover:text-white"
+        >
+          {t.dash.allTrips} →
+        </Link>
         <div className="sprockets h-3" aria-hidden="true" />
       </div>
     </section>
@@ -178,8 +208,9 @@ function TheRoll({ trips, t, locale }: Roll & { t: Dict; locale: Locale }) {
 function Places({ rows, t, locale }: { rows: Awaited<ReturnType<typeof getPlaces>>; t: Dict; locale: Locale }) {
   if (rows.length === 0) return <p className="text-sm text-ink-soft">{t.dash.noPlaces}</p>;
   return (
+    <div className="max-h-[21rem] overflow-y-auto pr-1">
     <table className="w-full text-sm">
-      <thead>
+      <thead className="sticky top-0 bg-surface">
         <tr className="border-b border-line text-left text-xs text-ink-soft">
           <th className="py-2 font-medium">{t.dash.place}</th>
           <th className="py-2 text-right font-medium">{t.dash.trips}</th>
@@ -198,6 +229,7 @@ function Places({ rows, t, locale }: { rows: Awaited<ReturnType<typeof getPlaces
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 

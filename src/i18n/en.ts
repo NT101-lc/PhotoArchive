@@ -512,6 +512,7 @@ export const en = {
     randomNote: "Nothing was shot around this date in earlier years, so here are a few frames picked at random. They change every day.",
     roll: "The roll so far",
     rollNote: "The first frames of the latest trips. Amber edge marks a video.",
+    allTrips: "See all trips",
     openAllFrames: (n: number, title: string) => `Open all ${n} frames of ${title}`,
     mediaFrom: (video: boolean, title: string) => `${video ? "Video" : "Photo"} from ${title}`,
     mediaFromYear: (video: boolean, title: string, year: number) => `${video ? "Video" : "Photo"} from ${title}, ${year}`,
