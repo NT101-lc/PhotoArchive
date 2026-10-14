@@ -497,6 +497,7 @@ export const en = {
       videos: (n: number): string => (n === 1 ? "video" : "videos"),
       places: (n: number): string => (n === 1 ? "place" : "places"),
       people: (n: number): string => (n === 1 ? "person" : "people"),
+      days: (n: number): string => (n === 1 ? "day" : "days"),
     },
     tripsPerYear: "Trips per year",
     tripsPerYearNote: "Tap or hover a year to see how many photos came back.",

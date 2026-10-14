@@ -83,20 +83,20 @@ export default async function HomePage() {
                     <IconPin size={18} className="text-accent" />
                     {latest.location}
                   </span>
-                  {/* Tem số liệu: nhãn lấy phần chữ của t.dash.stat / t.count (bỏ số đứng đầu) để không thêm chữ mới */}
+                  {/* Tem số liệu: dt (nhãn) phải đứng trước dd (số) cho đúng cấu trúc dl; flex-col-reverse để số vẫn hiện ở trên */}
                   <dl className="grid max-w-md grid-cols-3 gap-2.5">
                     {[
                       { n: latestPhotos.length, label: t.dash.stat.photos(latestPhotos.length), tile: "var(--accent)" },
                       { n: people, label: t.dash.stat.people(people), tile: "var(--teal)" },
-                      { n: days, label: t.count.days(days).replace(/^\d+\s*/, ""), tile: "var(--edge)" },
+                      { n: days, label: t.dash.stat.days(days), tile: "var(--edge)" },
                     ].map((s) => (
                       <div
                         key={s.label}
-                        className="stat-tile min-w-0 px-3 py-2.5 sm:px-4"
+                        className="stat-tile flex min-w-0 flex-col-reverse justify-end px-3 py-2.5 sm:px-4"
                         style={{ "--tile": s.tile } as CSSProperties}
                       >
-                        <dd className="font-display text-2xl leading-none font-extrabold tabular-nums sm:text-3xl">{s.n}</dd>
                         <dt className="mt-1 text-xs text-ink-soft sm:text-sm">{s.label}</dt>
+                        <dd className="font-display text-2xl leading-none font-extrabold tabular-nums sm:text-3xl">{s.n}</dd>
                       </div>
                     ))}
                   </dl>

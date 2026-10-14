@@ -493,6 +493,7 @@ export const vi: Dict = {
       videos: () => "video",
       places: () => "nơi",
       people: () => "người",
+      days: () => "ngày",
     },
     tripsPerYear: "Số chuyến mỗi năm",
     tripsPerYearNote: "Chạm hoặc rê chuột vào một năm để xem mang về bao nhiêu ảnh.",

@@ -71,16 +71,23 @@ export default async function DashboardPage() {
         ].map((s) => (
           <div
             key={s.label}
-            className="stat-tile min-w-0 px-4 py-3.5 sm:px-5 sm:py-4"
+            className="stat-tile flex min-w-0 flex-col px-4 py-3.5 sm:px-5 sm:py-4"
             style={{ "--tile": s.tile } as CSSProperties}
           >
-            <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg text-[var(--tile)]" style={{ background: "color-mix(in oklab, var(--tile) 16%, transparent)" }}>
-              {s.icon}
-            </span>
-            <dd className="font-display text-4xl leading-none font-extrabold sm:text-5xl">
+            {/* dl cần dt trước dd: dt (contents) chứa cả icon lẫn nhãn, order xếp lại thành icon / số / nhãn như thiết kế */}
+            <dt className="contents">
+              <span
+                className="order-1 mb-2 flex h-9 w-9 items-center justify-center rounded-lg text-[var(--tile)]"
+                style={{ background: "color-mix(in oklab, var(--tile) 16%, transparent)" }}
+                aria-hidden="true"
+              >
+                {s.icon}
+              </span>
+              <span className="order-3 mt-1.5 text-sm text-ink-soft">{s.label}</span>
+            </dt>
+            <dd className="order-2 font-display text-4xl leading-none font-extrabold sm:text-5xl">
               <CountUp value={s.value} locale={locale} />
             </dd>
-            <dt className="mt-1.5 text-sm text-ink-soft">{s.label}</dt>
           </div>
         ))}
       </dl>

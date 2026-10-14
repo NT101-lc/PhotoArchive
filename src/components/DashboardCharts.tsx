@@ -5,7 +5,8 @@ import { useI18n } from "@/i18n/client";
 import { Avatar } from "./Avatar";
 
 // Biểu đồ của /dashboard. Một chuỗi dữ liệu nên không có chú thích (tiêu đề đã nói tên),
-// màu dữ liệu là token --chart (đã kiểm tra tương phản với nền ở cả hai chế độ).
+// màu dữ liệu là token --chart (đã kiểm tra tương phản với nền ở cả hai chế độ); --edge (hổ phách) chỉ để đánh dấu
+// đỉnh, và chỉ khi có đúng một giá trị lớn nhất (hoà thì không đánh dấu ai).
 // Mỗi cột / thanh có tooltip khi rê chuột hoặc focus bằng bàn phím; bảng ẩn cho trình đọc màn hình.
 
 type YearRow = { year: number; trips: number; photos: number };
@@ -17,6 +18,7 @@ export function TripsByYear({ data }: { data: YearRow[] }) {
   const [active, setActive] = useState<number | null>(null);
   const { t } = useI18n();
   const max = Math.max(1, ...data.map((d) => d.trips));
+  const uniquePeak = data.filter((d) => d.trips === max).length === 1;
 
   if (data.length === 0) return <p className="text-sm text-ink-soft">{t.charts.noTrips}</p>;
 
@@ -53,9 +55,9 @@ export function TripsByYear({ data }: { data: YearRow[] }) {
                   className="animate-grow-up w-6 rounded-t-[6px] transition-[filter] duration-100"
                   style={{
                     height: h,
-                    // Năm nhiều chuyến nhất tô hổ phách, còn lại xanh chart pha teal
+                    // Năm nhiều chuyến nhất (duy nhất) tô hổ phách, còn lại xanh chart pha teal
                     backgroundImage: `linear-gradient(to top, ${
-                      d.trips === max ? "var(--edge), color-mix(in oklab, var(--edge) 60%, var(--butter))" : "var(--chart), color-mix(in oklab, var(--chart) 55%, var(--teal))"
+                      uniquePeak && d.trips === max ? "var(--edge), color-mix(in oklab, var(--edge) 60%, var(--butter))" : "var(--chart), color-mix(in oklab, var(--chart) 55%, var(--teal))"
                     })`,
                     animationDelay: `${i * 70}ms`,
                     filter: active === i ? "brightness(1.15)" : undefined,
@@ -104,6 +106,7 @@ export function TopUploaders({ data }: { data: Uploader[] }) {
   const [active, setActive] = useState<string | null>(null);
   const { t } = useI18n();
   const max = Math.max(1, ...data.map((d) => d.photos + d.videos));
+  const uniquePeak = data.filter((d) => d.photos + d.videos === max).length === 1;
 
   if (data.length === 0) return <p className="text-sm text-ink-soft">{t.charts.noUploads}</p>;
 
@@ -132,9 +135,9 @@ export function TopUploaders({ data }: { data: Uploader[] }) {
                 className="animate-grow-right h-3 rounded-full transition-[filter] duration-100"
                 style={{
                   width: `${Math.max(1.5, (total / max) * 82)}%`,
-                  // Người đứng đầu hổ phách, còn lại xanh chart pha teal
+                  // Người đứng đầu (duy nhất) hổ phách, còn lại xanh chart pha teal
                   backgroundImage: `linear-gradient(to right, ${
-                    total === max ? "color-mix(in oklab, var(--edge) 60%, var(--butter)), var(--edge)" : "color-mix(in oklab, var(--chart) 55%, var(--teal)), var(--chart)"
+                    uniquePeak && total === max ? "color-mix(in oklab, var(--edge) 60%, var(--butter)), var(--edge)" : "color-mix(in oklab, var(--chart) 55%, var(--teal)), var(--chart)"
                   })`,
                   animationDelay: `${i * 90}ms`,
                   filter: show ? "brightness(1.15)" : undefined,
