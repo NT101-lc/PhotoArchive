@@ -19,15 +19,15 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
     "aws4fetch": "^1.0.20",
-    "drizzle-orm": "^0.45.3",
+    "drizzle-orm": "^0.45.4",
     "heic-decode": "^2.1.0",
-    "next": "16.3.8",
+    "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-icons": "^5.7.0",
     "server-only": "^0.0.1",
     "sharp": "^0.35.5",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -36,7 +36,7 @@
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"
