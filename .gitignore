@@ -43,3 +43,7 @@ next-env.d.ts
 
 # Bản sao giờ chụp cũ do src/db/fix-taken-at.ts tạo ra
 fix-taken-at-backup-*.json
+
+# Hướng dẫn cho AI agent: giữ trên máy, không commit (AGENTS.md do `next dev` tự tạo lại)
+/CLAUDE.md
+/AGENTS.md
