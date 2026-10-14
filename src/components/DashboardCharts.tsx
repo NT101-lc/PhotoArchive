@@ -25,6 +25,15 @@ export function TripsByYear({ data }: { data: YearRow[] }) {
       <div className="relative" style={{ height: CHART_H + 28 }}>
         {/* Đường đáy */}
         <div className="absolute inset-x-0 h-px bg-line" style={{ top: CHART_H }} />
+        {/* Đường gióng mờ ở 1/3, 2/3 và đỉnh thang; chỉ trang trí nên ẩn khỏi trình đọc màn hình */}
+        {[1 / 3, 2 / 3, 1].map((f) => (
+          <div
+            key={f}
+            aria-hidden="true"
+            className="absolute inset-x-0 border-t border-dashed border-line/60"
+            style={{ top: CHART_H - f * (CHART_H - 24) }}
+          />
+        ))}
         <div className="absolute inset-x-0 top-0 flex justify-around" style={{ height: CHART_H }}>
           {data.map((d, i) => {
             const h = Math.max(4, (d.trips / max) * (CHART_H - 24));
@@ -41,8 +50,16 @@ export function TripsByYear({ data }: { data: YearRow[] }) {
               >
                 <span className="mb-1 text-sm font-semibold tabular-nums" aria-hidden="true">{d.trips}</span>
                 <span
-                  className="w-6 rounded-t-[4px] bg-chart transition-[filter] duration-100"
-                  style={{ height: h, filter: active === i ? "brightness(1.15)" : undefined }}
+                  className="animate-grow-up w-6 rounded-t-[6px] transition-[filter] duration-100"
+                  style={{
+                    height: h,
+                    // Năm nhiều chuyến nhất tô hổ phách, còn lại xanh chart pha teal
+                    backgroundImage: `linear-gradient(to top, ${
+                      d.trips === max ? "var(--edge), color-mix(in oklab, var(--edge) 60%, var(--butter))" : "var(--chart), color-mix(in oklab, var(--chart) 55%, var(--teal))"
+                    })`,
+                    animationDelay: `${i * 70}ms`,
+                    filter: active === i ? "brightness(1.15)" : undefined,
+                  }}
                 />
                 {active === i && <Tooltip value={t.count.trips(d.trips)} label={t.charts.yearTooltip(d.year, d.photos)} />}
               </div>
@@ -92,7 +109,7 @@ export function TopUploaders({ data }: { data: Uploader[] }) {
 
   return (
     <ol className="flex flex-col gap-3">
-      {data.map((d) => {
+      {data.map((d, i) => {
         const total = d.photos + d.videos;
         const show = active === d.id;
         return (
@@ -112,8 +129,16 @@ export function TopUploaders({ data }: { data: Uploader[] }) {
             </span>
             <span className="relative flex items-center gap-2">
               <span
-                className="h-2.5 rounded-r-[4px] bg-chart transition-[filter] duration-100"
-                style={{ width: `${Math.max(1.5, (total / max) * 82)}%`, filter: show ? "brightness(1.15)" : undefined }}
+                className="animate-grow-right h-3 rounded-full transition-[filter] duration-100"
+                style={{
+                  width: `${Math.max(1.5, (total / max) * 82)}%`,
+                  // Người đứng đầu hổ phách, còn lại xanh chart pha teal
+                  backgroundImage: `linear-gradient(to right, ${
+                    total === max ? "color-mix(in oklab, var(--edge) 60%, var(--butter)), var(--edge)" : "color-mix(in oklab, var(--chart) 55%, var(--teal)), var(--chart)"
+                  })`,
+                  animationDelay: `${i * 90}ms`,
+                  filter: show ? "brightness(1.15)" : undefined,
+                }}
               />
               <span className="text-sm font-semibold tabular-nums">{total}</span>
               {show && (

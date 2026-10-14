@@ -396,6 +396,69 @@
     border-bottom: 0;
   }
 
+  /* Đèn hắt phía sau hero: hổ phách ở một góc, xanh ở góc kia; mờ để chữ phía trên vẫn đủ tương phản */
+  .glow {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(38rem 24rem at 82% 40%, color-mix(in oklab, var(--edge) 20%, transparent), transparent 70%),
+      radial-gradient(34rem 22rem at 12% 8%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 70%);
+    filter: blur(8px);
+  }
+  [data-theme="dark"] .glow {
+    background:
+      radial-gradient(38rem 24rem at 82% 40%, color-mix(in oklab, var(--edge) 15%, transparent), transparent 70%),
+      radial-gradient(34rem 22rem at 12% 8%, color-mix(in oklab, var(--accent) 13%, transparent), transparent 70%);
+  }
+
+  /* Hạt phim phủ lên: dùng lại nhiễu của .unexposed, rất nhạt */
+  .grain {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.12;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Ô số liệu: màu nhấn truyền qua --tile, gradient nhẹ từ góc trên trái, hover nổi lên */
+  .stat-tile {
+    --tile: var(--accent);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid color-mix(in oklab, var(--tile) 28%, var(--line));
+    border-radius: 14px;
+    background:
+      linear-gradient(145deg, color-mix(in oklab, var(--tile) 16%, var(--surface)), var(--surface) 70%);
+    box-shadow:
+      inset 0 1px 0 var(--backlight),
+      0 1px 2px rgb(var(--shadow-c) / 0.06);
+    transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s, border-color 0.2s;
+  }
+  .stat-tile:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklab, var(--tile) 55%, var(--line));
+    box-shadow:
+      inset 0 1px 0 var(--backlight),
+      0 12px 24px -12px color-mix(in oklab, var(--tile) 45%, rgb(var(--shadow-c) / 0.5));
+  }
+
+  /* Thẻ biểu đồ: bo 14px, bóng mềm, rê chuột thì viền ngả sang màu nhấn */
+  .card-lift {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: 0 1px 2px rgb(var(--shadow-c) / 0.05), 0 10px 24px -16px rgb(var(--shadow-c) / 0.3);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .card-lift:hover {
+    border-color: color-mix(in oklab, var(--accent) 45%, var(--line));
+    box-shadow: 0 1px 2px rgb(var(--shadow-c) / 0.06), 0 16px 32px -16px rgb(var(--shadow-c) / 0.38);
+  }
+
   /* Lỗ răng cưa cuộn phim — đặt trên nền màu film */
   .sprockets {
     background-image: radial-gradient(circle at center, var(--bg) 0 2.2px, transparent 2.7px);
@@ -449,6 +512,29 @@
   to {
     opacity: 1;
   }
+}
+
+/* Cột / thanh mọc lên khi biểu đồ hiện; delay đặt qua style. Khối reduce cuối file ép duration ~0 nên im lặng. */
+@keyframes grow-up {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes grow-right {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@utility animate-grow-up {
+  transform-origin: bottom;
+  animation: grow-up 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@utility animate-grow-right {
+  transform-origin: left;
+  animation: grow-right 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 @utility animate-rise {

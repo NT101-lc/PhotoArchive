@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { DragScroll } from "@/components/DragScroll";
 import { EmptyState } from "@/components/EmptyState";
@@ -55,12 +56,18 @@ export default async function HomePage() {
           clip chứ không phải hidden: không tạo vùng cuộn mới nên AppBar sticky vẫn chạy. */}
       <main className="overflow-x-clip">
         {/* ---------- Chuyến gần nhất ---------- */}
-        <section className="mx-auto grid max-w-[1280px] gap-10 px-4 pt-10 pb-10 sm:px-6 sm:pt-14 md:grid-cols-[minmax(0,1fr)_minmax(0,40%)] md:items-center lg:gap-16">
+        <section className="relative isolate mx-auto grid max-w-[1280px] gap-10 px-4 pt-10 pb-10 sm:px-6 sm:pt-14 md:grid-cols-[minmax(0,1fr)_minmax(0,40%)] md:items-center lg:gap-16">
+          <div className="glow" aria-hidden="true" />
+          <div className="grain" aria-hidden="true" />
           <div className="min-w-0">
             <p className="eyebrow">{t.home.latestTrip(formatDateRange(latest.tripDate, latest.endDate, locale))}</p>
+            {/* Chữ gradient từ mực sang xanh nhấn; chỉ pha 35% accent để vẫn đủ tương phản ở cả hai theme */}
             <h1
-              className="mt-2 max-w-[16ch] font-display text-[clamp(2.6rem,6.6vw,5.75rem)] leading-[0.9] font-extrabold tracking-[-0.04em] text-balance"
-              style={{ fontStretch: "125%" }}
+              className="mt-2 max-w-[16ch] bg-clip-text pb-[0.08em] font-display text-[clamp(2.6rem,6.6vw,5.75rem)] leading-[0.9] font-extrabold tracking-[-0.04em] text-balance text-transparent"
+              style={{
+                fontStretch: "125%",
+                backgroundImage: "linear-gradient(120deg, var(--ink) 35%, color-mix(in oklab, var(--ink) 65%, var(--accent)))",
+              }}
             >
               {latest.title}
             </h1>
@@ -70,13 +77,39 @@ export default async function HomePage() {
               </p>
             )}
             <div className="mt-6 flex flex-col gap-6">
-              <p className="max-w-[46ch] text-lg leading-relaxed text-ink-soft">
-                <span className="mr-2 inline-flex items-center gap-1 align-[-2px] font-semibold text-ink">
-                  <IconPin size={18} className="text-accent" />
-                  {latest.location}
-                </span>
-                {t.home.summary(latestPhotos.length, people, days)}
-              </p>
+              {latestPhotos.length > 0 ? (
+                <div className="flex flex-col gap-3.5">
+                  <span className="inline-flex items-center gap-1 self-start text-lg font-semibold text-ink">
+                    <IconPin size={18} className="text-accent" />
+                    {latest.location}
+                  </span>
+                  {/* Tem số liệu: nhãn lấy phần chữ của t.dash.stat / t.count (bỏ số đứng đầu) để không thêm chữ mới */}
+                  <dl className="grid max-w-md grid-cols-3 gap-2.5">
+                    {[
+                      { n: latestPhotos.length, label: t.dash.stat.photos(latestPhotos.length), tile: "var(--accent)" },
+                      { n: people, label: t.dash.stat.people(people), tile: "var(--teal)" },
+                      { n: days, label: t.count.days(days).replace(/^\d+\s*/, ""), tile: "var(--edge)" },
+                    ].map((s) => (
+                      <div
+                        key={s.label}
+                        className="stat-tile min-w-0 px-3 py-2.5 sm:px-4"
+                        style={{ "--tile": s.tile } as CSSProperties}
+                      >
+                        <dd className="font-display text-2xl leading-none font-extrabold tabular-nums sm:text-3xl">{s.n}</dd>
+                        <dt className="mt-1 text-xs text-ink-soft sm:text-sm">{s.label}</dt>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ) : (
+                <p className="max-w-[46ch] text-lg leading-relaxed text-ink-soft">
+                  <span className="mr-2 inline-flex items-center gap-1 align-[-2px] font-semibold text-ink">
+                    <IconPin size={18} className="text-accent" />
+                    {latest.location}
+                  </span>
+                  {t.home.summary(latestPhotos.length, people, days)}
+                </p>
+              )}
               <div className="flex flex-wrap gap-2.5">
                 <Link href={`/albums/${latest.id}`} className="btn btn-primary h-11 px-5">
                   {t.home.openAlbum}
@@ -99,6 +132,7 @@ export default async function HomePage() {
           <div className="mb-10 flex flex-col gap-3 border-b border-line pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="font-display text-3xl font-extrabold tracking-[-0.03em] sm:text-4xl">{t.home.everyTrip}</h2>
+              <span className="mt-2 block h-1 w-10 rounded-full bg-edge" aria-hidden="true" />
               <p className="mt-1.5 text-ink-soft">
                 {t.home.totals(albums.length, totalPhotos, places, years[years.length - 1])}
               </p>
@@ -160,7 +194,7 @@ function ContactSheet({ album, photos, t }: { album: Album; photos: Photo[]; t: 
               </span>
               <Link
                 href={last ? `/albums/${album.id}` : `/albums/${album.id}?photo=${p.id}`}
-                className="animate-develop group relative block aspect-[3/2] overflow-hidden rounded-[2px] bg-white/5"
+                className="animate-develop group relative block aspect-[3/2] overflow-hidden rounded-[2px] bg-white/5 ring-1 ring-white/15 transition-transform duration-200 hover:-translate-y-0.5 focus-visible:-translate-y-0.5"
                 style={{ animationDelay: `${150 + i * 140}ms` }}
                 aria-label={last ? t.home.openAllPhotos(photos.length) : t.home.viewPhotoBy(i + 1, p.uploadedBy)}
               >
@@ -279,7 +313,7 @@ function TripCard({ album, morph, t }: { album: Album; morph: boolean; t: Dict }
         album={album}
         sizes="256px"
         morph={morph}
-        className="p-1.5 transition-transform duration-200 group-hover:-translate-y-1"
+        className="p-1.5 transition-[transform,box-shadow] duration-200 group-hover:-translate-y-1 group-hover:rotate-[0.6deg] group-hover:shadow-hard-lg"
       />
       <span className="mt-2.5 block truncate font-display text-lg font-bold tracking-[-0.01em] group-hover:text-accent">
         {album.title}

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Avatar } from "@/components/Avatar";
+import { CountUp } from "@/components/CountUp";
 import { TopUploaders, TripsByYear } from "@/components/DashboardCharts";
-import { IconPlay } from "@/components/Icons";
+import { IconFilm, IconImage, IconPin, IconPlay } from "@/components/Icons";
 import { PageHero } from "@/components/PageHero";
 import { SmartImage } from "@/components/SmartImage";
 import { VideoQueue } from "@/components/VideoQueue";
@@ -63,14 +64,23 @@ export default async function DashboardPage() {
 
       <dl className="-mt-3 mb-14 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { value: totals.trips, label: t.dash.stat.trips(totals.trips) },
-          { value: totals.photos, label: t.dash.stat.photos(totals.photos) },
-          { value: totals.videos, label: t.dash.stat.videos(totals.videos) },
-          { value: totals.places, label: t.dash.stat.places(totals.places) },
+          { value: totals.trips, label: t.dash.stat.trips(totals.trips), tile: "var(--accent)", icon: <IconFilm size={20} /> },
+          { value: totals.photos, label: t.dash.stat.photos(totals.photos), tile: "var(--teal)", icon: <IconImage size={20} /> },
+          { value: totals.videos, label: t.dash.stat.videos(totals.videos), tile: "var(--lilac)", icon: <IconPlay size={20} /> },
+          { value: totals.places, label: t.dash.stat.places(totals.places), tile: "var(--butter)", icon: <IconPin size={20} /> },
         ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-line bg-surface px-4 py-3.5 sm:px-5 sm:py-4">
-            <dd className="font-display text-3xl font-extrabold tabular-nums sm:text-4xl">{s.value.toLocaleString(locale === "vi" ? "vi-VN" : "en-US")}</dd>
-            <dt className="mt-0.5 text-sm text-ink-soft">{s.label}</dt>
+          <div
+            key={s.label}
+            className="stat-tile min-w-0 px-4 py-3.5 sm:px-5 sm:py-4"
+            style={{ "--tile": s.tile } as CSSProperties}
+          >
+            <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg text-[var(--tile)]" style={{ background: "color-mix(in oklab, var(--tile) 16%, transparent)" }}>
+              {s.icon}
+            </span>
+            <dd className="font-display text-4xl leading-none font-extrabold sm:text-5xl">
+              <CountUp value={s.value} locale={locale} />
+            </dd>
+            <dt className="mt-1.5 text-sm text-ink-soft">{s.label}</dt>
           </div>
         ))}
       </dl>
@@ -121,9 +131,10 @@ function Section({
   card?: boolean;
 }) {
   return (
-    <section className={`${card ? "min-w-0 rounded-xl border border-line bg-surface p-5 sm:p-6" : ""} ${className}`}>
+    <section className={`${card ? "card-lift min-w-0 p-5 sm:p-6" : ""} ${className}`}>
       <h2 className="font-display text-2xl font-extrabold tracking-[-0.02em]">{title}</h2>
-      <p className="mt-1 mb-5 text-sm text-ink-soft">{note}</p>
+      <span className="mt-1.5 block h-1 w-8 rounded-full bg-edge" aria-hidden="true" />
+      <p className="mt-2 mb-5 text-sm text-ink-soft">{note}</p>
       {children}
     </section>
   );
@@ -175,7 +186,7 @@ function TheRoll({ trips, t, locale }: Roll & { t: Dict; locale: Locale }) {
                           aria-label={
                             last ? t.dash.openAllFrames(trip.total, trip.title) : t.dash.mediaFrom(f.kind === "video", trip.title)
                           }
-                          className="relative block aspect-[3/2] overflow-hidden rounded-[1px] bg-white/10 transition-[filter] hover:brightness-125"
+                          className="relative block aspect-[3/2] overflow-hidden rounded-[1px] bg-white/10 ring-1 ring-white/15 transition-[filter,transform] hover:-translate-y-0.5 hover:brightness-125 focus-visible:-translate-y-0.5"
                         >
                           <SmartImage src={f.thumbUrl} alt="" fill sizes="(max-width: 768px) 16vw, 160px" className="object-cover" />
                           {f.kind === "video" && <span className="absolute inset-x-0 bottom-0 h-[3px] bg-edge" aria-hidden="true" />}
@@ -207,6 +218,7 @@ function TheRoll({ trips, t, locale }: Roll & { t: Dict; locale: Locale }) {
 
 function Places({ rows, t, locale }: { rows: Awaited<ReturnType<typeof getPlaces>>; t: Dict; locale: Locale }) {
   if (rows.length === 0) return <p className="text-sm text-ink-soft">{t.dash.noPlaces}</p>;
+  const maxPhotos = Math.max(1, ...rows.map((p) => p.photos));
   return (
     <div className="max-h-[21rem] overflow-y-auto pr-1">
     <table className="w-full text-sm">
@@ -221,7 +233,19 @@ function Places({ rows, t, locale }: { rows: Awaited<ReturnType<typeof getPlaces
       <tbody>
         {rows.map((p) => (
           <tr key={p.location} className="border-b border-line">
-            <td className="py-2.5 font-semibold">{p.location}</td>
+            <td className="py-2.5 font-semibold">
+              {p.location}
+              {/* Thanh tỉ lệ ảnh so với địa điểm nhiều ảnh nhất */}
+              <span className="mt-1.5 block h-1 rounded-full bg-chart/15" aria-hidden="true">
+                <span
+                  className="block h-full rounded-full"
+                  style={{
+                    width: `${Math.max(3, (p.photos / maxPhotos) * 100)}%`,
+                    backgroundImage: "linear-gradient(90deg, var(--chart), color-mix(in oklab, var(--chart) 55%, var(--teal)))",
+                  }}
+                />
+              </span>
+            </td>
             <td className="py-2.5 text-right tabular-nums">{p.trips}</td>
             <td className="py-2.5 text-right tabular-nums">{p.photos}</td>
             <td className="py-2.5 pl-4 text-right text-ink-soft tabular-nums">{formatDate(p.lastTrip, locale)}</td>
